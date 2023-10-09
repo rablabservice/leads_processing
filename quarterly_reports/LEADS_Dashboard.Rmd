@@ -1,0 +1,504 @@
+---
+title: "PETCore Dashboard"
+author: "Leonardo Iaccarino"
+output: 
+  flexdashboard::flex_dashboard:
+    logo: service/logo96.png
+    orientation: rows
+    vertical_layout: scroll
+---
+
+<style>                     
+.navbar {
+  background-color:#052049;
+  border-color:#0071AD;
+}
+</style>  
+
+```{r setup, include=FALSE}
+#This loads needed libraries in the markdown environment and loads all the "Rdata" files outputted by the main script, containing generated plots and numbers, selecting the latest based on the date. The plots and numbers included in the Rdata file are loaded to the environment and inserted within the different "slots" where appropriate.
+
+library(flexdashboard)
+library(plotly)
+library(ggseg)
+
+datafiles=file.info(list.files("/Volumes/petcore/Projects/LEADS/data_f7p1/LONI_uploads/reports/", pattern="*Dashboard*", full.names = T))
+load(rownames(datafiles)[order(datafiles$mtime)][nrow(datafiles)])
+
+```
+
+Page 1
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Patients screened
+
+```{r}
+valueBox(npt_screened, icon = "fa-notes-medical", color="#F26D04")
+```
+
+### EOAD
+
+```{r}
+valueBox(neoad, icon = "fa-user",color="#052049")
+```
+
+### EOnonAD
+
+```{r}
+valueBox(neononad, 
+         icon = "fa-user",color="#007CBE")
+```
+
+### Total PET Images Processed
+
+```{r}
+valueBox(ntotalimagesproc, 
+         icon = "fa-hdd",color="#F26D04")
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Concordance visual Read vs. Quantification
+
+```{r}
+gauge(round(rate_concordance), min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(80, 100), warning = c(40, 79), danger = c(0, 39)
+))
+```
+
+### Rate Amyloid-positivity in PT
+
+```{r}
+gauge(round(rate_amypos), min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(0, 100)
+))
+```
+
+### Rate Amyloid-negativity in PT
+
+```{r}
+gauge(round(rate_amyneg), min = 0, max = 100, symbol = '%', gaugeSectors(
+  danger = c(0, 100)
+))
+```
+
+### Rate Tau-positivity in EOAD
+
+```{r}
+gauge(round(rate_tauposeoad), min = 0, max = 100, symbol = '%', gaugeSectors(
+  success = c(0, 100)
+))
+```
+
+Row
+-----------------------------------------------------------------------
+
+### FBB-PET Baseline processed data (passing QC)
+
+```{r}
+
+p_timetrend_fbb$labels$fill<-""
+p_timetrend_fbb$labels$colour<-""
+pa=ggplotly(p_timetrend_fbb)
+pa$x$data[[1]]$marker$color<- "#052049"
+pa$x$data[[2]]$marker$color<- "#007CBE"
+pa$x$data[[3]]$marker$color<- "#B4B9BF"
+pa %>% layout(legend=list(x = 100, y = 0.5, title=list(text='Cohort')))
+
+```
+
+### FTP-PET Baseline processed data (passing QC)
+
+```{r}
+
+p_timetrend_ftp$labels$fill<-""
+p_timetrend_ftp$labels$colour<-""
+pa=ggplotly(p_timetrend_ftp)
+pa$x$data[[1]]$marker$color<- "#052049"
+pa$x$data[[2]]$marker$color<- "#007CBE"
+pa$x$data[[3]]$marker$color<- "#B4B9BF"
+pa %>% layout(legend=list(x = 50, y = 0.5, title=list(text='Cohort')))
+
+```
+
+### FDG-PET processed data (passing QC)
+
+```{r}
+
+p_timetrend_fdg$labels$fill<-""
+p_timetrend_fdg$labels$colour<-""
+pa=ggplotly(p_timetrend_fdg)
+# pa$x$data[[1]]$marker$color<- "#052049"
+# pa$x$data[[2]]$marker$color<- "#007CBE"
+# pa$x$data[[3]]$marker$color<- "#B4B9BF"
+pa %>% layout(legend=list(x = 50, y = 0.5, title=list(text='Cohort')))
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Centiloids vs. Visual Read
+
+```{r}
+p_ctlsvsvisread_poscp$labels$fill<-""
+p_ctlsvsvisread_poscp$labels$colour<-""
+pa=ggplotly(p_ctlsvsvisread_poscp)
+pa$x$data[[1]]$name<-"Positive"
+pa$x$data[[2]]$name<-"Negative"
+pa %>% layout(legend=list(x = 100, y = 0.5, title=list(text='Visual Read')))
+
+```
+
+### Centiloids by cohort
+
+```{r}
+
+p_ctlsbycohort_poscp$labels$fill<-""
+p_ctlsbycohort_poscp$labels$colour<-""
+pa=ggplotly(p_ctlsbycohort_poscp)
+pa$x$data[[1]]$marker$color<- "#052049"
+pa$x$data[[2]]$marker$color<- "#007CBE"
+pa$x$data[[3]]$marker$color<- "#B4B9BF"
+pa %>% layout(legend=list(x = 50, y = 0.5, title=list(text='Cohort')))
+
+```
+
+Row
+-----------------------------------------------------------------------
+
+### FTP-PET ROI Summary
+
+```{r}
+p_ftppet_metabraak$labels$fill<-""
+p_ftppet_metabraak$labels$colour<-""
+pa=ggplotly(p_ftppet_metabraak)
+pa$x$data[[1]]$marker$color<- "#052049"
+pa$x$data[[2]]$marker$color<- "#007CBE"
+pa$x$data[[3]]$marker$color<- "#B4B9BF"
+pa %>% layout(legend=list(x = 50, y = 0.5, title=list(text='Cohort')))
+
+```
+
+### FTP-PET metaROI vs. Centiloids
+
+```{r}
+p_metaroiamyctls_all$labels$fill<-""
+p_metaroiamyctls_all$labels$colour<-""
+pa=ggplotly(p_metaroiamyctls_all)
+pa$x$data[[1]]$marker$color<- "#052049"
+pa$x$data[[2]]$marker$color<- "#007CBE"
+pa$x$data[[3]]$marker$color<- "#B4B9BF"
+pa %>% layout(legend=list(x = 50, y = 0.5, title=list(text='Cohort')))
+
+```
+
+Page 2
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### Average FBB-PET SUVR in EOAD
+
+```{r}
+p_fbb_eoad
+```
+
+### Average FTP-PET SUVR in EOAD
+
+```{r}
+p_ftp_eoad
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Average FBB-PET SUVR in EOnonAD
+
+```{r}
+p_fbb_eononad
+```
+
+### Average FTP-PET SUVR in EOnonAD
+
+```{r}
+p_ftp_eononad
+```
+
+Row
+-----------------------------------------------------------------------
+
+### Average FBB-PET SUVR in CN
+
+```{r}
+p_fbb_cn
+```
+
+### Average FTP-PET SUVR in CN
+
+```{r}
+p_ftp_cn
+```
+
+
+Page 3
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### N Patients with longitudinal FBB-PET
+
+```{r}
+valueBox(nlongfbb, icon = "fa-hourglass", color="#F26D04")
+```
+
+### N Patients with longitudinal FTP-PET
+
+```{r}
+
+valueBox(nlongftp, icon = "fa-hourglass", color="#F26D04")
+
+```
+
+### N Patients with longitudinal FBB-PET & FTP-PET
+
+```{r}
+
+valueBox(nlongfbbftp, icon = "fa-hourglass", color="#F26D04")
+
+```
+
+Row {data-height=600}
+-----------------------------------------------------------------------
+
+### Longitudinal FBB-PET Centiloid
+
+```{r}
+ggplotly(fbblg_plot2, tooltip=c("age","MRIBASED_Composite_Centiloids"))
+```
+
+### Longitudinal FTP-PET MetaROI
+
+```{r}
+ggplotly(ftplg_plot2, tooltip=c("age","MetaROI_MRIBASED_SUVR"))
+```
+
+
+Row {data-height=250}
+-----------------------------------------------------------------------
+
+### FBB-PET Composite
+
+```{r}
+
+p_amyctls_change$labels$title<-""
+ggplotly(p_amyctls_change)
+
+```
+
+### FBB-PET Frontal
+
+```{r}
+p_amyfrontalsuvr_change$labels$title<-""
+ggplotly(p_amyfrontalsuvr_change)
+
+```
+
+### FBB-PET Parietal
+
+```{r}
+p_amyparietalsuvr_change$labels$title<-""
+ggplotly(p_amyparietalsuvr_change)
+
+```
+
+### FBB-PET Temporal
+
+```{r}
+p_amytemporalsuvr_change$labels$title<-""
+ggplotly(p_amytemporalsuvr_change)
+
+```
+
+### FBB-PET Occipital
+
+```{r}
+p_amyoccipitalsuvr_change$labels$title<-""
+ggplotly(p_amyoccipitalsuvr_change)
+
+```
+
+### FBB-PET Cingulate
+
+```{r}
+p_amycingulatesuvr_change$labels$title<-""
+ggplotly(p_amycingulatesuvr_change)
+
+```
+
+Row {data-height=250}
+-----------------------------------------------------------------------
+
+### FTP-PET metaROI
+
+```{r}
+p_ftpmeta_change$labels$title<-""
+ggplotly(p_ftpmeta_change)
+
+```
+
+### FTP-PET Frontal
+
+```{r}
+p_ftpfrontalsuvr_change$labels$title<-""
+ggplotly(p_ftpfrontalsuvr_change)
+
+```
+
+### FTP-PET Parietal
+
+```{r}
+p_ftpparietalsuvr_change$labels$title<-""
+ggplotly(p_ftpparietalsuvr_change)
+
+```
+
+### FTP-PET Temporal
+
+```{r}
+p_ftptemporalsuvr_change$labels$title<-""
+ggplotly(p_ftptemporalsuvr_change)
+
+```
+
+### FTP-PET Occipital
+
+```{r}
+p_ftpoccipitalsuvr_change$labels$title<-""
+ggplotly(p_ftpoccipitalsuvr_change)
+
+```
+
+### FTP-PET Cingulate
+
+```{r}
+p_ftpcingulatesuvr_change$labels$title<-""
+ggplotly(p_ftpcingulatesuvr_change)
+
+```
+
+Row {data-height=250}
+-----------------------------------------------------------------------
+
+### Summary Ann. change
+
+```{r}
+p_centmeta_change$labels$title<-""
+ggplotly(p_centmeta_change)
+
+```
+
+### Frontal Ann. change
+
+```{r}
+p_frontal_change$labels$title<-""
+ggplotly(p_frontal_change)
+
+```
+
+### Parietal Ann. change
+
+```{r}
+p_parietal_change$labels$title<-""
+ggplotly(p_parietal_change)
+
+```
+
+### Temporal Ann. change
+
+```{r}
+p_temporal_change$labels$title<-""
+ggplotly(p_temporal_change)
+
+```
+
+### Occipital Ann. change
+
+```{r}
+p_occipital_change$labels$title<-""
+ggplotly(p_occipital_change)
+
+```
+
+### Cingulate Ann. change
+
+```{r}
+p_cingulate_change$labels$title<-""
+ggplotly(p_cingulate_change)
+
+```
+
+Page 4
+=======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### N Patients with longitudinal FBB-PET
+
+```{r}
+valueBox(nlongfbb, icon = "fa-hourglass", color="#F26D04")
+```
+
+### N Patients with longitudinal FTP-PET
+
+```{r}
+
+valueBox(nlongftp, icon = "fa-hourglass", color="#F26D04")
+
+```
+
+### N Patients with longitudinal FBB-PET & FTP-PET
+
+```{r}
+
+valueBox(nlongfbbftp, icon = "fa-hourglass", color="#F26D04")
+
+```
+
+Row {data-height=600}
+-----------------------------------------------------------------------
+
+### Longitudinal FBB-PET Centiloid by APOE
+
+```{r}
+ggplotly(fbblg_plot2_apoe,tooltip=c("age","MRIBASED_Composite_Centiloids","APOEpos"))
+```
+
+### Longitudinal FTP-PET MetaROI by APOE
+
+```{r}
+ggplotly(ftplg_plot2_apoe,tooltip=c("age","MetaROI_MRIBASED_SUVR","APOEpos"))
+```
+
+Row {data-height=600}
+-----------------------------------------------------------------------
+
+### Longitudinal FBB-PET Centiloid by CDR
+
+```{r}
+ggplotly(fbblg_plot2_cdr,tooltip=c("age","MRIBASED_Composite_Centiloids","CDRtot"))
+```
+
+### Longitudinal FTP-PET MetaROI by CDR
+
+```{r}
+ggplotly(ftplg_plot2_cdr,tooltip=c("age","MetaROI_MRIBASED_SUVR","CDRtot"))
+```
+
