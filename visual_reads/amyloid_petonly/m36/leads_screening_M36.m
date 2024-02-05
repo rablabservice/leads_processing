@@ -1,6 +1,6 @@
 %%% Master script to deal with EOnonAD M36 amyloid PET within LEADS project.
 %%% Nidhi Mundada, UCSF; nidhi.mundada@ucsf.edu
-%%% Derived from LEADS Screening Script 
+%%% Derived from LEADS Screening Script
 %%% April 2022
 
 %%% Restore maltlab defaults %% Nidhi May 2022
@@ -24,9 +24,9 @@ rois={'/mnt/coredata/Projects/LEADS/screening_M36/service/ROI/Cingulate.nii', ..
     '/mnt/coredata/Projects/LEADS/screening_M36/service/ROI/Parietal.nii', ...
     '/mnt/coredata/Projects/LEADS/screening_M36/service/ROI/Temporal.nii', ...
     '/mnt/coredata/Projects/LEADS/screening_M36/service/ROI/WholeCerebellum.nii'}';
-    
 
-%%% Load the table 
+
+%%% Load the table
 db=readtable(db_file); % Reads the database that should have been updated after the last analysis
 
 %%% Get list of images already screened
@@ -37,7 +37,7 @@ newimgs=dir(strcat(dwndir,'LDS*')); newimgs={newimgs.name}';
 
 %%% Get the subset of images that were uploaded and indeed have not been
 %%% screened yet
-newimgs = setdiff(newimgs, allimgs); 
+newimgs = setdiff(newimgs, allimgs);
 
 % Process new scans if any
 if isempty(newimgs)==0
@@ -45,26 +45,26 @@ if isempty(newimgs)==0
 newdb={};
 
     for i=1:size(newimgs,1)
-    
-    % module to convert DICOM to NIFTI since LONI change 
+
+    % module to convert DICOM to NIFTI since LONI change
     % June 2023; nidhi.mundada@ucsf.edu
     dcmdir=dir(strcat(dwndir, newimgs{i,1},'/*/*/*/*.dcm'));
     dcmdir=dcmdir.folder;
     cd (dcmdir)
     dicm2nii(pwd,pwd,'3D.nii;')
-    
+
     cd('/mnt/coredata/Projects/LEADS/screening_M36/')
-    
+
     % Create new output directory
     newscrdir=char(strcat(scrdir,cellstr(newimgs{i}))); mkdir(newscrdir);
-    
+
     % grab the image
     oldfname=dir(strcat(dwndir,newimgs{i},'/*/*/*/*.nii')); oldfname=strcat(oldfname.folder,'/',oldfname.name);
-    
+
     % move and rename file
     temp_img=strcat(newscrdir,'/',newimgs{i},'.nii');
     movefile(oldfname,temp_img); %% renamed and moved the file to the output folder
-    
+
     % Create dir in which to store the quantification result
     mkdir(strcat(newscrdir,'/quantification/results'))
 
@@ -104,7 +104,7 @@ newdb={};
     new_wimg=strcat(newscrdir,'/w',newimgs{i},'.nii');
     img=spm_vol(new_wimg);
     imgv=spm_read_vols(img);
-    
+
     % extract values from ROIs
     for f = 1:size(rois,1) % Looping through the ROIs
       roi=spm_vol(rois{f,:}); % Reading img header from the loop
@@ -116,7 +116,7 @@ newdb={};
       vals(f)=ext_val; % Store values for the individual ROIs across the images
       clear roi roiv img_mask temp ext_val
     end % end for loop for each macrolobar ROI needed for screening
-    
+
     %%%% Store results of extraction and compute mean and suvr, plus amyloid
     %%%% positivity based on quantification
 
@@ -125,14 +125,14 @@ newdb={};
     tvals.composite_suvr=tvals.composite./tvals.wholecerebellum;
     tvals.amypos_quant(tvals.composite_suvr >= 1.18) = 1; % Cut-off threshold based on the new ADNI72 Validation
 
-    %%%%% Create a table to store substrings of filenames 
+    %%%%% Create a table to store substrings of filenames
     dems=table(newimgs(i),cellstr(newimgs{i}(4:6)),cellstr(newimgs{i}(7:end)),'VariableNames',{'filename' 'site' 'atri_id'});
 
     %%%%%% Append to new database %%%%%%%
 
     demstvals=[dems tvals]; %% combine filename,site and id with calculations
-    newdb=vertcat(newdb,demstvals); 
-    
+    newdb=vertcat(newdb,demstvals);
+
     %%% create quantification output %%%
     acq_date=strsplit(oldfname,'/'); acq_date=acq_date{10}(1:10);
     quant=table(newimgs(i),cellstr(acq_date),tvals.composite_suvr, 1.18, tvals.amypos_quant,'VariableNames',{'filename' 'Date_FBB' 'Composite_Score','Threshold','Amy_Positivity'});
@@ -142,7 +142,7 @@ newdb={};
     %%%%%%%%%%% Create warped SUVR images %%%%%%%%%%%%%
 
     suvr_wfname=char(strcat(newscrdir,'/SUVR_w',cellstr(newimgs{i})));
-    exp=char(strcat('i1./',num2str(tvals.wholecerebellum(1)))); 
+    exp=char(strcat('i1./',num2str(tvals.wholecerebellum(1))));
 
     clear matlabbatch;
     spm('defaults','PET');
@@ -154,11 +154,11 @@ newdb={};
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
     spm_jobman('run',matlabbatch); clear matlabbatch;
-    
+
     suvr_fname=char(strcat(newscrdir,'/SUVR_',cellstr(newimgs{i})));
-    
+
     clear matlabbatch;
     spm('defaults','PET');
     matlabbatch{1}.spm.util.imcalc.input = cellstr(temp_img);
@@ -169,11 +169,11 @@ newdb={};
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
     spm_jobman('run',matlabbatch); clear matlabbatch;
 
     clear dicmdir newscrdir temp_img oldfname newfname new_wimg img imgv tvals dems demstvals acq_date quant quantfile suvr_wfname exp suvr_fname
-    
+
     end % end for loop for each new image
 
 % Write the updated database
@@ -201,10 +201,10 @@ clear;
 close all;
 
 else
-    
+
     clear;
     close all
-    fprintf(1,'No new images were found. Analyses are up-to-date!\n');  
+    fprintf(1,'No new images were found. Analyses are up-to-date!\n');
 
 end % end if condition there are images that need to be screened
 

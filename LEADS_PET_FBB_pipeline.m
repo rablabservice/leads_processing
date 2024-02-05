@@ -33,7 +33,7 @@ r1n=spm_vol(aparcscan); % reading the aparc-aseg
 r1=spm_read_vols(r1n);
 
 img=spm_vol(rfbbscan); % Reading the coregistered fbb scan we just estimated
-img1=spm_read_vols(img); 
+img1=spm_read_vols(img);
 
 %%% Extract ref region and macroregion values %%%
 
@@ -48,12 +48,12 @@ Maccpcc_sz = zeros(1,size(ind_accpcc,1));
           temp=temp(~isnan(temp));
           ext_val=mean(temp);
           vec(f)=ext_val; % Store values for the individual ROIs across the images
-          vec_sz(f)=size(temp,1);             
+          vec_sz(f)=size(temp,1);
     end % end for loop for each accpcc ROI
-    
+
           Maccpcc(1,:)=vec; % save the values ROI-wise (column-wise)
           Maccpcc_sz(1,:)=vec_sz;  % save the roi size
-          
+
 clear vec;
 clear vec_sz;
 
@@ -68,9 +68,9 @@ Mfront_sz = zeros(1,size(ind_front,1));
           temp=temp(~isnan(temp));
           ext_val=mean(temp);
           vec(f)=ext_val; % Store values for the individual ROIs across the images
-          vec_sz(f)=size(temp,1);             
+          vec_sz(f)=size(temp,1);
     end % end for loop for each front ROI
-    
+
           Mfront(1,:)=vec; % save the values ROI-wise (column-wise)
           Mfront_sz(1,:)=vec_sz;  % save the roi size
 clear vec;
@@ -87,9 +87,9 @@ Mtemp_sz = zeros(1,size(ind_temp,1));
           temp=temp(~isnan(temp));
           ext_val=mean(temp);
           vec(f)=ext_val; % Store values for the individual ROIs across the images
-          vec_sz(f)=size(temp,1);             
+          vec_sz(f)=size(temp,1);
     end % end for loop for each temp ROI
-    
+
           Mtemp(1,:)=vec; % save the values ROI-wise (column-wise)
           Mtemp_sz(1,:)=vec_sz;  % save the roi size
 clear vec;
@@ -106,12 +106,12 @@ Mpariet_sz = zeros(1,size(ind_pariet,1));
           temp=temp(~isnan(temp));
           ext_val=mean(temp);
           vec(f)=ext_val; % Store values for the individual ROIs across the images
-          vec_sz(f)=size(temp,1);             
+          vec_sz(f)=size(temp,1);
     end % end for loop for each pariet ROI
-    
+
           Mpariet(1,:)=vec; % save the values ROI-wise (column-wise)
           Mpariet_sz(1,:)=vec_sz;  % save the roi size
-                 
+
 clear vec;
 clear vec_sz;
 
@@ -126,12 +126,12 @@ Mcbl_sz = zeros(1,size(ind_cbl,1));
           temp=temp(~isnan(temp));
           ext_val=mean(temp);
           vec(f)=ext_val; % Store values for the individual ROIs across the images
-          vec_sz(f)=size(temp,1);             
+          vec_sz(f)=size(temp,1);
     end % end for loop for each cbl ROI
-    
+
           Mcbl(1,:)=vec; % save the values ROI-wise (column-wise)
           Mcbl_sz(1,:)=vec_sz;  % save the roi size
-                 
+
 clear vec;
 clear vec_sz;
 
@@ -162,7 +162,7 @@ matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
 matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{1}.spm.util.imcalc.options.mask = 0;
 matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
 matlabbatch{2}.spm.util.imcalc.input = cellstr(rfbbscan);
 matlabbatch{2}.spm.util.imcalc.output = newfname;
 matlabbatch{2}.spm.util.imcalc.outdir = {''};
@@ -171,7 +171,7 @@ matlabbatch{2}.spm.util.imcalc.var = struct('name', {}, 'value', {});
 matlabbatch{2}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{2}.spm.util.imcalc.options.mask = 0;
 matlabbatch{2}.spm.util.imcalc.options.interp = 1;
-matlabbatch{2}.spm.util.imcalc.options.dtype = 4;
+matlabbatch{2}.spm.util.imcalc.options.dtype = spm_type('float32');
 spm_jobman('run',matlabbatch); clear matlabbatch;
 
 %%% New module to extract a global score with the new methods %%%
@@ -206,7 +206,7 @@ spm_jobman('run',matlabbatch); clear matlabbatch;
 
 %%%%% code to create Multi-axial views for reporting %%%%
 
-% 1. SUVR 
+% 1. SUVR
 [pp,ff,~]=spm_fileparts(newfname);
 slovname=char(strcat(pp,'/Multiaxial_',ff,'.pdf'));
 o = slover;
@@ -222,7 +222,7 @@ o = fill_defaults (o);
 o.slices = -30:6:58;
 o = paint(o);
 crdate=char(pp(size(pp,2)-9:end)); crid=char(ff(1:10));
-jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FBB-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');            
+jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FBB-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
 hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
@@ -252,7 +252,7 @@ o = fill_defaults (o);
 o.slices = -32:8:30;
 o = paint(o);
 
-jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FBB-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');            
+jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FBB-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
 hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);

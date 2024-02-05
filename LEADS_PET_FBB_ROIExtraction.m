@@ -36,7 +36,7 @@ tdb_fbb_longFBB=tdb_fbb;
 olddb=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_ROI_Extraction*');
 
     if size(olddb,1)>0
-    
+
     olddb=struct2cell(olddb)';
     olddb=olddb(:,[1 3]);
     olddb=array2table(olddb);
@@ -89,26 +89,26 @@ olddb=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_ROI_Extraction*
                         filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/RemovedbutKept_Cases_FBB_ROI_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
                         writetable(remcases,filename,'WriteRowNames',true)
                 end % end if condition choice on removed cases
-                
+
                 clear choice filename
 
             end % end if condition existence of removed cases
-            
+
             elseif checkinfo==1
-                
+
                 fprintf(2,'No new FBB scans needed extraction!\n');
                 tdb_fbb={};
-                
+
          end % end if condition there is a difference between old extraction and new extraction list
-        
+
     end % end if condition there is a previous FBB extraction database available
-    
+
 % To be safe, let's separately scan also the longitudinal database
 
 olddb_longFBB=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_CompWM_Extraction*');
 
     if size(olddb_longFBB,1)>0
-    
+
     olddb_longFBB=struct2cell(olddb_longFBB)';
     olddb_longFBB=olddb_longFBB(:,[1 3]);
     olddb_longFBB=array2table(olddb_longFBB);
@@ -160,30 +160,30 @@ olddb_longFBB=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_CompWM_
                         fprintf(1,'Fine! I will still save a csv file to keep track of that.\n\n');
                         filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/RemovedbutKept_Cases_FBB_CompWM_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
                         writetable(remcases_longFBB,filename,'WriteRowNames',true)
-                        
+
                 end % end if condition choice on removed cases
-                
+
                 clear choice filename
 
             end % end if condition existence of removed cases
-                        
+
             elseif checkinfo==1
-                
+
                 fprintf(2,'No new FBB scans needed longitudinal extraction!\n');
                 tdb_fbb_longFBB={};
-                
+
          end % end if condition there is a difference between old extraction and new extraction list
-        
+
     end % end if condition there is a previous FBB Longitudinal extraction database available
-    
+
 
 
     if size(tdb_fbb,1)>0
-    
+
 %%% Time to extract with lists we have
 
 % 1. Cross-sectional Module
-    
+
 %%% Create the list of regions we are interested in, plus creating labels
 
 fsids=[2; 4;	5;	7;	8;	10;	11;	12;	13;	14;	15;	16;	17;	18;	24;	26;	28;	30;	31;	41;	43;	44;	46;	47;	49;	50;	51;	52;	53;	54;	58;	60;	62;	63;	72;	77;	80;	85;	251;	252;	253;	254;	255;	1000;	1001;	1002;	1003;	1005;	1006;	1007;	1008;	1009;	1010;	1011;	1012;	1013;	1014;	1015;	1016;	1017;	1018;	1019;	1020;	1021;	1022;	1023;	1024;	1025;	1026;	1027;	1028;	1029;	1030;	1031;	1032;	1033;	1034;	1035;	2000;	2001;	2002;	2003;	2005;	2006;	2007;	2008;	2009;	2010;	2011;	2012;	2013;	2014;	2015;	2016;	2017;	2018;	2019;	2020;	2021;	2022;	2023;	2024;	2025;	2026;	2027;	2028;	2029;	2030;	2031;	2032;	2033;	2034;	2035];
@@ -202,23 +202,23 @@ aparcs = char(tdb_fbb(:,2));
 aparc_spm = tdb_fbb(:,2);
 
 %% Extraction section
-                    
+
 regs = fsids; % We are extracting from all the 113 regions included in the object fsids
 numf1=size(regs,1);
 
 M = zeros(numv1,numf1); % create empty matrix in which to store values from all the ROIs
-M_sz = zeros(numv1,numf1);  
+M_sz = zeros(numv1,numf1);
 
 M_refreg=zeros(numv1,1); % creating an empty matrix storing ref region extraction
-M_refreg_sz=zeros(numv1,1); 
-                           
+M_refreg_sz=zeros(numv1,1);
+
 for v = 1:numv1 % Reading each image
 
 r1n=spm_vol(aparcs(v,:)); % reading the aparc-aseg
 r1=spm_read_vols(r1n);
 
-img=spm_vol(vols(v,:)); % Reading img header 
-img1=spm_read_vols(img); % Reading img values 
+img=spm_vol(vols(v,:)); % Reading img header
+img1=spm_read_vols(img); % Reading img values
 
 [~,f,e]=spm_fileparts(vols(v,:));
 tempfname=char(strcat(f,e));
@@ -235,7 +235,7 @@ for f = 1:size(ind_accpcc,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_amy(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_amy_sz(f)=size(temp,1);             
+      vec_amy_sz(f)=size(temp,1);
 end
       Maccpcc(1,:)=vec_amy; % save the values ROI-wise (column-wise)
       Maccpcc_sz(1,:)=vec_amy_sz;  % save the roi size
@@ -253,7 +253,7 @@ for f = 1:size(ind_front,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_amy(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_amy_sz(f)=size(temp,1);             
+      vec_amy_sz(f)=size(temp,1);
 end
       Mfront(1,:)=vec_amy; % save the values ROI-wise (column-wise)
       Mfront_sz(1,:)=vec_amy_sz;  % save the roi size
@@ -271,7 +271,7 @@ for f = 1:size(ind_temp,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_amy(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_amy_sz(f)=size(temp,1);             
+      vec_amy_sz(f)=size(temp,1);
 end
       Mtemp(1,:)=vec_amy; % save the values ROI-wise (column-wise)
       Mtemp_sz(1,:)=vec_amy_sz;  % save the roi size
@@ -289,7 +289,7 @@ for f = 1:size(ind_pariet,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_amy(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_amy_sz(f)=size(temp,1);             
+      vec_amy_sz(f)=size(temp,1);
 end
       Mpariet(1,:)=vec_amy; % save the values ROI-wise (column-wise)
       Mpariet_sz(1,:)=vec_amy_sz;  % save the roi size
@@ -308,7 +308,7 @@ for f = 1:size(ind_cbl,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_amy(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_amy_sz(f)=size(temp,1);             
+      vec_amy_sz(f)=size(temp,1);
 end
       Mcbl(1,:)=vec_amy; % save the values ROI-wise (column-wise)
       Mcbl_sz(1,:)=vec_amy_sz;  % save the roi size
@@ -331,7 +331,7 @@ end
 allmacros_comp=[wmean_accpcc wmean_front wmean_temp wmean_pariet];
 compsuvr=(mean(allmacros_comp))/wmean_cbl;
 
-%%% Module for new global score 
+%%% Module for new global score
 
 [sz1,sz2,sz3]=size(img1);
 rsuvr=reshape(img1,sz1*sz2*sz3,1);
@@ -353,7 +353,7 @@ ind2=find((rparc==1003 | rparc==1012 | rparc==1014 ...
 
 compsuvr_t2=mean(rsuvr(ind2));
 
-%%% 
+%%%
 
 allmacros(v,:)=[compsuvr_t2 compsuvr wmean_accpcc wmean_front wmean_temp wmean_pariet wmean_cbl];
 allmacros_sz(v,:)=[size_accpcc size_front size_temp size_pariet size_cbl];
@@ -377,7 +377,7 @@ M(v,:)=vec; % save the values ROI-wise (column-wise)
 M_sz(v,:)=vec_sz;  % save the roi size
 
 %%%% Small module to get reference region
-%%%% values 
+%%%% values
 
 templdsid=regexp(vols_spm(v),'LDS\d{7}','match','once');
 tempfbbdate=regexp(vols_spm(v),'\d{4}-\d{2}-\d{2}','match','once');
@@ -404,8 +404,8 @@ refreg_sz=size(temp,1);
 M_refreg(v,1)=refregval;
 M_refreg_sz(v,1)=refreg_sz;
 
-clear r1n r1 img img1 p f e Maccpcc Maccpcc_sz Mfront Mfront_sz Mtemp Mtemp_sz Mpariet Mpariet_sz Mcbl Mcbl_sz wmean_accpcc wmean_front wmean_temp wmean_pariet wmean_cbl size_accpcc size_front size_temp size_pariet size_cbl allmacros_comp compsuvr rsuvr raparc ind2 compsuvr_t2 templdsid tempfbbdate tempfbbfold temptimepoint refreg tempsuv refregn regreg1 suv suv1 mask suv_mask temp refregval refreg_sz 
-             
+clear r1n r1 img img1 p f e Maccpcc Maccpcc_sz Mfront Mfront_sz Mtemp Mtemp_sz Mpariet Mpariet_sz Mcbl Mcbl_sz wmean_accpcc wmean_front wmean_temp wmean_pariet wmean_cbl size_accpcc size_front size_temp size_pariet size_cbl allmacros_comp compsuvr rsuvr raparc ind2 compsuvr_t2 templdsid tempfbbdate tempfbbfold temptimepoint refreg tempsuv refregn regreg1 suv suv1 mask suv_mask temp refregval refreg_sz
+
 end
 
 % creating the tables that will be merged together and concatenated to the
@@ -438,7 +438,7 @@ qc=horzcat(vols_spm, aparc_spm);
 T_qc=array2table(qc);
 T_qc.Properties.VariableNames={'FBBPET_path','APARC_path'};
 
-T=[T_meta T_qc T_refreg T_macros T T_refreg_sz T_macros_sz T_sz]; 
+T=[T_meta T_qc T_refreg T_macros T T_refreg_sz T_macros_sz T_sz];
 
 if size(newcases,1)>0
 T=vertcat(oldinfo,T);
@@ -447,8 +447,8 @@ end % end if condition this is a batch of new images that have to be appended to
 % export database
 filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_ROI_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
 writetable(T,filename,'WriteRowNames',true)
-copyfile(filename,'/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service/'); % copy in the shared drive for report generation in R            
- 
+copyfile(filename,'/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service/'); % copy in the shared drive for report generation in R
+
     end % end if condition new images need extraction
 
 % 2. Longitudinal Module
@@ -465,21 +465,21 @@ M_suvr_longFBB=zeros(size(fbbscans_longFBB,1),1);
 M_sz_longFBB = zeros(size(fbbscans_longFBB,1),1);
 
 for i=1:size(fbbscans_longFBB,1)
-   
+
     fprintf(1,'Now starting Longitudinal processing for %s\n',fbbscans_longFBB_spm{i});
-    
+
     tempimg=fbbscans_longFBB_spm{i};
     tempaparc=aparcscans_longFBB_spm{i};
-    
+
     % working on the pieces needed
     % 1. WM parcellation from the aparc, smooth and threshold
-    
+
     [appath,apfname,~]=spm_fileparts(char(tempaparc));
     wmaparcfname=strcat(appath,'/',apfname,'_wm.nii');
     swmaparcfname=strcat(appath,'/s',apfname,'_wm.nii');
     swmaparcfnamethres=strcat(appath,'/s',apfname,'_wm_thr0p7.nii');
     tempnu=strcat(appath,'/',apfname(1:29),'nu.nii');
-    
+
     spm('defaults','PET');
     matlabbatch{1}.spm.util.imcalc.input = cellstr(tempaparc);
     matlabbatch{1}.spm.util.imcalc.output = char(wmaparcfname);
@@ -489,7 +489,7 @@ for i=1:size(fbbscans_longFBB,1)
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
     matlabbatch{2}.spm.spatial.smooth.data = cellstr(wmaparcfname);
     matlabbatch{2}.spm.spatial.smooth.fwhm = [8 8 8];
     matlabbatch{2}.spm.spatial.smooth.dtype = 0;
@@ -503,18 +503,18 @@ for i=1:size(fbbscans_longFBB,1)
     matlabbatch{3}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{3}.spm.util.imcalc.options.mask = 0;
     matlabbatch{3}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{3}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{3}.spm.util.imcalc.options.dtype = spm_type('uint8');
     spm_jobman('run',matlabbatch); clear matlabbatch;
-    
+
     % Send QC multislice to the shared petcore
-    
+
     tempbs_wm_slovname=quickmultislice3(tempnu, char(swmaparcfnamethres),'axial','nih.lut','0.5 1.5','-30 6 58');
     copyfile(tempbs_wm_slovname,path_qccompwm);
-    
-    % 2. Isolate Brainstem 
-    
+
+    % 2. Isolate Brainstem
+
     bsaparcfname=strcat(appath,'/',apfname,'_bs.nii');
-    
+
     spm('defaults','PET');
     matlabbatch{1}.spm.util.imcalc.input = cellstr(tempaparc);
     matlabbatch{1}.spm.util.imcalc.output = char(bsaparcfname);
@@ -524,15 +524,15 @@ for i=1:size(fbbscans_longFBB,1)
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
     spm_jobman('run',matlabbatch); clear matlabbatch;
-    
+
     % 3. combine WM, bs and wcbl that has to be already there
-    
+
     compwmfname=strcat(appath,'/compwm_ref_mask.nii');
-    
+
     compwmfs=vertcat(swmaparcfnamethres,bsaparcfname,cellstr(strcat(appath,'/wholecbl_ref_mask.nii')));
-    
+
     spm('defaults','PET');
     matlabbatch{1}.spm.util.imcalc.input = compwmfs;
     matlabbatch{1}.spm.util.imcalc.output = char(compwmfname);
@@ -542,43 +542,43 @@ for i=1:size(fbbscans_longFBB,1)
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
     spm_jobman('run',matlabbatch); clear matlabbatch;
-    
+
     % Grab the rSCAN to get the scaling factor to be saved in the database
-    
+
     [imgpath,imgfname,~]=spm_fileparts(char(tempimg));
-    
+
     rimgfname=strcat(imgpath,'/r',imgfname(1:end-9),'.nii');
-    
+
     % Extract value
-    
-    roi=spm_vol(char(strcat(appath,'/compwm_ref_mask.nii'))); 
+
+    roi=spm_vol(char(strcat(appath,'/compwm_ref_mask.nii')));
     roi1=spm_read_vols(roi);
-    
+
     img=spm_vol(rimgfname); % Reading img header from the loop
-  img1=spm_read_vols(img); % Reading img values 
+  img1=spm_read_vols(img); % Reading img values
   img_mask=img1.*roi1; % Creating the masked image
   img_mask=nonzeros(img_mask);
   img_mask=img_mask(~isnan(img_mask));
   ext_val=mean(img_mask);
-  
+
   M_longFBB(i,1)=ext_val;
-  
+
   % Extract value from suvr image
-  
+
   imgsuvr=spm_vol(char(tempimg)); % Reading imgsuvr header from the loop
-  imgsuvr1=spm_read_vols(imgsuvr); % Reading imgsuvr values 
+  imgsuvr1=spm_read_vols(imgsuvr); % Reading imgsuvr values
   imgsuvr_mask=imgsuvr1.*roi1; % Creating the masked image
   imgsuvr_mask=nonzeros(imgsuvr_mask);
   imgsuvr_mask=imgsuvr_mask(~isnan(imgsuvr_mask));
   ext_val_suvr=mean(imgsuvr_mask);
   M_suvr_longFBB(i,1)=ext_val_suvr;
-  
+
   M_sz_longFBB(i,1)=size(img_mask,1);
-  
+
   % Create the new suvr image, last thing I want
-      
+
     exp=char(strcat('i1/',num2str(ext_val)));
     newfname=char(strcat(imgpath,'/',imgfname(1:end-9),'_suvr_compWM.nii'));
 
@@ -591,11 +591,11 @@ for i=1:size(fbbscans_longFBB,1)
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
     spm_jobman('run',matlabbatch); clear matlabbatch;
 
-    clear apfname appath tempnu bsaparcfname compwmfname compwmfs exp ext_val ext_val_suvr img img1 img_mask imgfname imgpath newfname rimgfname roi roi1 swmaparcfname swmaparcfnamethres tempaparc tempimg wmaparcfname 
-    
+    clear apfname appath tempnu bsaparcfname compwmfname compwmfs exp ext_val ext_val_suvr img img1 img_mask imgfname imgpath newfname rimgfname roi roi1 swmaparcfname swmaparcfnamethres tempaparc tempimg wmaparcfname
+
 end % end for each new image to be processed longitudinally
 
 T_longFBB=array2table(M_longFBB);
@@ -617,7 +617,7 @@ qc_longFBB=horzcat(fbbscans_longFBB_spm, aparcscans_longFBB_spm);
 T_qc_longFBB=array2table(qc_longFBB);
 T_qc_longFBB.Properties.VariableNames={'FBBPET_path','APARC_path'};
 
-T_longFBB=[T_meta_longFBB T_qc_longFBB T_longFBB Tsuvr_longFBB T_sz_longFBB]; 
+T_longFBB=[T_meta_longFBB T_qc_longFBB T_longFBB Tsuvr_longFBB T_sz_longFBB];
 
 if size(newcases_longFBB,1)>0
 T_longFBB=vertcat(oldinfo_longFBB,T_longFBB);
@@ -632,6 +632,6 @@ end % end if condition existence of files in need of longitudinal extraction
 
 % Done, wrapping up - clear everything before proceeding to the FTP ROI
 % Extraction
-            
+
 clearvars -except tdb_ftp tdb_fdg path_processed path_extraction path_qccompwm
 fprintf(1,'**Completed ROI and Longitudinal extraction for all the FBB SUVR images available!\n');

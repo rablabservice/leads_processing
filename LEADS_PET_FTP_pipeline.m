@@ -31,7 +31,7 @@ copyfile('/mnt/coredata/Projects/LEADS/script_f7p1/templates/rCerebellum-SUIT.ni
 
 spm('defaults','PET');
 clear matlabbatch;
-matlabbatch{1}.spm.spatial.normalise.write.subj.def = cellstr(strcat(pathftp,'/y_revnorm.nii')); 
+matlabbatch{1}.spm.spatial.normalise.write.subj.def = cellstr(strcat(pathftp,'/y_revnorm.nii'));
 matlabbatch{1}.spm.spatial.normalise.write.subj.resample = cellstr(strcat(pathftp,'/rCerebellum-SUIT.nii'));
 matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70
                                                           78 76 85];
@@ -46,8 +46,8 @@ matlabbatch{2}.spm.spatial.coreg.write.roptions.mask = 0;
 matlabbatch{2}.spm.spatial.coreg.write.roptions.prefix = 'r';
 spm_jobman('run',matlabbatch); clear matlabbatch;
 
-%%% we have the reverse normalized SUIT template now. 
-%%% Let's take into account the aparc+aseg 
+%%% we have the reverse normalized SUIT template now.
+%%% Let's take into account the aparc+aseg
 
 %%% Code straight from ADNI processing sent from Deniz and available at /home/jagust/dkorman/matlab/MakeSUITCerebMask_ADNI.m %%%
 
@@ -93,7 +93,7 @@ rcereaparc(ind)=ones(length(ind),1);
 
 cereaparc=reshape(rcereaparc,sz1,sz2,sz3);
 Vcereaparc=Vaparc;
-Vcereaparc.fname=[pathftp '/infcblg_ref_mask.nii']; %% saved the inferior cbl gray mask 
+Vcereaparc.fname=[pathftp '/infcblg_ref_mask.nii']; %% saved the inferior cbl gray mask
 spm_write_vol(Vcereaparc,cereaparc);
 
 meaninfcere=mean(rsuvr(ind)); %% stored the ref region value to create the SUVR image
@@ -111,7 +111,7 @@ matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
 matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{1}.spm.util.imcalc.options.mask = 0;
 matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
 spm_jobman('run',matlabbatch); clear matlabbatch;
 
 %%%%% code to create Multi-axial views for reporting %%%%
@@ -133,7 +133,7 @@ o = fill_defaults (o);
 o.slices = -30:6:58;
 o = paint(o);
 crdate=char(pp(size(pp,2)-9:end)); crid=char(ff(1:10));
-jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FTP-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');            
+jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FTP-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
 hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
@@ -162,7 +162,7 @@ o = fill_defaults (o);
 o.slices = -32:8:30;
 o = paint(o);
 
-jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FTP-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');            
+jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FTP-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
 hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
@@ -172,5 +172,5 @@ jpeglab3=strcat('Ref region QC: Inf CBL gray on FTP-PET',{' '},'***',{' '},'Left
 hTitAx3 = axes('Parent',o.figure,'Position',[0 0.93 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab3,'Parent',hTitAx3,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 print(slovnameref,'-djpeg','-r300');
-    
+
 clear Vaparc aparc raparc Vsuvr suvr rsuvr Vcere cere rcere indkeep indtoss rkeep rtoss keep toss skeep stoss rskeep rstoss ind szwholecer rcereaparc cereaparc Vcereaparc meaninfcere exp newfname slovname slovnameref

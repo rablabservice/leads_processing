@@ -36,7 +36,7 @@ tdb_ftp_longFTP=tdb_ftp;
 olddb=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FTP_ROI_Extraction*');
 
     if size(olddb,1)>0
-    
+
     olddb=struct2cell(olddb)';
     olddb=olddb(:,[1 3]);
     olddb=array2table(olddb);
@@ -89,26 +89,26 @@ olddb=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FTP_ROI_Extraction*
                         filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/RemovedbutKept_Cases_FTP_ROI_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
                         writetable(remcases,filename,'WriteRowNames',true)
                 end % end if condition choice on removed cases
-                
+
                 clear choice filename
 
             end % end if condition existence of removed cases
-            
+
             elseif checkinfo==1
-                
+
                 fprintf(2,'No new FTP scans needed extraction!\n');
                 tdb_ftp={};
-                
+
          end % end if condition there is a difference between old extraction and new extraction list
-        
+
     end % end if condition there is a previous FTP extraction database available
-    
+
 % To be safe, let's separately scan also the longitudinal database
 
 olddb_longFTP=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FTP_ErodedWM_Extraction*');
 
     if size(olddb_longFTP,1)>0
-    
+
     olddb_longFTP=struct2cell(olddb_longFTP)';
     olddb_longFTP=olddb_longFTP(:,[1 3]);
     olddb_longFTP=array2table(olddb_longFTP);
@@ -160,29 +160,29 @@ olddb_longFTP=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FTP_ErodedW
                         fprintf(1,'Fine! I will still save a csv file to keep track of that.\n\n');
                         filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/RemovedbutKept_Cases_FTP_CompWM_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
                         writetable(remcases_longFTP,filename,'WriteRowNames',true)
-                        
+
                 end % end if condition choice on removed cases
-                
+
                 clear choice filename
 
             end % end if condition existence of removed cases
-                        
+
             elseif checkinfo==1
-                
+
                 fprintf(2,'No new FTP scans needed Longitudinal extraction\n');
                 tdb_ftp_longFTP={};
-                
+
          end % end if condition there is a difference between old extraction and new extraction list
-        
+
     end % end if condition there is a previous FTP Longitudinal extraction database available
-    
-    
+
+
     if size(tdb_ftp,1)>0
-    
+
 % 1. Cross-sectional Module
 
 %%% Create the list of regions we are interested in, plus creating labels
-    
+
 fsids=[2;  4;	5;	7;	8;	10;	11;	12;	13;	14;	15;	16;	17;	18;	24;	26;	28;	30;	31;	41;	43;	44;	46;	47;	49;	50;	51;	52;	53;	54;	58;	60;	62;	63;	72;	77;	80;	85;	251;	252;	253;	254;	255;	1000;	1001;	1002;	1003;	1005;	1006;	1007;	1008;	1009;	1010;	1011;	1012;	1013;	1014;	1015;	1016;	1017;	1018;	1019;	1020;	1021;	1022;	1023;	1024;	1025;	1026;	1027;	1028;	1029;	1030;	1031;	1032;	1033;	1034;	1035;	2000;	2001;	2002;	2003;	2005;	2006;	2007;	2008;	2009;	2010;	2011;	2012;	2013;	2014;	2015;	2016;	2017;	2018;	2019;	2020;	2021;	2022;	2023;	2024;	2025;	2026;	2027;	2028;	2029;	2030;	2031;	2032;	2033;	2034;	2035];
 fslabs={'Left_Cerebral_White_Matter'; 'Left_Lateral_Ventricle';	'Left_Inf_Lat_Vent';	'Left_Cerebellum_White_Matter';	'Left_Cerebellum_Cortex';	'Left_Thalamus_Proper';	'Left_Caudate';	'Left_Putamen';	'Left_Pallidum';	'Third_Ventricle';	'Fourth_Ventricle';	'Brain_Stem';	'Left_Hippocampus';	'Left_Amygdala';	'CSF';	'Left_Accumbens_area';	'Left_VentralDC';	'Left_vessel';	'Left_choroid_plexus';	'Right_Cerebral_White_Matter'; 'Right_Lateral_Ventricle';	'Right_Inf_Lat_Vent';	'Right_Cerebellum_White_Matter';	'Right_Cerebellum_Cortex';	'Right_Thalamus_Proper';	'Right_Caudate';	'Right_Putamen';	'Right_Pallidum';	'Right_Hippocampus';	'Right_Amygdala';	'Right_Accumbens_area';	'Right_VentralDC';	'Right_vessel';	'Right_choroid_plexus';	'Fifth_Ventricle';	'WM_hypointensities';	'non_WM_hypointensities';	'Optic_Chiasm';	'CC_Posterior';	'CC_Mid_Posterior';	'CC_Central';	'CC_Mid_Anterior';	'CC_Anterior';	'ctx_lh_unknown';	'ctx_lh_bankssts';	'ctx_lh_caudalanteriorcingulate';	'ctx_lh_caudalmiddlefrontal';	'ctx_lh_cuneus';	'ctx_lh_entorhinal';	'ctx_lh_fusiform';	'ctx_lh_inferiorparietal';	'ctx_lh_inferiortemporal';	'ctx_lh_isthmuscingulate';	'ctx_lh_lateraloccipital';	'ctx_lh_lateralorbitofrontal';	'ctx_lh_lingual';	'ctx_lh_medialorbitofrontal';	'ctx_lh_middletemporal';	'ctx_lh_parahippocampal';	'ctx_lh_paracentral';	'ctx_lh_parsopercularis';	'ctx_lh_parsorbitalis';	'ctx_lh_parstriangularis';	'ctx_lh_pericalcarine';	'ctx_lh_postcentral';	'ctx_lh_posteriorcingulate';	'ctx_lh_precentral';	'ctx_lh_precuneus';	'ctx_lh_rostralanteriorcingulate';	'ctx_lh_rostralmiddlefrontal';	'ctx_lh_superiorfrontal';	'ctx_lh_superiorparietal';	'ctx_lh_superiortemporal';	'ctx_lh_supramarginal';	'ctx_lh_frontalpole';	'ctx_lh_temporalpole';	'ctx_lh_transversetemporal';	'ctx_lh_insula';	'ctx_rh_unknown';	'ctx_rh_bankssts';	'ctx_rh_caudalanteriorcingulate';	'ctx_rh_caudalmiddlefrontal';	'ctx_rh_cuneus';	'ctx_rh_entorhinal';	'ctx_rh_fusiform';	'ctx_rh_inferiorparietal';	'ctx_rh_inferiortemporal';	'ctx_rh_isthmuscingulate';	'ctx_rh_lateraloccipital';	'ctx_rh_lateralorbitofrontal';	'ctx_rh_lingual';	'ctx_rh_medialorbitofrontal';	'ctx_rh_middletemporal';	'ctx_rh_parahippocampal';	'ctx_rh_paracentral';	'ctx_rh_parsopercularis';	'ctx_rh_parsorbitalis';	'ctx_rh_parstriangularis';	'ctx_rh_pericalcarine';	'ctx_rh_postcentral';	'ctx_rh_posteriorcingulate';	'ctx_rh_precentral';	'ctx_rh_precuneus';	'ctx_rh_rostralanteriorcingulate';	'ctx_rh_rostralmiddlefrontal';	'ctx_rh_superiorfrontal';	'ctx_rh_superiorparietal';	'ctx_rh_superiortemporal';	'ctx_rh_supramarginal';	'ctx_rh_frontalpole';	'ctx_rh_temporalpole';	'ctx_rh_transversetemporal';	'ctx_rh_insula'};
 
@@ -202,23 +202,23 @@ aparcs = char(tdb_ftp(:,2));
 aparc_spm = tdb_ftp(:,2);
 
 %% Extraction section
-                    
+
 regs = fsids; % We are extracting from all the 113 regions included in the object fsids
 numf1=size(regs,1);
 
 M = zeros(numv1,numf1); % create empty matrix in which to store values from all the ROIs
-M_sz = zeros(numv1,numf1);  
+M_sz = zeros(numv1,numf1);
 
 M_refreg=zeros(numv1,1); % creating an empty matrix storing ref region extraction
-M_refreg_sz=zeros(numv1,1);    
+M_refreg_sz=zeros(numv1,1);
 
 for v = 1:numv1 % Reading each image
-    
+
 r1n=spm_vol(aparcs(v,:)); % reading the aparc-aseg
 r1=spm_read_vols(r1n);
 
-img=spm_vol(vols(v,:)); % Reading img header 
-img1=spm_read_vols(img); % Reading img values 
+img=spm_vol(vols(v,:)); % Reading img header
+img1=spm_read_vols(img); % Reading img values
 
 [~,f,e]=spm_fileparts(vols(v,:));
 tempfname=char(strcat(f,e));
@@ -239,7 +239,7 @@ for f = 1:size(ind_brk12_nohcp,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_braak12_nohcp(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_braak12_nohcp_sz(f)=size(temp,1);             
+      vec_braak12_nohcp_sz(f)=size(temp,1);
 end % end for loop for Braak 1
       Mbrk12_nohcp(1,:)=vec_braak12_nohcp; % save the values ROI-wise (column-wise)
       Mbrk12_nohcp_sz(1,:)=vec_braak12_nohcp_sz;  % save the rois size
@@ -257,7 +257,7 @@ for f = 1:size(ind_brk12,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_braak12(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_braak12_sz(f)=size(temp,1);             
+      vec_braak12_sz(f)=size(temp,1);
 end % end for loop Braak 12
       Mbrk12(1,:)=vec_braak12; % save the values ROI-wise (column-wise)
       Mbrk12_sz(1,:)=vec_braak12_sz;  % save the rois size
@@ -275,7 +275,7 @@ for f = 1:size(ind_brk34,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_braak34(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_braak34_sz(f)=size(temp,1);             
+      vec_braak34_sz(f)=size(temp,1);
 end % end for loop Braak 34
       Mbrk34(1,:)=vec_braak34; % save the values ROI-wise (column-wise)
       Mbrk34_sz(1,:)=vec_braak34_sz;  % save the rois size
@@ -293,7 +293,7 @@ for f = 1:size(ind_brk56,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_braak56(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_braak56_sz(f)=size(temp,1);             
+      vec_braak56_sz(f)=size(temp,1);
 end % end for loop Braak 56
       Mbrk56(1,:)=vec_braak56; % save the values ROI-wise (column-wise)
       Mbrk56_sz(1,:)=vec_braak56_sz;  % save the rois size
@@ -336,7 +336,7 @@ size_brk56=sum(Mbrk56_sz,2);
     allbrks(v,:)=[brkstg wmean_brk12_nohcp wmean_brk12 wmean_brk34 wmean_brk56];
     allbrks_sz(v,:)=[size_brk12_nohcp size_brk12 size_brk34 size_brk56];
 
-    %%%%%%%%%%%%%%% MetaROI Section %%%%%%%%%%%%%% 
+    %%%%%%%%%%%%%%% MetaROI Section %%%%%%%%%%%%%%
     %%% Jack et al., 2017 https://doi.org/10.1016/j.jalz.2016.08.005
     %%% Cut-off of 1.20 for ADNI data provided in Maass et al.,
     %%% 2017 http://dx.doi.org/10.1016/j.neuroimage.2017.05.058
@@ -354,7 +354,7 @@ for f = 1:size(ind_metaroi,1) % Looping through the ROIs
       temp=temp(~isnan(temp));
       ext_val=mean(temp);
       vec_metaroi(f)=ext_val; % Store values for the individual ROIs across the images
-      vec_metaroi_sz(f)=size(temp,1);             
+      vec_metaroi_sz(f)=size(temp,1);
 end % end for loop metaROI
       Mmetaroi(1,:)=vec_metaroi; % save the values ROI-wise (column-wise)
       Mmetaroi_sz(1,:)=vec_metaroi_sz;  % save the rois size
@@ -386,7 +386,7 @@ end % end for loop for each Freesurfer APARC+ASEG region
   M_sz(v,:)=vec_sz;  % save the roi size
 
  %%%% Small module to get reference region
- %%%% values 
+ %%%% values
 
  templdsid=regexp(vols_spm(v),'LDS\d{7}','match','once');
  tempftpdate=regexp(vols_spm(v),'\d{4}-\d{2}-\d{2}','match','once');
@@ -414,7 +414,7 @@ end % end for loop for each Freesurfer APARC+ASEG region
  M_refreg_sz(v,1)=refreg_sz;
 
  clear r1n r1 img img1 p f e Mbrk12_nohcp Mbrk12_nohcp_sz Mbrk12 Mbrk12_sz Mbrk34 Mbrk34_sz Mbrk56 Mbrk56_sz Mmetaroi Mmetaroi_sz templdsid tempftpdate tempftpfold temptimepoint refreg tempsuv refregn regreg1 suv suv1 mask suv_mask temp refregval refreg_sz metaroi_pos wmean_metaroi size_metaroi brkstg wmean_brk12_nohcp wmean_brk12 wmean_brk34 wmean_brk56 size_brk12_nohcp size_brk12 size_brk34 size_brk56
- 
+
 end % end for loop for each image
 
 T_refreg=array2table(M_refreg);
@@ -452,7 +452,7 @@ T_qc=array2table(qc);
 T_qc.Properties.VariableNames={'FTPPET_path','APARC_path'};
 
 
-T=[T_meta T_qc T_refreg T_metarois T_braaks T T_refreg_sz T_metarois_sz T_braaks_sz T_sz]; 
+T=[T_meta T_qc T_refreg T_metarois T_braaks T T_refreg_sz T_metarois_sz T_braaks_sz T_sz];
 if size(newcases,1)>0
 T=vertcat(oldinfo,T);
 end
@@ -460,11 +460,11 @@ end
 filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FTP_ROI_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
 writetable(T,filename,'WriteRowNames',true)
 copyfile(filename, '/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service/');
-            
+
     end % end if condition new FTP scans needed extractions
 
     if size(tdb_ftp_longFTP,1)>0
-    
+
 % 2. Longitudinal Module
 
 fprintf(1,'Now Starting longitudinal module for FTP...\n');
@@ -477,15 +477,15 @@ M_suvr_longFTP=zeros(size(ftpscans_longFTP,1),1);
 M_sz_longFTP = zeros(size(ftpscans_longFTP,1),1);
 
 for i=1:size(ftpscans_longFTP,1)
-   
+
     fprintf(1,'Now starting Longitudinal processing for %s\n',ftpscans_longFTP_spm{i});
 
     tempimg=ftpscans_longFTP_spm{i};
     tempaparc=aparcscans_longFTP_spm{i};
-    
+
     % working on the pieces needed
     % 1. WM parcellation from the aparc, smooth and threshold
-    
+
    [appath,apfname,~]=spm_fileparts(char(tempaparc));
     wmaparcfname=strcat(appath,'/',apfname,'_wm.nii');
     swmaparcfname=strcat(appath,'/s',apfname,'_wm.nii');
@@ -501,7 +501,7 @@ for i=1:size(ftpscans_longFTP,1)
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
     matlabbatch{2}.spm.spatial.smooth.data = cellstr(wmaparcfname);
     matlabbatch{2}.spm.spatial.smooth.fwhm = [8 8 8];
     matlabbatch{2}.spm.spatial.smooth.dtype = 0;
@@ -515,56 +515,56 @@ for i=1:size(ftpscans_longFTP,1)
     matlabbatch{3}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{3}.spm.util.imcalc.options.mask = 0;
     matlabbatch{3}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{3}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{3}.spm.util.imcalc.options.dtype = spm_type('uint8');
     spm_jobman('run',matlabbatch); clear matlabbatch;
-    
+
     copyfile(char(swmaparcfnamethres),char(strcat(appath,'/erodedwm_ref_mask.nii')));
-    
+
     % Send QC multislice to the shared petcore if it does not exist already
-    
+
     srcmulti=dir(strcat(path_qccompwm,'/*',apfname,'*'));
-    
+
     if size(srcmulti,1)==0
-    
+
     tempbs_wm_slovname=quickmultislice3(tempnu, char(swmaparcfnamethres),'axial','nih.lut','0.5 1.5','-30 6 58');
     copyfile(tempbs_wm_slovname,path_qccompwm);
-    
+
     end
-    
-    
+
+
     % Grab the rSCAN to get the scaling factor to be saved in the database
-    
+
     [imgpath,imgfname,~]=spm_fileparts(char(tempimg));
-    
+
     rimgfname=strcat(imgpath,'/r',imgfname(1:end-13),'.nii');
-    
+
     % Extract value from r image
-    
-    roi=spm_vol(char(strcat(appath,'/erodedwm_ref_mask.nii'))); 
+
+    roi=spm_vol(char(strcat(appath,'/erodedwm_ref_mask.nii')));
     roi1=spm_read_vols(roi);
-    
+
       img=spm_vol(rimgfname); % Reading img header from the loop
-      img1=spm_read_vols(img); % Reading img values 
+      img1=spm_read_vols(img); % Reading img values
       img_mask=img1.*roi1; % Creating the masked image
       img_mask=nonzeros(img_mask);
       img_mask=img_mask(~isnan(img_mask));
       ext_val=mean(img_mask);
       M_longFTP(i,1)=ext_val;
-  
+
   % Extract value from suvr image
-  
+
   imgsuvr=spm_vol(char(tempimg)); % Reading imgsuvr header from the loop
-  imgsuvr1=spm_read_vols(imgsuvr); % Reading imgsuvr values 
+  imgsuvr1=spm_read_vols(imgsuvr); % Reading imgsuvr values
   imgsuvr_mask=imgsuvr1.*roi1; % Creating the masked image
   imgsuvr_mask=nonzeros(imgsuvr_mask);
   imgsuvr_mask=imgsuvr_mask(~isnan(imgsuvr_mask));
   ext_val_suvr=mean(imgsuvr_mask);
   M_suvr_longFTP(i,1)=ext_val_suvr;
-  
+
   M_sz_longFTP(i,1)=size(img_mask,1);
-  
+
   % Create the new suvr image, last thing I want
-    
+
     exp=char(strcat('i1/',num2str(ext_val)));
     newfname=char(strcat(imgpath,'/',imgfname(1:end-13),'_suvr_erodedWM.nii'));
 
@@ -577,11 +577,11 @@ for i=1:size(ftpscans_longFTP,1)
     matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
     matlabbatch{1}.spm.util.imcalc.options.mask = 0;
     matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
     spm_jobman('run',matlabbatch); clear matlabbatch;
 
-    clear tempnu srcmulti apfname appath bsaparcfname compwmfname compwmfs exp ext_val ext_val_suvr img img1 imgsuvr imgsuvr1 imgsuvr_mask img_mask imgfname imgpath newfname rimgfname roi roi1 swmaparcfname swmaparcfnamethres tempaparc tempimg wmaparcfname 
-    
+    clear tempnu srcmulti apfname appath bsaparcfname compwmfname compwmfs exp ext_val ext_val_suvr img img1 imgsuvr imgsuvr1 imgsuvr_mask img_mask imgfname imgpath newfname rimgfname roi roi1 swmaparcfname swmaparcfnamethres tempaparc tempimg wmaparcfname
+
 end
 
 T_longFTP=array2table(M_longFTP);
@@ -603,7 +603,7 @@ qc_longFTP=horzcat(ftpscans_longFTP_spm, aparcscans_longFTP_spm);
 T_qc_longFTP=array2table(qc_longFTP);
 T_qc_longFTP.Properties.VariableNames={'FTPPET_path','APARC_path'};
 
-T_longFTP=[T_meta_longFTP T_qc_longFTP T_longFTP Tsuvr_longFTP T_sz_longFTP]; 
+T_longFTP=[T_meta_longFTP T_qc_longFTP T_longFTP Tsuvr_longFTP T_sz_longFTP];
 
 if size(newcases,1)>0
 T_longFTP=vertcat(oldinfo_longFTP,T_longFTP);
@@ -617,7 +617,6 @@ copyfile(filename,'/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service
 
 % Done, wrapping up - clear everything before proceeding to the FDG ROI
 % Extraction
-            
+
 clearvars -except tdb_fdg path_processed path_extraction path_qccompwm
 fprintf(1,'**Completed ROI and Longitudinal extraction for all the FTP SUVR images available!\n');
-            

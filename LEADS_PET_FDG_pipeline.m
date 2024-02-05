@@ -30,13 +30,13 @@ spm_jobman('run',matlabbatch); clear matlabbatch;
 r1n=spm_vol(bsscan); % reading the brainstem parcellation
 r1=spm_read_vols(r1n);
 
-img=spm_vol(rfdgscan); % Reading img header 
-img1=spm_read_vols(img); % Reading img values 
+img=spm_vol(rfdgscan); % Reading img header
+img1=spm_read_vols(img); % Reading img values
 
 mask = (r1 == 174); % Creating the logical mask to separate the pons ROI
 img_mask=img1.*mask; % Creating the masked image
 temp=nonzeros(img_mask);
-temp=temp(~isnan(temp));                              
+temp=temp(~isnan(temp));
 meanpons=mean(temp); %% stored the ref region value to create the SUVR image
 
 exp=char(strcat('i1/',num2str(meanpons)));
@@ -52,7 +52,7 @@ matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
 matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{1}.spm.util.imcalc.options.mask = 0;
 matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-matlabbatch{1}.spm.util.imcalc.options.dtype = 4;
+matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
 matlabbatch{2}.spm.util.imcalc.input = cellstr(rfdgscan);
 matlabbatch{2}.spm.util.imcalc.output = newfname;
 matlabbatch{2}.spm.util.imcalc.outdir = {''};
@@ -61,7 +61,7 @@ matlabbatch{2}.spm.util.imcalc.var = struct('name', {}, 'value', {});
 matlabbatch{2}.spm.util.imcalc.options.dmtx = 0;
 matlabbatch{2}.spm.util.imcalc.options.mask = 0;
 matlabbatch{2}.spm.util.imcalc.options.interp = 1;
-matlabbatch{2}.spm.util.imcalc.options.dtype = 4;
+matlabbatch{2}.spm.util.imcalc.options.dtype = spm_type('float32');
 spm_jobman('run',matlabbatch); clear matlabbatch;
 
 %%%%% code to create Multi-axial views for reporting %%%%
@@ -86,7 +86,7 @@ o = fill_defaults (o);
 o.slices = -30:6:58;
 o = paint(o);
 crdate=char(pp(size(pp,2)-9:end)); crid=char(ff(1:10));
-jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FDG-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');            
+jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FDG-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
 hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
@@ -114,7 +114,7 @@ o.figure = spm_figure('GetWin','Graphics');
 o = fill_defaults (o);
 o.slices = -32:8:30;
 o = paint(o);
-jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FDG-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');            
+jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'FDG-PET',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
 hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
 text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
 jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
