@@ -6,11 +6,8 @@
 %%%%%% Sep 2021: Code Cleanup
 %%%%%% Feb 2024: Major update with the transition to 6mm PET data
 
-%% Checking what subjects (MRIs) have been already processed
-
-cd (path_processed);
-
-listmris=dir('*/*/MRI*/LDS*nu.nii');
+% Get a list of all processed MRIs
+listmris=dir(fullfile(dirs('processed'), '*', 'MRI*', '*nu.nii'));
 listmris = {listmris.name}';
 listmris=cellfun(@(fnonu) fnonu(1:end-7), listmris, 'uniformoutput',0);
 
@@ -327,117 +324,6 @@ for ii=1:size(listfsf,1)
         matlabbatch{2}.spm.spatial.smooth.prefix = 's8iso_';
         spm_jobman('run',matlabbatch); clear matlabbatch
 
-
-%%%%% code to create Multi-axial views for reporting %%%%
-
-% 1. Multislice MRI standard
-
-    [pp,ff,~]=spm_fileparts(char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_nu.nii'))));
-    slovname=char(strcat(pp,'/Multiaxial_',ff,'.jpg'));
-    temp_rend=char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_nu.nii')));
-    o = slover;
-    o.cbar = 1;
-    o.img(1).vol=spm_vol(temp_rend);
-    o.img(1).type='structural';
-    o.img(1).prop=1;
-    o.transform = 'axial';
-    o.figure = spm_figure('GetWin','Graphics');
-    o = fill_defaults (o);
-    o.slices = -30:6:58;
-    o = paint(o);
-    crdate=char(pp(size(pp,2)-9:end)); crid=char(ff(1:10));
-    jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'MRI T1',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
-    hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
-    hTitAx2 = axes('Parent',o.figure,'Position',[0 0.95 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab2,'Parent',hTitAx2,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    jpeglab3=strcat('3D T1 MPRAGE',{' '},'***',{' '},'Left is Left');
-    hTitAx3 = axes('Parent',o.figure,'Position',[0 0.93 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab3,'Parent',hTitAx3,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    print(slovname,'-djpeg','-r300');
-
-    % 2. Aparc+Aseg QC
-
-    [pp,ff,~]=spm_fileparts(char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_raparc+aseg.nii'))));
-    slovname2=char(strcat(pp,'/Multiaxial_axial_',ff,'.jpg'));
-
-    temp_back=char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_nu.nii')));
-    temp_ovrly=char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_raparc+aseg.nii')));
-
-    o = slover;
-    o.cbar = 2;
-    o.img(1).vol=spm_vol(temp_back);
-    o.img(1).type='structural';
-    o.img(1).prop=1;
-    o.img(2).vol = spm_vol (temp_ovrly);
-    o.img(2).type = 'truecolour';
-    o.img(2).cmap = 'actc';
-    o.img(2).range = [0 2030];
-    o.img(2).prop=0.8;
-    o.transform = 'axial';
-    o.figure = spm_figure('GetWin','Graphics');
-    o = fill_defaults (o);
-    o.slices = -30:6:58;
-    o = paint(o);
-    crdate=char(pp(size(pp,2)-9:end)); crid=char(ff(1:10));
-    jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'Aparc on MRI T1',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
-    hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
-    hTitAx2 = axes('Parent',o.figure,'Position',[0 0.95 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab2,'Parent',hTitAx2,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    jpeglab3=strcat('3D T1 MPRAGE',{' '},'***',{' '},'Left is Left');
-    hTitAx3 = axes('Parent',o.figure,'Position',[0 0.93 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab3,'Parent',hTitAx3,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    print(slovname2,'-djpeg','-r300');
-
-    % 3. SPM Segmentation QC
-
-    [pp,ff,~]=spm_fileparts(char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_nu.nii'))));
-    slovname3=char(strcat(pp,'/Multiaxial_c1nu_',ff,'.jpg'));
-    temp_back=char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_nu.nii')));
-    temp_ovrly=char(cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/c1',newmris{ii},'_nu.nii')));
-    o = slover;
-    o.cbar = 2;
-    o.img(1).vol=spm_vol(temp_back);
-    o.img(1).type='structural';
-    o.img(1).prop=1;
-    o.img(2).vol = spm_vol (temp_ovrly);
-    o.img(2).type = 'split';
-    o.img(2).cmap = 'winter';
-    o.img(2).range = [0.2 0.6];
-
-    o.transform = 'axial';
-    o.figure = spm_figure('GetWin','Graphics');
-    o = fill_defaults (o);
-    o.slices = -30:6:58;
-    o = paint(o);
-    crdate=char(pp(size(pp,2)-9:end)); crid=char(ff(1:10));
-    jpeglab=strcat('ID:',{' '},crid,{' '},'***',{' '},'SPM c1 on MRI T1',{' '},'***',{' '},'LEADS.PETCORE@ucsf.edu');
-    hTitAx = axes('Parent',o.figure,'Position',[0 0.97 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab,'Parent',hTitAx,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    jpeglab2=strcat('Scan Date:',{' '},datestr(crdate),{' '},'***',{' '},'Quantification Date:',{' '},date);
-    hTitAx2 = axes('Parent',o.figure,'Position',[0 0.95 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab2,'Parent',hTitAx2,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    jpeglab3=strcat('3D T1 MPRAGE',{' '},'***',{' '},'Left is Left');
-    hTitAx3 = axes('Parent',o.figure,'Position',[0 0.93 0.06 0.02],'Visible','off');
-    text(0.5,0,jpeglab3,'Parent',hTitAx3,'HorizontalAlignment','left','VerticalAlignment','baseline','Color','black','FontSize',12);
-    print(slovname3,'-djpeg','-r300');
-
-    else
-
-       fprintf(2,'Warning! %s Freesurfer folder does not exist, maybe it failed?\n',newmris{ii});
-
-    end % end if condition freesurfer folder exists
-
-    clear  oldovrlyname newlocovrlyname rncmd newdistovrlyname cpcmd temptp1 tempmytp oldfname newfname symlink1 oldfname2 newfname2 symlink2 oldfname3 newfname3 symlink3 pp ff slovname temp_rend slovname2 temp_back temp_ovrly slovname3
-
 end % end for loop for each new freesurfer folder
 
 cd (path_processed);
-
-%% Let's copy the all the available JPEG files to the shared petcore
-system('cp -n  */*/MRI*/Multiaxial_L*.jpg   /shared/petcore/Projects/LEADS/data_f7p1/summary/mri/t1mprage/.');
-system('cp -n  */*/MRI*/Multiaxial_axial_L*.jpg   /shared/petcore/Projects/LEADS/data_f7p1/summary/mri/aparcont1/.');
-system('cp -n  */*/MRI*/Multiaxial_c1nu_L*.jpg   /shared/petcore/Projects/LEADS/data_f7p1/summary/mri/c1ont1/.');
