@@ -1,99 +1,70 @@
-function output = getScanInfo(subjDir)
-% Return info on each scan in subject directory.
-subj = fileparts(subjDir);
-dicoms = dir(fullfile(subjDir, '**', '*.dcm'));
-niftis = dir(fullfile(subjDir, '**', '*.nii*'));
-scanDirs = unique({dicoms.folder, niftis.folder});
-output = [];
+function output = getScanInfo(subjDir, scanTypeMapFile)
+    % Parse subject dir and return subject ID, scan date, and scan type.
 
-for i = 1:length(scanDirs)
-    scanDir = scanDirs{i};
-    petDate = getAcqDate(scanDir);
-    notes = "";
-    if ~isempty(petDate)
+    % Load the file with modality input to output name mappings
+    switch nargin
+        case 1
+            scanTypeMapFile = '/mnt/coredata/processing/leads/metadata/ssheets/scan_types_and_tracers.csv';
+    end
+    scanTypeMap = readtable(scanTypeMapFile, 'TextType', 'string');
+
+    % Find all unique nifti-containing subdirectories
+    scanDirs = unique({dir(fullfile(subjDir, '**', '*.nii*')).folder});
+    if isempty(scanDirs)
+        output = cell2table(cell(0, 4), 'VariableNames', {'subj', 'scanDate', 'scanType', 'scanPath'});
+        return;
+    end
+
+    % Get the subject ID from the base directory name
+    subj = getSubjectID(subjDir)
+
+    output = [];
+    for i = 1:length(scanDirs)
+        scanDir = scanDirs{i};
+        scanDate = getScanDate(scanDir);
         niftis = dir(fullfile(scanDir, '*.nii*'));
-        dicoms = dir(fullfile(scanDir, '*.dcm'));
-        if isempty(niftis) && ~isempty(dicoms)
-            niftis = dcm2niix(scanDir); % Assuming dcm2niix is a custom or installed function
-        end
-        if length(niftis) == 1
-            niiPath = fullfile(niftis(1).folder, niftis(1).name);
-        elseif isempty(niftis)
-            niiPath = "";
-            notes = notes + "Can't find reconstructed nifti for " + scanDir + "; ";
-        else
-            niiPath = "";
-            notes = notes + "Multiple niftis found for " + scanDir + "; ";
-        end
-        if ~isempty(niiPath)
-            tracer = getTracer(niiPath);
-            if isempty(tracer)
-                notes = notes + "Can't parse PET tracer from " + niiPath + "; ";
-            end
-            inputRes = getInputRes(niiPath);
-            if isempty(inputRes)
-                notes = notes + "Can't parse starting resolution from " + niiPath + "; ";
-            end
-        else
-            tracer = "";
-            inputRes = [];
-        end
-    else
-        niiPath = "";
-        tracer = "";
-        inputRes = [];
-        notes = notes + "Can't find PET acquisition date for " + scanDir + "; ";
+        niiPath = fullfile(niftis(1).folder, niftis(1).name);
+        scanType = getScanType(niiPath, scanTypeMap);
+        output = [output; {subj, scanDate, scanType, niiPath}];
     end
-    output = [output; {subj, petDate, tracer, inputRes, niiPath, notes}];
+
+    % Convert output to table for easier handling, similar to pandas DataFrame
+    output = cell2table(output, 'VariableNames', {'subj', 'scanDate', 'scanType', 'scanPath'});
 end
 
-% Convert output to table for easier handling, similar to pandas DataFrame
-output = cell2table(output, 'VariableNames', {"subj", "petDate", "tracer", "inputRes", "rawPetf", "notes"});
+function subj = getSubjectID(subjDir)
+    % Return the subject ID from the base directory name.
+    [~, subj, ~] = fileparts(subjDir);
 end
 
-function acqDate = getAcqDate(filepath)
-% Return the acquisition date as YYYY-MM-DD.
-parts = strsplit(filepath, filesep);
-for i = length(parts):-1:1
-    d = parts{i};
-    try
-        datetime(d(1:10), 'InputFormat', 'yyyy-MM-dd');
-        acqDate = d(1:10);
-        return;
-    catch
+function scanDate = getScanDate(filepath)
+    % Return the scan acquisition date as YYYY-MM-DD.
+    parts = strsplit(filepath, filesep);
+    for i = length(parts):-1:1
+        d = parts{i};
+        try
+            datetime(d(1:10), 'InputFormat', 'yyyy-MM-dd');
+            scanDate = d(1:10);
+            return;
+        catch
+        end
     end
-end
-acqDate = [];
+    scanDate = '';
 end
 
-function tracer = getTracer(filepath)
-% Return the PET tracer used from filepath to the recon'd nifti.
-[~, basename, ~] = fileparts(filepath);
-basename = lower(basename);
-tracers = {'fbb', 'florbetaben', 'neuraceq', 'fbp', 'florbetapir', 'av45', 'av-45', 'amyvid', 'flutafuranol', 'nav4694', 'nav-4694', 'azd4694', 'azd-4694', 'pib', 'pittsburgh compound b', 'pittsburgh compound-b'};
-tracerNames = {'FBB', 'FBB', 'FBB', 'FBP', 'FBP', 'FBP', 'FBP', 'FBP', 'NAV', 'NAV', 'NAV', 'NAV', 'NAV', 'PIB', 'PIB', 'PIB'};
-for i = 1:length(tracers)
-    if contains(basename, tracers{i})
-        tracer = tracerNames{i};
-        return;
+function scanType = getScanType(filepath, scanTypeMap)
+    % Parse the filepath and return the scan type.
+    [~, basename, ~] = fileparts(filepath);
+    basename = lower(string(basename));
+
+    % Search through each scan type in the mapping
+    for i = 1:height(scanTypeMap)
+        if contains(basename, scanTypeMap.name_in{i})
+            scanType = scanTypeMap.name_out{i};
+            return;
+        end
     end
-end
-tracer = [];
-end
 
-function inputRes = getInputRes(filepath)
-% Get the starting resolution from file basename.
-[~, basename, ~] = fileparts(filepath);
-basename = lower(basename);
-if contains(basename, 'uniform_6mm_res')
-    inputRes = [6, 6, 6];
-elseif contains(basename, 'uniform_8mm_res')
-    inputRes = [8, 8, 8];
-elseif contains(basename, 'uniform_') && contains(basename, 'mm_res')
-    resStr = extractBetween(basename, 'uniform_', 'mm_res');
-    resNum = str2double(resStr);
-    inputRes = [resNum, resNum, resNum];
-else
-    inputRes = [];
-end
+    % If no scan type is found, return an empty string
+    scanType = '';
 end

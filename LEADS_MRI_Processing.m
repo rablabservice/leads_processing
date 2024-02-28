@@ -7,35 +7,24 @@
 %%%%%% Feb 2024: Major update with the transition to 6mm PET data
 
 % Get a list of all processed MRIs
-listmris=dir(fullfile(dirs('processed'), '*', 'MRI*', '*nu.nii'));
+listmris = dir(fullfile(dirs('processed'), '*', 'MRI*', '*nu.nii'));
 listmris = {listmris.name}';
-listmris=cellfun(@(fnonu) fnonu(1:end-7), listmris, 'uniformoutput',0);
+listmris = cellfun(@(fnonu) fnonu(1:end-7), listmris, 'uniformoutput', 0);
 
-%% Looking for newly uploaded MRI folders
+%% Find newly uploaded MRIs
+newmri_files = dir(fullfile(dirs('newdata'), 'mri', '**', '*.nii*'));
+newmri_paths = fullfile({newmri_files.folder}', {newmri_files.name}');
+
 
 cd (path_newmris);
 
-newmris=dir('*/*/*/*/*.nii');
-newmris=transpose(struct2cell(newmris));
-tempnewids=regexp(newmris(:,2),'LDS\d{7}','match','once');
-tempnewmridates=regexp(newmris(:,2),'\d{4}-\d{2}-\d{2}','match','once');
-listnewmris=strcat(tempnewids,'_MRI_T1_',tempnewmridates);
+newmris = dir('*/*/*/*/*.nii');
+newmris = transpose(struct2cell(newmris));
+tempnewids = regexp(newmris(:,2), 'LDS\d{7}', 'match', 'once');
+tempnewmridates = regexp(newmris(:,2), '\d{4}-\d{2}-\d{2}', 'match', 'once');
+listnewmris = strcat(tempnewids, '_MRI_T1_', tempnewmridates);
 
-%% Small QC module, for a given subject there is duplicate new MRI
-%% This is possible if the user inadvertedly downloaded two different sequences or two repeat scans
 
-if size(unique(listnewmris),1)<size(listnewmris,1)
-
-   fprintf(2,'\nWarning! There is at least one duplicated MRI in the new batch.\nTake a look below:\n\n');
-
-    [~, uniqueIdx] =unique(listnewmris); % Find the indices of the unique strings
-    duplicates = listnewmris; % Copy the original into a duplicate array
-    duplicates(uniqueIdx) = []; % remove the unique strings, anything left is a duplicate
-    duplicates = unique(duplicates); % find the unique duplicates
-    disp(duplicates);
-   error('I will stop here. Clear the workspace, cleanup data in the new MRI folder and re-run.');
-
-end % end if condition QC there are no duplicate MRIs
 
 %% Check whether some of the new mris were actually already stored and processed
 

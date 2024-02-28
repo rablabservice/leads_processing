@@ -1,7 +1,7 @@
 %% Recursively search the newdata directory, find directories containing
 %% DICOM files but no NIfTI files, and convert DICOMs to NIfTI in these
 %% directories
-dcm2niix = fullfile(dirs('code'), 'utils', 'dcm2niix');
+dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix';
 
 % Find all dicoms in newdata
 dcm_files = dir(fullfile(dirs('newdata'), '**', '*.dcm'));

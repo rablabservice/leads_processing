@@ -2,59 +2,6 @@
 %%%%% Original code by Leo Iaccarino in 2019 %%%%%
 %%%%% Updated by Daniel Schonhaut in 2024 %%%%%
 
-function removeSubdirs(paths, prefix, verbose)
-% Remove subdirectories with a specified prefix in given paths.
-%
-% Parameters
-% ----------
-%   paths : cell array of strings
-%     Each string is a path in which directories with the specified
-%     prefix will be searched for and deleted. Required.
-%   prefix : string, optional
-%     String specifying the prefix of the directories to delete.
-%     Default is '' (all subdirectories are deleted).
-%   verbose : logical, optional
-%     If true, prints the path of each directory that is deleted.
-%     Default is true.
-%
-
-% Set default values for optional parameters.
-switch nargin
-    case 1
-        prefix = '';
-        verbose = true;
-    case 2
-        verbose = true;
-end
-
-% Ensure paths is a cell array.
-if ischar(paths) || isstring(paths)
-    paths = {paths};
-end
-
-% Remove subdirectories with the specified prefix.
-for ii = 1:length(paths)
-    parentDir = paths{ii};
-    if ~isfolder(parentDir)
-        if verbose
-            fprintf('Deleting directories; %s is not an existing directory, moving on...\n', parentDir);
-        end
-        continue;
-    end
-    subDirs = dir(fullfile(parentDir, [prefix '*']));
-    for jj = 1:length(subDirs)
-        if subDirs(jj).isdir
-            subDir = fullfile(parentDir, subDirs(jj).name);
-            % rmdir(subDir, 's');
-            if verbose
-                fprintf('Deleted %s\n', subDir);
-            end
-        end
-    end
-end
-end
-
-
 % Define directory paths
 dirs = containers.Map;
 dirs('proj') = '/mnt/coredata/processing/leads';
@@ -63,6 +10,7 @@ dirs('data') = fullfile(dirs('proj'), 'data');
 dirs('extraction') = fullfile(dirs('data'), 'extraction');
 dirs('freesurfer') = fullfile(dirs('data'), 'freesurfer');
 dirs('links') = fullfile(dirs('data'), 'links');
+dirs('metadata') = fullfile(dirs('proj'), 'metadata');
 dirs('newdata') = fullfile(dirs('data'), 'newdata');
 dirs('processed') = fullfile(dirs('data'), 'processed');
 
@@ -126,14 +74,5 @@ elseif user_action == 8
 end
 
 % End the program
-msg = [
-    '\nAll done',...
-    '\n',...
-    '\n   |\\      _,,,---,,_      ',...
-    '\n   /,`.-''`''    -.  ;-;;,_  ',...
-    '\n  |,4-  ) )-,_. ,\\ (  `''-'' ',...
-    '\n ''---''''(_/--''  `-''\\_)      ',...
-    '\n\n'
-    ]
-fprintf(msg);
+sayBye();
 clear;
