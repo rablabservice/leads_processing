@@ -7,16 +7,13 @@
 %%%%%% Feb 2024: Major update with the transition to 6mm PET data
 
 % Get a list of all processed MRIs
-listmris = dir(fullfile(dirs('processed'), '*', 'MRI*', '*nu.nii'));
+listmris = dir(fullfile(PATHS('processed'), '*', 'MRI_T1_*', '*nu.nii'));
 listmris = {listmris.name}';
 listmris = cellfun(@(fnonu) fnonu(1:end-7), listmris, 'uniformoutput', 0);
 
 %% Find newly uploaded MRIs
-newmri_files = dir(fullfile(dirs('newdata'), 'mri', '**', '*.nii*'));
+newmri_files = dir(fullfile(PATHS('newdata'), 'mri', '**', '*.nii*'));
 newmri_paths = fullfile({newmri_files.folder}', {newmri_files.name}');
-
-
-cd (path_newmris);
 
 newmris = dir('*/*/*/*/*.nii');
 newmris = transpose(struct2cell(newmris));

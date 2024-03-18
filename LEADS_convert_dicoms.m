@@ -4,12 +4,12 @@
 dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix';
 
 % Find all dicoms in newdata
-dcm_files = dir(fullfile(dirs('newdata'), '**', '*.dcm'));
+dcm_files = dir(fullfile(PATHS('newdata'), '**', '*.dcm'));
 dcm_paths = fullfile({dcm_files.folder}', {dcm_files.name}');
 dcm_dirs = unique(cellfun(@fileparts, dcm_paths, 'UniformOutput', false));
 
 % Find all niftis in newdata
-nii_files = dir(fullfile(dirs('newdata'), '**', '*.nii*'));
+nii_files = dir(fullfile(PATHS('newdata'), '**', '*.nii*'));
 nii_paths = fullfile({nii_files.folder}', {nii_files.name}');
 nii_dirs = unique(cellfun(@fileparts, nii_paths, 'UniformOutput', false));
 

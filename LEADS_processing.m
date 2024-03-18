@@ -2,21 +2,22 @@
 %%%%% Original code by Leo Iaccarino in 2019 %%%%%
 %%%%% Updated by Daniel Schonhaut in 2024 %%%%%
 
-% Define directory paths
-dirs = containers.Map;
-dirs('proj') = '/mnt/coredata/processing/leads';
-dirs('code') = fullfile(dirs('proj'), 'code');
-dirs('data') = fullfile(dirs('proj'), 'data');
-dirs('extraction') = fullfile(dirs('data'), 'extraction');
-dirs('freesurfer') = fullfile(dirs('data'), 'freesurfer');
-dirs('links') = fullfile(dirs('data'), 'links');
-dirs('metadata') = fullfile(dirs('proj'), 'metadata');
-dirs('newdata') = fullfile(dirs('data'), 'newdata');
-dirs('processed') = fullfile(dirs('data'), 'processed');
-
 % Add paths to other scripts we need to access
-addpath(genpath(dirs('code')));
-addpath(genpath('/mnt/coredata/Projects/Resources/scripts/leotools'));
+restoredefaultpath;
+run '/home/mac/dschonhaut/matlab/startup.m';
+
+% Define directory paths
+PATHS = containers.Map;
+PATHS('proj') = '/mnt/coredata/processing/leads';
+PATHS('code') = fullfile(PATHS('proj'), 'code');
+PATHS('data') = fullfile(PATHS('proj'), 'data');
+PATHS('extraction') = fullfile(PATHS('data'), 'extraction');
+PATHS('freesurfer') = fullfile(PATHS('data'), 'freesurfer');
+PATHS('links') = fullfile(PATHS('data'), 'links');
+PATHS('metadata') = fullfile(PATHS('proj'), 'metadata');
+PATHS('newdata') = fullfile(PATHS('data'), 'newdata');
+PATHS('processed') = fullfile(PATHS('data'), 'processed');
+addpath(genpath(PATHS('code')));
 
 % Ask the user what processing to perform
 msg = sprintf(
@@ -34,17 +35,17 @@ msg = sprintf(
     '\n  [7] Run the full pipeline (actions [1]-[6])',...
     '\n  [8] Run the full pipeline except MRI processing (actions [2]-[6])',...
     '\n  --> '
-    ], dirs('proj')
+    ], PATHS('proj')
 );
 user_action = input(msg);
 if user_action == 1
     run LEADS_convert_dicoms.m
     run LEADS_MRI_Processing.m
-    removeSubdirs(fullfile(dirs('newdata'), {'mri'}));
+    removeSubdirs(fullfile(PATHS('newdata'), {'mri'}));
 elseif user_action == 2
     run LEADS_convert_dicoms.m
     run LEADS_PET_Processing.m
-    removeSubdirs(fullfile(dirs('newdata'), {'fbb', 'fdg', 'ftp'}));
+    removeSubdirs(fullfile(PATHS('newdata'), {'fbb', 'fdg', 'ftp'}));
 elseif user_action == 3
     run LEADS_PET_Quantification.m
 elseif user_action == 4
@@ -55,19 +56,19 @@ elseif user_action == 6
     run LEADS_convert_dicoms.m
     run LEADS_MRI_Processing.m
     run LEADS_PET_Processing.m
-    removeSubdirs(fullfile(dirs('newdata'), {'mri', 'fbb', 'fdg', 'ftp'}));
+    removeSubdirs(fullfile(PATHS('newdata'), {'mri', 'fbb', 'fdg', 'ftp'}));
 elseif user_action == 7
     run LEADS_convert_dicoms.m
     run LEADS_MRI_Processing.m
     run LEADS_PET_Processing.m
-    removeSubdirs(fullfile(dirs('newdata'), {'mri', 'fbb', 'fdg', 'ftp'}));
+    removeSubdirs(fullfile(PATHS('newdata'), {'mri', 'fbb', 'fdg', 'ftp'}));
     run LEADS_PET_Quantification.m
     run LEADS_PETMRI_MNI.m
     run LEADS_Wmapping.m
 elseif user_action == 8
     run LEADS_convert_dicoms.m
     run LEADS_PET_Processing.m
-    removeSubdirs(fullfile(dirs('newdata'), {'fbb', 'fdg', 'ftp'}));
+    removeSubdirs(fullfile(PATHS('newdata'), {'fbb', 'fdg', 'ftp'}));
     run LEADS_PET_Quantification.m
     run LEADS_PETMRI_MNI.m
     run LEADS_Wmapping.m
