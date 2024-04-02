@@ -105,7 +105,7 @@ if checkinfo==0
         spm('defaults','PET');
         matlabbatch{1}.spm.util.tvol.matfiles = newcases;
         matlabbatch{1}.spm.util.tvol.tmax = 3;
-        matlabbatch{1}.spm.util.tvol.mask = {'/mnt/neuroimaging/SPM/spm12/tpm/mask_ICV.nii,1'};
+        matlabbatch{1}.spm.util.tvol.mask = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/mask_ICV.nii,1'};
         matlabbatch{1}.spm.util.tvol.outf = char(strcat(path_wscore_meta,'tempTIV.csv'));
         spm_jobman('run',matlabbatch); clear matlabbatch;
 

@@ -1,9 +1,4 @@
-%%% script to run when in the FTP folder where an FTP needs to be processed
-%%% outputs: Mask ref region inferior CBL gray, SUVR image
-%%% inputs FTP scan, nu MRI, aparc+aseg MRI, SUIT Template
-
-%nii_setOrigin(ftpscan);
-% Different module to set origin
+% Reset origin
 file = deblank(ftpscan);
 st.vol = spm_vol(file);
 vs = st.vol.mat\eye(4);
@@ -25,8 +20,7 @@ matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.mask = 0;
 matlabbatch{1}.spm.spatial.coreg.estwrite.roptions.prefix = 'r';
 spm_jobman('run',matlabbatch); clear matlabbatch;
 
-%% Working to get the SUIT template reverse normalized in the native subject space
-
+%% Reverse normalize the SUIT template to native MRI space
 copyfile('/mnt/coredata/Projects/LEADS/script_f7p1/templates/rCerebellum-SUIT.nii',pathftp)
 
 spm('defaults','PET');

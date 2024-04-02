@@ -428,7 +428,7 @@ T_sz.Properties.VariableNames = cellstr(strcat(fslabs,'_ClustSize'));
 
 templdsids=regexp(vols_spm,'LDS\d{7}','match','once');
 tempdates=regexp(vols_spm,'\d{4}-\d{2}-\d{2}','match','once');
-tempmridates=regexp(aparc_spm,'(?<=MRI_T1_)\d{4}-\d{2}-\d{2}','match','once');
+tempmridates=regexp(aparc_spm,'(?<=MRI-T1_)\d{4}-\d{2}-\d{2}','match','once');
 
 meta=horzcat(templdsids, tempdates, tempmridates);
 T_meta=array2table(meta);
@@ -452,186 +452,181 @@ copyfile(filename,'/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service
     end % end if condition new images need extraction
 
 % 2. Longitudinal Module
-
 if size(tdb_fbb_longFBB,1)>0
+    fprintf(1,'Now Starting longitudinal module for FBB...\n');
 
-fprintf(1,'Now Starting longitudinal module for FBB...\n');
+    fbbscans_longFBB=char(tdb_fbb_longFBB(:,1));
+    fbbscans_longFBB_spm=cellstr(fbbscans_longFBB);
+    aparcscans_longFBB=char(tdb_fbb_longFBB(:,2));
+    aparcscans_longFBB_spm=cellstr(aparcscans_longFBB);
 
-fbbscans_longFBB=char(tdb_fbb_longFBB(:,1)); fbbscans_longFBB_spm=cellstr(fbbscans_longFBB);
-aparcscans_longFBB=char(tdb_fbb_longFBB(:,2)); aparcscans_longFBB_spm=cellstr(aparcscans_longFBB);
+    M_longFBB = zeros(size(fbbscans_longFBB,1),1); % create empty matrix in which to store values from all the ROIs
+    M_suvr_longFBB=zeros(size(fbbscans_longFBB,1),1);
+    M_sz_longFBB = zeros(size(fbbscans_longFBB,1),1);
 
-M_longFBB = zeros(size(fbbscans_longFBB,1),1); % create empty matrix in which to store values from all the ROIs
-M_suvr_longFBB=zeros(size(fbbscans_longFBB,1),1);
-M_sz_longFBB = zeros(size(fbbscans_longFBB,1),1);
+    for i=1:size(fbbscans_longFBB,1)
 
-for i=1:size(fbbscans_longFBB,1)
+        fprintf(1,'Now starting Longitudinal processing for %s\n',fbbscans_longFBB_spm{i});
 
-    fprintf(1,'Now starting Longitudinal processing for %s\n',fbbscans_longFBB_spm{i});
+        tempimg=fbbscans_longFBB_spm{i};
+        tempaparc=aparcscans_longFBB_spm{i};
 
-    tempimg=fbbscans_longFBB_spm{i};
-    tempaparc=aparcscans_longFBB_spm{i};
+        % working on the pieces needed
+        % 1. WM parcellation from the aparc, smooth and threshold
 
-    % working on the pieces needed
-    % 1. WM parcellation from the aparc, smooth and threshold
+        [appath,apfname,~]=spm_fileparts(char(tempaparc));
+        wmaparcfname=strcat(appath,'/',apfname,'_wm.nii');
+        swmaparcfname=strcat(appath,'/s',apfname,'_wm.nii');
+        swmaparcfnamethres=strcat(appath,'/s',apfname,'_wm_thr0p7.nii');
+        tempnu=strcat(appath,'/',apfname(1:29),'nu.nii');
 
-    [appath,apfname,~]=spm_fileparts(char(tempaparc));
-    wmaparcfname=strcat(appath,'/',apfname,'_wm.nii');
-    swmaparcfname=strcat(appath,'/s',apfname,'_wm.nii');
-    swmaparcfnamethres=strcat(appath,'/s',apfname,'_wm_thr0p7.nii');
-    tempnu=strcat(appath,'/',apfname(1:29),'nu.nii');
+        spm('defaults','PET');
+        matlabbatch{1}.spm.util.imcalc.input = cellstr(tempaparc);
+        matlabbatch{1}.spm.util.imcalc.output = char(wmaparcfname);
+        matlabbatch{1}.spm.util.imcalc.outdir = {''};
+        matlabbatch{1}.spm.util.imcalc.expression = 'i1==2 | i1==41';
+        matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
+        matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
+        matlabbatch{1}.spm.util.imcalc.options.mask = 0;
+        matlabbatch{1}.spm.util.imcalc.options.interp = 0;
+        matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
+        matlabbatch{2}.spm.spatial.smooth.data = cellstr(wmaparcfname);
+        matlabbatch{2}.spm.spatial.smooth.fwhm = [8 8 8];
+        matlabbatch{2}.spm.spatial.smooth.dtype = 0;
+        matlabbatch{2}.spm.spatial.smooth.im = 0;
+        matlabbatch{2}.spm.spatial.smooth.prefix = 's';
+        matlabbatch{3}.spm.util.imcalc.input = cellstr(swmaparcfname);
+        matlabbatch{3}.spm.util.imcalc.output = char(swmaparcfnamethres);
+        matlabbatch{3}.spm.util.imcalc.outdir = {''};
+        matlabbatch{3}.spm.util.imcalc.expression = 'i1>0.7';
+        matlabbatch{3}.spm.util.imcalc.var = struct('name', {}, 'value', {});
+        matlabbatch{3}.spm.util.imcalc.options.dmtx = 0;
+        matlabbatch{3}.spm.util.imcalc.options.mask = 0;
+        matlabbatch{3}.spm.util.imcalc.options.interp = 0;
+        matlabbatch{3}.spm.util.imcalc.options.dtype = spm_type('uint8');
+        spm_jobman('run',matlabbatch); clear matlabbatch;
 
-    spm('defaults','PET');
-    matlabbatch{1}.spm.util.imcalc.input = cellstr(tempaparc);
-    matlabbatch{1}.spm.util.imcalc.output = char(wmaparcfname);
-    matlabbatch{1}.spm.util.imcalc.outdir = {''};
-    matlabbatch{1}.spm.util.imcalc.expression = 'i1==2 | i1==41';
-    matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-    matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-    matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-    matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
-    matlabbatch{2}.spm.spatial.smooth.data = cellstr(wmaparcfname);
-    matlabbatch{2}.spm.spatial.smooth.fwhm = [8 8 8];
-    matlabbatch{2}.spm.spatial.smooth.dtype = 0;
-    matlabbatch{2}.spm.spatial.smooth.im = 0;
-    matlabbatch{2}.spm.spatial.smooth.prefix = 's';
-    matlabbatch{3}.spm.util.imcalc.input = cellstr(swmaparcfname);
-    matlabbatch{3}.spm.util.imcalc.output = char(swmaparcfnamethres);
-    matlabbatch{3}.spm.util.imcalc.outdir = {''};
-    matlabbatch{3}.spm.util.imcalc.expression = 'i1>0.7';
-    matlabbatch{3}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-    matlabbatch{3}.spm.util.imcalc.options.dmtx = 0;
-    matlabbatch{3}.spm.util.imcalc.options.mask = 0;
-    matlabbatch{3}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{3}.spm.util.imcalc.options.dtype = spm_type('uint8');
-    spm_jobman('run',matlabbatch); clear matlabbatch;
+        % Send QC multislice to the shared petcore
 
-    % Send QC multislice to the shared petcore
+        tempbs_wm_slovname=quickmultislice3(tempnu, char(swmaparcfnamethres),'axial','nih.lut','0.5 1.5','-30 6 58');
+        copyfile(tempbs_wm_slovname,path_qccompwm);
 
-    tempbs_wm_slovname=quickmultislice3(tempnu, char(swmaparcfnamethres),'axial','nih.lut','0.5 1.5','-30 6 58');
-    copyfile(tempbs_wm_slovname,path_qccompwm);
+        % 2. Isolate Brainstem
 
-    % 2. Isolate Brainstem
+        bsaparcfname=strcat(appath,'/',apfname,'_bs.nii');
 
-    bsaparcfname=strcat(appath,'/',apfname,'_bs.nii');
+        spm('defaults','PET');
+        matlabbatch{1}.spm.util.imcalc.input = cellstr(tempaparc);
+        matlabbatch{1}.spm.util.imcalc.output = char(bsaparcfname);
+        matlabbatch{1}.spm.util.imcalc.outdir = {''};
+        matlabbatch{1}.spm.util.imcalc.expression = 'i1==16';
+        matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
+        matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
+        matlabbatch{1}.spm.util.imcalc.options.mask = 0;
+        matlabbatch{1}.spm.util.imcalc.options.interp = 0;
+        matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
+        spm_jobman('run',matlabbatch); clear matlabbatch;
 
-    spm('defaults','PET');
-    matlabbatch{1}.spm.util.imcalc.input = cellstr(tempaparc);
-    matlabbatch{1}.spm.util.imcalc.output = char(bsaparcfname);
-    matlabbatch{1}.spm.util.imcalc.outdir = {''};
-    matlabbatch{1}.spm.util.imcalc.expression = 'i1==16';
-    matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-    matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-    matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-    matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
-    spm_jobman('run',matlabbatch); clear matlabbatch;
+        % 3. combine WM, bs and wcbl that has to be already there
 
-    % 3. combine WM, bs and wcbl that has to be already there
+        compwmfname=strcat(appath,'/compwm_ref_mask.nii');
 
-    compwmfname=strcat(appath,'/compwm_ref_mask.nii');
+        compwmfs=vertcat(swmaparcfnamethres,bsaparcfname,cellstr(strcat(appath,'/wholecbl_ref_mask.nii')));
 
-    compwmfs=vertcat(swmaparcfnamethres,bsaparcfname,cellstr(strcat(appath,'/wholecbl_ref_mask.nii')));
+        spm('defaults','PET');
+        matlabbatch{1}.spm.util.imcalc.input = compwmfs;
+        matlabbatch{1}.spm.util.imcalc.output = char(compwmfname);
+        matlabbatch{1}.spm.util.imcalc.outdir = {''};
+        matlabbatch{1}.spm.util.imcalc.expression = '(i1+i2+i3)>0';
+        matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
+        matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
+        matlabbatch{1}.spm.util.imcalc.options.mask = 0;
+        matlabbatch{1}.spm.util.imcalc.options.interp = 0;
+        matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
+        spm_jobman('run',matlabbatch); clear matlabbatch;
 
-    spm('defaults','PET');
-    matlabbatch{1}.spm.util.imcalc.input = compwmfs;
-    matlabbatch{1}.spm.util.imcalc.output = char(compwmfname);
-    matlabbatch{1}.spm.util.imcalc.outdir = {''};
-    matlabbatch{1}.spm.util.imcalc.expression = '(i1+i2+i3)>0';
-    matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-    matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-    matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-    matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
-    spm_jobman('run',matlabbatch); clear matlabbatch;
+        % Grab the rSCAN to get the scaling factor to be saved in the database
 
-    % Grab the rSCAN to get the scaling factor to be saved in the database
+        [imgpath,imgfname,~]=spm_fileparts(char(tempimg));
 
-    [imgpath,imgfname,~]=spm_fileparts(char(tempimg));
+        rimgfname=strcat(imgpath,'/r',imgfname(1:end-9),'.nii');
 
-    rimgfname=strcat(imgpath,'/r',imgfname(1:end-9),'.nii');
+        % Extract value
 
-    % Extract value
+        roi=spm_vol(char(strcat(appath,'/compwm_ref_mask.nii')));
+        roi1=spm_read_vols(roi);
 
-    roi=spm_vol(char(strcat(appath,'/compwm_ref_mask.nii')));
-    roi1=spm_read_vols(roi);
+        img=spm_vol(rimgfname); % Reading img header from the loop
+        img1=spm_read_vols(img); % Reading img values
+        img_mask=img1.*roi1; % Creating the masked image
+        img_mask=nonzeros(img_mask);
+        img_mask=img_mask(~isnan(img_mask));
+        ext_val=mean(img_mask);
 
-    img=spm_vol(rimgfname); % Reading img header from the loop
-  img1=spm_read_vols(img); % Reading img values
-  img_mask=img1.*roi1; % Creating the masked image
-  img_mask=nonzeros(img_mask);
-  img_mask=img_mask(~isnan(img_mask));
-  ext_val=mean(img_mask);
+        M_longFBB(i,1)=ext_val;
 
-  M_longFBB(i,1)=ext_val;
+        % Extract value from suvr image
 
-  % Extract value from suvr image
+        imgsuvr=spm_vol(char(tempimg)); % Reading imgsuvr header from the loop
+        imgsuvr1=spm_read_vols(imgsuvr); % Reading imgsuvr values
+        imgsuvr_mask=imgsuvr1.*roi1; % Creating the masked image
+        imgsuvr_mask=nonzeros(imgsuvr_mask);
+        imgsuvr_mask=imgsuvr_mask(~isnan(imgsuvr_mask));
+        ext_val_suvr=mean(imgsuvr_mask);
+        M_suvr_longFBB(i,1)=ext_val_suvr;
 
-  imgsuvr=spm_vol(char(tempimg)); % Reading imgsuvr header from the loop
-  imgsuvr1=spm_read_vols(imgsuvr); % Reading imgsuvr values
-  imgsuvr_mask=imgsuvr1.*roi1; % Creating the masked image
-  imgsuvr_mask=nonzeros(imgsuvr_mask);
-  imgsuvr_mask=imgsuvr_mask(~isnan(imgsuvr_mask));
-  ext_val_suvr=mean(imgsuvr_mask);
-  M_suvr_longFBB(i,1)=ext_val_suvr;
+        M_sz_longFBB(i,1)=size(img_mask,1);
 
-  M_sz_longFBB(i,1)=size(img_mask,1);
+        % Create the new suvr image, last thing I want
 
-  % Create the new suvr image, last thing I want
+        exp=char(strcat('i1/',num2str(ext_val)));
+        newfname=char(strcat(imgpath,'/',imgfname(1:end-9),'_suvr_compWM.nii'));
 
-    exp=char(strcat('i1/',num2str(ext_val)));
-    newfname=char(strcat(imgpath,'/',imgfname(1:end-9),'_suvr_compWM.nii'));
+        spm('defaults','PET');
+        matlabbatch{1}.spm.util.imcalc.input = cellstr(rimgfname);
+        matlabbatch{1}.spm.util.imcalc.output = newfname;
+        matlabbatch{1}.spm.util.imcalc.outdir = {''};
+        matlabbatch{1}.spm.util.imcalc.expression = exp;
+        matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
+        matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
+        matlabbatch{1}.spm.util.imcalc.options.mask = 0;
+        matlabbatch{1}.spm.util.imcalc.options.interp = 1;
+        matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
+        spm_jobman('run',matlabbatch); clear matlabbatch;
 
-    spm('defaults','PET');
-    matlabbatch{1}.spm.util.imcalc.input = cellstr(rimgfname);
-    matlabbatch{1}.spm.util.imcalc.output = newfname;
-    matlabbatch{1}.spm.util.imcalc.outdir = {''};
-    matlabbatch{1}.spm.util.imcalc.expression = exp;
-    matlabbatch{1}.spm.util.imcalc.var = struct('name', {}, 'value', {});
-    matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-    matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-    matlabbatch{1}.spm.util.imcalc.options.interp = 1;
-    matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('float32');
-    spm_jobman('run',matlabbatch); clear matlabbatch;
+        clear apfname appath tempnu bsaparcfname compwmfname compwmfs exp ext_val ext_val_suvr img img1 img_mask imgfname imgpath newfname rimgfname roi roi1 swmaparcfname swmaparcfnamethres tempaparc tempimg wmaparcfname
 
-    clear apfname appath tempnu bsaparcfname compwmfname compwmfs exp ext_val ext_val_suvr img img1 img_mask imgfname imgpath newfname rimgfname roi roi1 swmaparcfname swmaparcfnamethres tempaparc tempimg wmaparcfname
+    end
 
-end % end for each new image to be processed longitudinally
+    T_longFBB=array2table(M_longFBB);
+    Tsuvr_longFBB=array2table(M_suvr_longFBB);
+    T_sz_longFBB=array2table(M_sz_longFBB);
+    T_longFBB.Properties.VariableNames={'ScalingFactor_CompWM'};
+    Tsuvr_longFBB.Properties.VariableNames={'SUVR_CompWM'};
+    T_sz_longFBB.Properties.VariableNames={'ScalingFactor_CompWM_ClustSize'};
 
-T_longFBB=array2table(M_longFBB);
-Tsuvr_longFBB=array2table(M_suvr_longFBB);
-T_sz_longFBB=array2table(M_sz_longFBB);
-T_longFBB.Properties.VariableNames={'ScalingFactor_CompWM'};
-Tsuvr_longFBB.Properties.VariableNames={'SUVR_CompWM'};
-T_sz_longFBB.Properties.VariableNames={'ScalingFactor_CompWM_ClustSize'};
+    templdsids_longFBB=regexp(fbbscans_longFBB_spm,'LDS\d{7}','match','once');
+    tempdates_longFBB=regexp(fbbscans_longFBB_spm,'\d{4}-\d{2}-\d{2}','match','once');
+    tempmridates_longFBB=regexp(aparcscans_longFBB_spm,'(?<=MRI-T1_)\d{4}-\d{2}-\d{2}','match','once');
 
-templdsids_longFBB=regexp(fbbscans_longFBB_spm,'LDS\d{7}','match','once');
-tempdates_longFBB=regexp(fbbscans_longFBB_spm,'\d{4}-\d{2}-\d{2}','match','once');
-tempmridates_longFBB=regexp(aparcscans_longFBB_spm,'(?<=MRI_T1_)\d{4}-\d{2}-\d{2}','match','once');
+    meta_longFBB=horzcat(templdsids_longFBB, tempdates_longFBB, tempmridates_longFBB);
+    T_meta_longFBB=array2table(meta_longFBB);
+    T_meta_longFBB.Properties.VariableNames={'ID','FBBPET_Date','MRI_Date'};
 
-meta_longFBB=horzcat(templdsids_longFBB, tempdates_longFBB, tempmridates_longFBB);
-T_meta_longFBB=array2table(meta_longFBB);
-T_meta_longFBB.Properties.VariableNames={'ID','FBBPET_Date','MRI_Date'};
+    qc_longFBB=horzcat(fbbscans_longFBB_spm, aparcscans_longFBB_spm);
+    T_qc_longFBB=array2table(qc_longFBB);
+    T_qc_longFBB.Properties.VariableNames={'FBBPET_path','APARC_path'};
 
-qc_longFBB=horzcat(fbbscans_longFBB_spm, aparcscans_longFBB_spm);
-T_qc_longFBB=array2table(qc_longFBB);
-T_qc_longFBB.Properties.VariableNames={'FBBPET_path','APARC_path'};
+    T_longFBB=[T_meta_longFBB T_qc_longFBB T_longFBB Tsuvr_longFBB T_sz_longFBB];
 
-T_longFBB=[T_meta_longFBB T_qc_longFBB T_longFBB Tsuvr_longFBB T_sz_longFBB];
+    if size(newcases_longFBB,1)>0
+        T_longFBB=vertcat(oldinfo_longFBB,T_longFBB);
+    end
 
-if size(newcases_longFBB,1)>0
-T_longFBB=vertcat(oldinfo_longFBB,T_longFBB);
-end % end if condition new longitudinal cases exist
-
-filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_CompWM_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
-writetable(T_longFBB,filename,'WriteRowNames',true)
-copyfile(filename,'/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service/');
-
-end % end if condition existence of files in need of longitudinal extraction
-
+    filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FBB_CompWM_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
+    writetable(T_longFBB,filename,'WriteRowNames',true)
+    copyfile(filename,'/shared/petcore/Projects/LEADS/data_f7p1/LONI_uploads/service/');
+end
 
 % Done, wrapping up - clear everything before proceeding to the FTP ROI
-% Extraction
-
-clearvars -except tdb_ftp tdb_fdg path_processed path_extraction path_qccompwm
-fprintf(1,'**Completed ROI and Longitudinal extraction for all the FBB SUVR images available!\n');
+fprintf(1,'Completed ROI extraction for processed FBB scans\n');

@@ -6,12 +6,12 @@
 %%% Restore maltlab defaults %% Nidhi May 2022
 restoredefaultpath;
 addpath('/home/mac/nmundada/matlab');
-addpath('/mnt/neuroimaging/FreeSurfer/V7.1.0/matlab');
-addpath('/mnt/neuroimaging/FreeSurfer/V7.1.0/fsfast/toolbox');
+addpath('/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/FreeSurfer/V7.1.0/matlab');
+addpath('/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/FreeSurfer/V7.1.0/fsfast/toolbox');
 addpath(genpath('/mnt/coredata/Projects/Resources/scripts/leotools/')) ;
 
 %%% Addpath for something we will need later
-addpath('/mnt/neuroimaging/SPM/spm12/');
+addpath('/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/');
 addpath('/mnt/coredata/Projects/LEADS/screening_M36/service/');
 
 %%% Create some variables we will use later, dirs template and ROIs

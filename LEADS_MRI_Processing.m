@@ -7,7 +7,7 @@
 %%%%%% Feb 2024: Major update with the transition to 6mm PET data
 
 % Get a list of all processed MRIs (subject ID and scan date)
-processed_mris = dir(fullfile(PATHS('processed'), '**', 'MRI_T1_*', '*nu.nii*'));
+processed_mris = dir(fullfile(PATHS('processed'), '**', 'MRI-T1_*', '*nu.nii*'));
 processed_mris = {processed_mris.name}';
 processed_mris = cellfun(@(x) x(1:end-7), processed_mris, 'uniformoutput', 0);
 
@@ -30,7 +30,7 @@ newmris = dir('*/*/*/*/*.nii');
 newmris = transpose(struct2cell(newmris));
 tempnewids = regexp(newmris(:,2), 'LDS\d{7}', 'match', 'once');
 tempnewmridates = regexp(newmris(:,2), '\d{4}-\d{2}-\d{2}', 'match', 'once');
-listnewmris = strcat(tempnewids, '_MRI_T1_', tempnewmridates);
+listnewmris = strcat(tempnewids, '_MRI-T1_', tempnewmridates);
 newmris = listnewmris;
 
 %% We can use the newmris object for the processing
@@ -66,8 +66,8 @@ for i=1:size(newmris,1)
     temptps=dir(strcat(profolder,'/Timepoint*'));
     temptps={temptps.name}';
     if size(temptps,1)==0 % There is no "Timepoint" folder in the processed one, this means it is a fresh subject
-        mkdir(strcat(profolder,'/MRI_T1_',temp_date));
-        newfname=strcat(profolder,'/MRI_T1_',temp_date,'/',temp_id,'_MRI_T1_',temp_date,'.nii');
+        mkdir(strcat(profolder,'/MRI-T1_',temp_date));
+        newfname=strcat(profolder,'/MRI-T1_',temp_date,'/',temp_id,'_MRI-T1_',temp_date,'.nii');
         movefile(oldfname,newfname); %% renamed and moved the file to the output folder
     end
 
@@ -146,10 +146,14 @@ for ii=1:size(listfsf,1)
 
         % new approach- if this is not the same date of the MRI at Timepoint 1,
         % coreg
-        mridirs = sort({dir(strcat(path_processed,newmris{ii}(1:10),'/MRI_T1_*')).name});
+        mridirs = sort({dir(strcat(path_processed,newmris{ii}(1:10),'/MRI-T1_*')).name});
         temptp1 = mridirs{1};
-        if ~isequal(temptp1(8:17),newmris{ii}(19:28))
-            newnupath=strcat(listfsf{ii},'/mri/','nu.nii');
+        if isequal(temptp1(8:17),newmris{ii}(19:28))
+            oldnupath = strcat(path_freesurfer, listfsf{ii}(size(listfsf{ii},2)-27:size(listfsf{ii},2)-18),'_',temptp1,'/mri/nu.nii');
+            newnupath = strcat(listfsf{ii},'/mri/','rnu.nii');
+            copyfile(oldnupath, newnupath);
+        else
+            newnupath=strcat(listfsf{ii},'/mri/','rnu.nii');
             newaparcpath=strcat(listfsf{ii},'/mri/','raparc+aseg.nii');
             newbspath=strcat(listfsf{ii},'/mri/','rbrainstemSsLabels_v12_VoxSpace.nii');
             oldnupath=strcat(path_freesurfer,listfsf{ii}(size(listfsf{ii},2)-27:size(listfsf{ii},2)-18),'_',temptp1,'/mri/nu.nii');
@@ -168,12 +172,12 @@ for ii=1:size(listfsf,1)
         end
 
         % quick module to know in which Timepoint are we
-        tempmytp=dir(strcat(path_processed,newmris{ii}(1:10),'/Timepoint*/MRI_T1_*'));
+        tempmytp=dir(strcat(path_processed,newmris{ii}(1:10),'/Timepoint*/MRI-T1_*'));
         tempmytp=struct2cell(tempmytp)';
         tempmytp=tempmytp(strcmp(tempmytp(:,1),newmris{ii}(12:28)),:);
 
-        oldfname=strcat(listfsf{ii},'/mri/','nu.nii');
-        newfname=strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_nu.nii');
+        oldfname=strcat(listfsf{ii},'/mri/','rnu.nii');
+        newfname=strcat(tempmytp{1,2},'/',tempmytp{1,1},'/',newmris{ii},'_rnu.nii');
         symlink1=strcat('ln -s',{' '},oldfname,{' '},newfname);
 
         oldfname2=strcat(listfsf{ii},'/mri/','raparc+aseg.nii');
@@ -195,27 +199,27 @@ for ii=1:size(listfsf,1)
         matlabbatch{1}.spm.spatial.preproc.channel.biasreg = 0.001;
         matlabbatch{1}.spm.spatial.preproc.channel.biasfwhm = 60;
         matlabbatch{1}.spm.spatial.preproc.channel.write = [0 0];
-        matlabbatch{1}.spm.spatial.preproc.tissue(1).tpm = {'/mnt/neuroimaging/SPM/spm12/tpm/TPM.nii,1'};
+        matlabbatch{1}.spm.spatial.preproc.tissue(1).tpm = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/TPM.nii,1'};
         matlabbatch{1}.spm.spatial.preproc.tissue(1).ngaus = 2;
-        matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 1];
-        matlabbatch{1}.spm.spatial.preproc.tissue(1).warped = [1 1];
-        matlabbatch{1}.spm.spatial.preproc.tissue(2).tpm = {'/mnt/neuroimaging/SPM/spm12/tpm/TPM.nii,2'};
+        matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 0];
+        matlabbatch{1}.spm.spatial.preproc.tissue(1).warped = [0 0];
+        matlabbatch{1}.spm.spatial.preproc.tissue(2).tpm = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/TPM.nii,2'};
         matlabbatch{1}.spm.spatial.preproc.tissue(2).ngaus = 2;
-        matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 1];
-        matlabbatch{1}.spm.spatial.preproc.tissue(2).warped = [1 1];
-        matlabbatch{1}.spm.spatial.preproc.tissue(3).tpm = {'/mnt/neuroimaging/SPM/spm12/tpm/TPM.nii,3'};
+        matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 0];
+        matlabbatch{1}.spm.spatial.preproc.tissue(2).warped = [0 0];
+        matlabbatch{1}.spm.spatial.preproc.tissue(3).tpm = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/TPM.nii,3'};
         matlabbatch{1}.spm.spatial.preproc.tissue(3).ngaus = 2;
-        matlabbatch{1}.spm.spatial.preproc.tissue(3).native = [1 1];
-        matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [1 1];
-        matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {'/mnt/neuroimaging/SPM/spm12/tpm/TPM.nii,4'};
+        matlabbatch{1}.spm.spatial.preproc.tissue(3).native = [1 0];
+        matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [0 0];
+        matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/TPM.nii,4'};
         matlabbatch{1}.spm.spatial.preproc.tissue(4).ngaus = 3;
         matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [0 0];
         matlabbatch{1}.spm.spatial.preproc.tissue(4).warped = [0 0];
-        matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {'/mnt/neuroimaging/SPM/spm12/tpm/TPM.nii,5'};
+        matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/TPM.nii,5'};
         matlabbatch{1}.spm.spatial.preproc.tissue(5).ngaus = 4;
         matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [0 0];
         matlabbatch{1}.spm.spatial.preproc.tissue(5).warped = [0 0];
-        matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {'/mnt/neuroimaging/SPM/spm12/tpm/TPM.nii,6'};
+        matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {'/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/tpm/TPM.nii,6'};
         matlabbatch{1}.spm.spatial.preproc.tissue(6).ngaus = 2;
         matlabbatch{1}.spm.spatial.preproc.tissue(6).native = [0 0];
         matlabbatch{1}.spm.spatial.preproc.tissue(6).warped = [0 0];
@@ -225,12 +229,7 @@ for ii=1:size(listfsf,1)
         matlabbatch{1}.spm.spatial.preproc.warp.affreg = 'mni';
         matlabbatch{1}.spm.spatial.preproc.warp.fwhm = 0;
         matlabbatch{1}.spm.spatial.preproc.warp.samp = 3;
-        matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];
-        matlabbatch{2}.spm.spatial.smooth.data = cellstr(strcat(tempmytp{1,2},'/',tempmytp{1,1},'/mwc1',newmris{ii},'_nu.nii'));
-        matlabbatch{2}.spm.spatial.smooth.fwhm = [8 8 8];
-        matlabbatch{2}.spm.spatial.smooth.dtype = 0;
-        matlabbatch{2}.spm.spatial.smooth.im = 0;
-        matlabbatch{2}.spm.spatial.smooth.prefix = 's8iso_';
+        matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1]; % writes the y_ (native to MNI) and iy_ (MNI to native) deformation field niftis
         spm_jobman('run',matlabbatch);
         clear matlabbatch
     else

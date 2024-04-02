@@ -160,8 +160,7 @@ for i=1:size(newftps,1)
             aparccmd=strcat('cp -a',{' '},aparclnk,{' '},strcat(path_processed,temp_id,'/',temptps{1,2},'/FTP_',temp_date));
             system(char(aparccmd));
 
-            % Let's store the reverse normalized matrix to process the
-            % SUIT template later for FTP
+            % Store the reverse normalized matrix
             srcrevnorm=dir(strcat(temptps{1,1},'/iy_*'));
             revnormlnk=strcat(temptps{1,1},'/',srcrevnorm.name);
             revnormcmd=strcat('ln -s',{' '},revnormlnk, {' '}, strcat(path_processed,temp_id,'/',temptps{1,2},'/FTP_',temp_date,'/y_revnorm.nii'));

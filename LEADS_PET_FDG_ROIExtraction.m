@@ -22,7 +22,7 @@ newinfo.Properties.VariableNames={'ID','FDGPET_Date'};
 olddb=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FDG_ROI_Extraction*');
 
     if size(olddb,1)>0
-    
+
     olddb=struct2cell(olddb)';
     olddb=olddb(:,[1 3]);
     olddb=array2table(olddb);
@@ -75,22 +75,22 @@ olddb=dir('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/FDG_ROI_Extraction*
                         filename = sprintf('/mnt/coredata/Projects/LEADS/data_f7p1/extraction/RemovedbutKept_Cases_FDG_ROI_Extraction_%s.csv', datestr(now,'mm-dd-yyyy_HH-MM-SS'));
                         writetable(remcases,filename,'WriteRowNames',true)
                 end % end if condition choice on removed cases
-                
+
                 clear choice filename
 
             end % end if condition existence of removed cases
-            
+
             elseif checkinfo==1
-                
+
                 fprintf(2,'No new FDG scans needed extraction!\n');
                 tdb_fdg={};
-                
+
          end % end if condition there is a difference between old extraction and new extraction list
-        
+
     end % end if condition there is a previous FDG extraction database available
-    
+
     if size(tdb_fdg,1)>0
-    
+
 % 1. Cross-sectional Module
 
 %%% Create the list of regions we are interested in, plus creating labels
@@ -113,18 +113,18 @@ regs = fsids; % We are extracting from all the 113 regions included in the objec
 numf1=size(regs,1);
 
 M = zeros(numv1,numf1); % create empty matrix in which to store values from all the ROIs
-M_sz = zeros(numv1,numf1);  
+M_sz = zeros(numv1,numf1);
 
 M_refreg=zeros(numv1,1); % creating an empty matrix storing ref region extraction
-M_refreg_sz=zeros(numv1,1);    
+M_refreg_sz=zeros(numv1,1);
 
     for v = 1:numv1 % Reading each image
 
         r1n=spm_vol(aparcs(v,:)); % reading the aparc-aseg
         r1=spm_read_vols(r1n);
 
-        img=spm_vol(vols(v,:)); % Reading img header 
-        img1=spm_read_vols(img); % Reading img values 
+        img=spm_vol(vols(v,:)); % Reading img header
+        img1=spm_read_vols(img); % Reading img values
 
         [~,f,e]=spm_fileparts(vols(v,:));
         tempfname=char(strcat(f,e));
@@ -142,10 +142,10 @@ M_refreg_sz=zeros(numv1,1);
         end % end for loop for each Freesurfer APARC+ASEG region
 
       M(v,:)=vec; % save the values ROI-wise (column-wise)
-      M_sz(v,:)=vec_sz;  % save the roi size                      
+      M_sz(v,:)=vec_sz;  % save the roi size
 
       %%%% Small module to get reference region
-     %%%% values 
+     %%%% values
 
      templdsid=regexp(vols_spm(v),'LDS\d{7}','match','once');
      tempfdgdate=regexp(vols_spm(v),'\d{4}-\d{2}-\d{2}','match','once');
@@ -188,7 +188,7 @@ T_sz.Properties.VariableNames = cellstr(strcat(fslabs,'_ClustSize'));
 
 templdsids=regexp(vols_spm,'LDS\d{7}','match','once');
 tempdates=regexp(vols_spm,'\d{4}-\d{2}-\d{2}','match','once');
-tempmridates=regexp(aparc_spm,'(?<=MRI_T1_)\d{4}-\d{2}-\d{2}','match','once');
+tempmridates=regexp(aparc_spm,'(?<=MRI-T1_)\d{4}-\d{2}-\d{2}','match','once');
 
 meta=horzcat(templdsids, tempdates, tempmridates);
 T_meta=array2table(meta);
@@ -198,7 +198,7 @@ qc=horzcat(vols_spm, aparc_spm);
 T_qc=array2table(qc);
 T_qc.Properties.VariableNames={'FDGPET_path','APARC_path'};
 
-T=[T_meta T_qc T_refreg T T_refreg_sz T_sz]; 
+T=[T_meta T_qc T_refreg T T_refreg_sz T_sz];
 
     if size(newcases,1)>0
     T=vertcat(oldinfo,T);

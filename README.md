@@ -21,6 +21,10 @@ across them, unweighted by volume.
 ways:
     - Raw data is stored in `/mnt/coredata/processing/leads/data/raw`
     - Processed data is stored in `/mnt/coredata/processing/leads/data/processed`
+    - `MRI_T1` filenames and directories are being changed to `MRI-T1`
+    - MRI-based mask files are being moved from PET directories to the
+    processed `MRI-T1` directory, and PET directories will then symlink
+    to the mask files that are used e.g. in making SUVR images
     - "w_affine" files are now simply prefixed with "a" to distinguish
     the linear affine transform from the nonlinear warping prefix "w",
     e.g. `a<subj>_MRI-T1_<YYYY-MM-DD>_nu.nii`

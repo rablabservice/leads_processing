@@ -15,7 +15,7 @@ PATHS('extraction') = fullfile(PATHS('data'), 'extraction');
 PATHS('freesurfer') = fullfile(PATHS('data'), 'freesurfer');
 PATHS('links') = fullfile(PATHS('data'), 'links');
 PATHS('metadata') = fullfile(PATHS('proj'), 'metadata');
-PATHS('newdata') = fullfile(PATHS('data'), 'newdata');
+PATHS('raw') = fullfile(PATHS('data'), 'raw');
 PATHS('processed') = fullfile(PATHS('data'), 'processed');
 addpath(genpath(PATHS('code')));
 

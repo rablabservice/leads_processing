@@ -440,7 +440,7 @@ T_sz.Properties.VariableNames = cellstr(strcat(fslabs,'_ClustSize'));
 
 templdsids=regexp(vols_spm,'LDS\d{7}','match','once');
 tempdates=regexp(vols_spm,'\d{4}-\d{2}-\d{2}','match','once');
-tempmridates=regexp(aparc_spm,'(?<=MRI_T1_)\d{4}-\d{2}-\d{2}','match','once');
+tempmridates=regexp(aparc_spm,'(?<=MRI-T1_)\d{4}-\d{2}-\d{2}','match','once');
 
 
 meta=horzcat(templdsids, tempdates, tempmridates);
@@ -593,7 +593,7 @@ T_sz_longFTP.Properties.VariableNames={'ScalingFactor_ErodedWM_ClustSize'};
 
 templdsids_longFTP=regexp(ftpscans_longFTP_spm,'LDS\d{7}','match','once');
 tempdates_longFTP=regexp(ftpscans_longFTP_spm,'\d{4}-\d{2}-\d{2}','match','once');
-tempmridates_longFTP=regexp(aparcscans_longFTP_spm,'(?<=MRI_T1_)\d{4}-\d{2}-\d{2}','match','once');
+tempmridates_longFTP=regexp(aparcscans_longFTP_spm,'(?<=MRI-T1_)\d{4}-\d{2}-\d{2}','match','once');
 
 meta_longFTP=horzcat(templdsids_longFTP, tempdates_longFTP, tempmridates_longFTP);
 T_meta_longFTP=array2table(meta_longFTP);
