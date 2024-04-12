@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import sys
 import os
 import os.path as op
 import datetime
@@ -338,5 +337,4 @@ def main():
     for tracer in raw_scans["scan_type"].unique():
         n = len(raw_scans.query(f"scan_type=='{tracer}'"))
         print(f"  {n:>3} {tracer}")
-    print(f"Dropped {missing}")
     print(f"Saved raw_scans to {outf}")
