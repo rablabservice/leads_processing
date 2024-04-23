@@ -28,7 +28,7 @@ function varargout = get_freesurfer_files(mri_dir, fmt, segment_brainstem, fs_di
         fs_dir {mustBeText} = ''
     end
 
-    % Format inputs
+    % Format paths
     mri_dir = abspath(mri_dir);
     if isempty(fs_dir)
         fs_dir = fullfile(mri_dir, 'freesurfer');

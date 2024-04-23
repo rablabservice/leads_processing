@@ -3,7 +3,7 @@ function copy_convert_freesurfer(mri_dir, segment_brainstem, overwrite, verbose)
     % and convert them from .mgz to .nii
     % ------------------------------------------------------------------
     arguments
-        mri_dir {mustBeText}
+        mri_dir {mustBeFolder}
         segment_brainstem logical = true
         overwrite logical = false
         verbose logical = true
@@ -24,19 +24,37 @@ function copy_convert_freesurfer(mri_dir, segment_brainstem, overwrite, verbose)
         [nii_exist, nu_niif, aparc_niif] = get_freesurfer_files(mri_dir, 'nii', segment_brainstem);
     end
 
-
+    % Convert .mgz files to .nii
     if mgz_exist
         if overwrite || ~nii_exist
             if verbose
-                fprintf('Converting FreeSurfer files from .mgz to .nii for %s\n', mri_dir);
+                fprintf('- Converting .mgz files to .nii\n')
             end
-            system(char(append(mri_convert, nu_mgzf, ' ', nu_niif)));
-            system(char(append(mri_convert, aparc_mgzf, ' ', aparc_niif)));
+
+            % Convert the nu.mgz
+            cmd_nu = char(append(mri_convert, nu_mgzf, ' ', nu_niif));
+            if verbose
+                fprintf('  $ %s\n', cmd_nu);
+            end
+            system(cmd_nu);
+
+            % Convert the aparc+aseg.mgz
+            cmd_aparc = char(append(mri_convert, aparc_mgzf, ' ', aparc_niif));
+            if verbose
+                fprintf('  $ %s\n', cmd_aparc);
+            end
+            system(cmd_aparc);
+
+            % Convert the brainstem.mgz
             if segment_brainstem
-                system(char(append(mri_convert, brainstem_mgzf, ' ', brainstem_niif)));
+                cmd_brainstem = char(append(mri_convert, brainstem_mgzf, ' ', brainstem_niif));
+                if verbose
+                    fprintf('  $ %s\n', cmd_brainstem);
+                end
+                system(cmd_brainstem);
             end
         end
     else
-        error('Missing one or more expected FreeSurfer outputs for %s', mri_dir);
+        fprintf('Missing one or more expected FreeSurfer outputs for %s', mri_dir);
     end
 end

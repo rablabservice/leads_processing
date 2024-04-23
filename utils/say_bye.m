@@ -1,4 +1,4 @@
-function sayBye()
+function say_bye()
     % Print a goodbye message to the console
     msg = [
     '\nAll done',...

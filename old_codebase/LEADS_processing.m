@@ -75,5 +75,5 @@ elseif user_action == 8
 end
 
 % End the program
-sayBye();
+say_bye();
 clear;

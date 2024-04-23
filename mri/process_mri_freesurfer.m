@@ -15,14 +15,14 @@ function process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite,
     %     If true, print diagnostic information
     % ------------------------------------------------------------------
     arguments
-        raw_mrif {mustBeText}
-        mri_dir {mustBeText}
+        raw_mrif {mustBeFile}
+        mri_dir {mustBeFolder}
         segment_brainstem logical = true
         overwrite logical = false
         verbose logical = true
     end
 
-    % Format inputs
+    % Format paths
     fs_version = 'freesurfer_7p1';
     raw_mrif = abspath(raw_mrif);
     mri_dir = abspath(mri_dir);
@@ -31,24 +31,32 @@ function process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite,
     % Check if the FreeSurfer directory already exists
     if exist(fs_dir, 'dir')
         if overwrite
+            if verbose
+                fprintf('- Removing existing FreeSurfer directory: %s\n', fs_dir);
+            end
             rmdir(fs_dir, 's');
         else
-            error('%s already exists. Set overwrite to true to delete it.', fs_dir);
+            if verbose
+                fprintf('- FreeSurfer directory exists, will not rerun\n');
+            end
+            return
         end
     end
 
-    % First run recon-all
+    % Run recon-all
     cmd_fs=char(append('recon-all -all -i ', raw_mrif, ' -sd ', mri_dir, ' -s ', fs_version));
     if verbose
-        disp(cmd_fs);
+        fprintf('- Processing MRI through FreeSurfer\n')
+        fprintf('  $ %s\n', cmd_fs);
     end
     system(cmd_fs);
 
-    % Then run segmentBS.sh
+    % Segment the brainstem
     if segment_brainstem
+        % Run segmentBS.sh
         cmd_bs=char(append('segmentBS.sh ', fs_version, ' ', mri_dir));
         if verbose
-            disp(cmd_bs);
+            fprintf('  $ %s\n', cmd_bs);
         end
         system(cmd_bs);
     end

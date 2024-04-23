@@ -24,8 +24,9 @@ function process_mri_post_freesurfer(mri_dir, segment_brainstem, overwrite, verb
         mri_files = {nuf, aparcf};
     end
 
-    % Reset origin to center-of-mass
-    mri_reset_origin_com(mri_files);  % overwrites the input images
+    % Reset origin to center-of-mass (note this step overwrites the
+    % input image files)
+    mri_reset_origin_com(mri_files);
 
     % If MRI is not baseline, coregister it to the baseline MRI
     baseline_nuf = get_baseline_mri(subj_dir);

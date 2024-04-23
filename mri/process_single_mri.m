@@ -1,20 +1,29 @@
-function process_single_mri(scan_tag, data_dir, overwrite, verbose)
+function process_single_mri(mri_dir, overwrite, verbose)
     % Run a single MRI scan through all the processing steps.
     % ------------------------------------------------------------------
+    arguments
+        mri_dir {mustBeFolder}
+        overwrite logical = false
+        verbose logical = true
+    end
 
-    % Get the scan tag
-    [subj, scan_type, scan_date] = parse_scan_tag(scan_tag);
-
+    % Format paths
+    mri_dir = abspath(mri_dir);
 
     % Find the scan in raw
+    % raw_mrif = fullfile(mri_dir, 'raw', 'mri.nii.gz');
 
+    % Print the scan tag (<subj>_<scan_type>_<scan_date>)
+    if verbose
+        scan_tag = get_scan_tag(mri_dir);
+        fprintf('\n%s\n', scan_tag);
+        fprintf('\n%s\n', repmat('-', 1, length(scan_tag)));
+    end
 
-    % Look for the scan in processed
-
-
-    % Run FreeSurfer processing
-
+    % Run FreeSurfer
+    process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite, verbose);
 
     % Run post-FreeSurfer processing
+    process_mri_post_freesurfer(mri_dir, segment_brainstem, overwrite, verbose);
 
 end

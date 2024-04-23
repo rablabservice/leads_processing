@@ -1,4 +1,4 @@
-function removeSubdirs(paths, prefix, verbose)
+function remove_subdirs(paths, prefix, verbose)
 % Remove subdirectories with a specified prefix in given paths.
 %
 % Parameters

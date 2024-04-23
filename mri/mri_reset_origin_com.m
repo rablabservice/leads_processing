@@ -9,26 +9,47 @@ function coivox = mri_reset_origin_com(vols)
     %     transform is estimated only for this image. Same transform is
     %     applied to any additional images.
     % ------------------------------------------------------------------
+    if verbose
+        fprintf('- Resetting origin to center-of-mass\n')
+        for v = 1:size(vols, 1)
+            filepath = abspath(vols(v, :));
+            if v == 1
+                fprintf('  - Source image: %s\n', basename(filepath));
+            elseif v == 2
+                fprintf('    Other images: %s\n', basename(filepath));
+            else
+                fprintf('                  %s\n', basename(filepath));
+            end
+        end
+    end
+
+    % Check that all input vols exist
+    for v = 1:size(vols, 1)
+        if ~exist(abspath(vols(v, :)), 'file')
+            error('File not found: %s', abspath(vols(v, :)));
+        end
+    end
+
+    % Initialize SPM
     spm_jobman('initcfg');
 
+    % Load the first image
     coivox = ones(4,1);
     [pth, nam, ext] = spm_fileparts(deblank(vols(1,:)));
     fname = fullfile(pth, [nam ext]);
-
     hdr = spm_vol([fname,',1']);
     img = spm_read_vols(hdr);
     img = img - min(img(:));
     img(isnan(img)) = 0;
 
-    % Find the center-of-mass in each dimension
+    % Find the center-of-mass along each dimension
     sumTotal = sum(img(:));
     coivox(1) = sum(sum(sum(img,3),2)'.*(1:size(img,1)))/sumTotal;
     coivox(2) = sum(sum(sum(img,3),1).*(1:size(img,2)))/sumTotal;
     coivox(3) = sum(squeeze(sum(sum(img,2),1))'.*(1:size(img,3)))/sumTotal;
     XYZ_mm = hdr.mat * coivox; % convert from voxels to mm
 
-    fprintf('%s center of brightness differs from current origin by %.0fx%.0fx%.0fmm in X Y Z dimensions\n', fname, XYZ_mm(1), XYZ_mm(2), XYZ_mm(3));
-
+    % Update the origin in the header of each image
     for v = 1:size(vols, 1)
         fname = deblank(vols(v, :));
         if ~isempty(fname)
@@ -39,9 +60,7 @@ function coivox = mri_reset_origin_com(vols)
             if exist(fname, 'file')
                 destname = fullfile(pth, [nam '_old.mat']);
                 copyfile(fname, destname);
-                fprintf('%s is renaming %s to %s\n', mfilename, fname, destname);
             end
-            % hdr.mat(1:3, 4) = hdr.mat(1:3, 4) - XYZ_mm(1:3);
             hdr.mat(1,4) =  hdr.mat(1,4) - XYZ_mm(1);
             hdr.mat(2,4) =  hdr.mat(2,4) - XYZ_mm(2);
             hdr.mat(3,4) =  hdr.mat(3,4) - XYZ_mm(3);
@@ -50,6 +69,11 @@ function coivox = mri_reset_origin_com(vols)
                 delete(fname);
             end
         end
+    end
+
+    % Coregister images to the SPM template
+    if verbose
+        fprintf('- Coregistering %s to the SPM OldNorm/T1.nii template\n', basename(vols(1, :)));
     end
     coregSub(vols);
     for v = 1:size(vols,1)

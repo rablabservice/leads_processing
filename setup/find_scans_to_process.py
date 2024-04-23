@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import os
 import os.path as op
 import datetime
@@ -7,16 +6,16 @@ from glob import glob
 import numpy as np
 import pandas as pd
 
+
 # Define directory paths
 PATHS = {
     "proj": "/mnt/coredata/processing/leads",
 }
 PATHS["data"] = op.join(PATHS["proj"], "data")
-PATHS["freesurfer"] = op.join(PATHS["data"], "freesurfer")
 PATHS["metadata"] = op.join(PATHS["proj"], "metadata")
+PATHS["newdata"] = op.join(PATHS["proj"], "newdata")
 PATHS["raw"] = op.join(PATHS["data"], "raw")
 PATHS["processed"] = op.join(PATHS["data"], "processed")
-
 
 # Define functions
 def scrape_raw(raw_dir, verbose=True):
@@ -88,8 +87,9 @@ def scrape_raw(raw_dir, verbose=True):
         if "fdg" in filepath.lower():
             return "FDG"
         if verbose:
-            print(f"WARNING: Could not parse scan type from {filepath}")
-        return np.nan
+            print(f"WARNING: Could not parse scan type from {filepath},")
+            print("         will assume it's an unlabeled LONI FDG scan")
+        return "FDG"
 
     # Find all nifti PET files in raw
     search_raw_dirs = [d for d in glob(op.join(PATHS["raw"], "*")) if (op.isdir(d) and not (d.split(op.sep)[-1] == "mri"))]
@@ -235,7 +235,7 @@ def main():
     # Add paths to processed MRI-T1 directories that match the selected
     # Freesurfer directory for each PET scan
     # Add processed MRI directories to raw_scans
-    link_to_old_leads_mris = True
+    link_to_old_leads_mris = False
     mri_dirs = []
     for idx, scan in raw_scans.iterrows():
         if scan["fs_dir"] is np.nan:

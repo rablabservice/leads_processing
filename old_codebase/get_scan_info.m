@@ -1,4 +1,4 @@
-function output = getScanInfo(subjDir, scanTypeMapFile)
+function output = get_scan_info(subjDir, scanTypeMapFile)
     % Parse subject dir and return subject ID, scan date, and scan type.
 
     % Load the file with modality input to output name mappings
