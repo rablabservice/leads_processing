@@ -8,7 +8,7 @@ function varargout = get_freesurfer_files(mri_dir, fmt, segment_brainstem, fs_di
     % mri_dir : char or str array
     %     Path to the processed scan directory where the FreeSurfer
     %     output files are located after converting them to .nii
-    % fmt : char, optional
+    % fmt : char or str array, optional
     %     - If 'nii' (default), the FreeSurfer output files are expected
     %       to be in .nii format in <mri_dir>.
     %     - If 'mgz', the FreeSurfer output files are expected to be in
