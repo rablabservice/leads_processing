@@ -18,7 +18,7 @@ function process_mris(data_dir, log_dir, overwrite, verbose)
         verbose logical = true
     end
 
-    % Get the full, normalized path to the data directory
+    % Format paths
     data_dir = abspath(data_dir);
     log_dir = abspath(log_dir);
 

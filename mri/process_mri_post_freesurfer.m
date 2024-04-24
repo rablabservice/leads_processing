@@ -36,17 +36,15 @@ function process_mri_post_freesurfer(mri_dir, segment_brainstem, overwrite, verb
         mri_coregister(mri_files, baseline_mri_dir);
     end
 
-    % Save out mask files used as reference regions or target ROIs.
-
-
     % Segment MRI, save forward and inverse deformation fields, and warp
     % the nu.nii to MNI space
-
+    segment_mri_and_warp_to_mni(mri_dir, overwrite, verbose);
 
     % Calculate affine transform from
+    affine_mri_to_mni(mri_dir, overwrite, verbose);
 
-
-
+    % Save out mask files used as reference regions or target ROIs.
+    save_aparc_roi_masks(mri_dir, overwrite, verbose);
 end
 
 
