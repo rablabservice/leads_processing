@@ -1,96 +1,115 @@
-function coivox = mri_reset_origin_com(vols)
+function outfiles = mri_reset_origin_com(infiles, verbose, prefix)
     % Recenter T1 to center-of-mass then coregister to the SPM template
     %
-    % Strictly rigid-body coregistration (no reslicing is done).
+    % Strictly rigid-body coregistration (no reslicing is done). Only
+    % the affine transform in the nifti headers are changed; data arrays
+    % are unaffected.
     %
-    % vols : char array of image file names
+    % Parameters
+    % ----------
+    % infiles : str/char or cell array of str/chars of nifti filenames
     %     Images to reorient, assumed to be from same individual and
     %     session. The first image should be the T1 MRI, and the
     %     transform is estimated only for this image. Same transform is
     %     applied to any additional images.
+    % verbose : logical, optional
+    %     If true, print diagnostic information
+    % prefix : str/char, optional
+    %     Prefix to prepend to the output filenames. Empty by default
+    %     (infiles are overwritten).
     % ------------------------------------------------------------------
+    arguments
+        infiles {mustBeText}
+        verbose logical = true
+        prefix {mustBeText} = ''
+    end
+
+    % Ensure infiles is a flattened cell array
+    if ~iscell(infiles)
+        infiles = cellstr(infiles);
+    end
+    infiles = infiles(:);
+
+    % Check that all input files exist, and format them correctly
+    for ii = 1:length(infiles)
+        infiles{ii} = abspath(infiles{ii});
+        if ~exist(infiles{ii}, 'file')
+            error('File not found: %s', infiles{ii});
+        end
+    end
+
+    % Print diagnostic information
     if verbose
         fprintf('- Resetting origin to center-of-mass\n')
-        for v = 1:size(vols, 1)
-            filepath = abspath(vols(v, :));
-            if v == 1
-                fprintf('  - Source image: %s\n', basename(filepath));
-            elseif v == 2
-                fprintf('    Other images: %s\n', basename(filepath));
+        for ii = 1:size(infiles)
+            if ii == 1
+                fprintf('  - Source image: %s\n', basename(infiles{ii}));
+            elseif ii == 2
+                fprintf('    Other images: %s\n', basename(infiles{ii}));
             else
-                fprintf('                  %s\n', basename(filepath));
+                fprintf('                  %s\n', basename(infiles{ii}));
             end
         end
     end
 
-    % Check that all input vols exist
-    for v = 1:size(vols, 1)
-        if ~exist(abspath(vols(v, :)), 'file')
-            error('File not found: %s', abspath(vols(v, :)));
+    % Copy the input files if a prefix is specified
+    outfiles = cell(size(infiles));
+    for ii = 1:length(infiles)
+        if isempty(prefix)
+            outfiles{ii} = infiles{ii};
+        else
+            [pth, nam, ext] = fileparts(infiles{ii});
+            outfiles{ii} = fullfile(pth, [prefix nam ext]);
+            copyfile(infiles{ii}, outfiles{ii});
         end
     end
 
     % Initialize SPM
     spm_jobman('initcfg');
 
-    % Load the first image
-    coivox = ones(4,1);
-    [pth, nam, ext] = spm_fileparts(deblank(vols(1,:)));
-    fname = fullfile(pth, [nam ext]);
-    hdr = spm_vol([fname,',1']);
+    % Load the first image and find the center of mass
+    hdr = spm_vol(outfiles{1});
     img = spm_read_vols(hdr);
     img = img - min(img(:));
     img(isnan(img)) = 0;
-
-    % Find the center-of-mass along each dimension
     sumTotal = sum(img(:));
+    coivox = ones(4,1);
     coivox(1) = sum(sum(sum(img,3),2)'.*(1:size(img,1)))/sumTotal;
     coivox(2) = sum(sum(sum(img,3),1).*(1:size(img,2)))/sumTotal;
     coivox(3) = sum(squeeze(sum(sum(img,2),1))'.*(1:size(img,3)))/sumTotal;
-    XYZ_mm = hdr.mat * coivox; % convert from voxels to mm
-
+    XYZ_mm = hdr.mat * coivox;
+    disp(XYZ_mm);
     % Update the origin in the header of each image
-    for v = 1:size(vols, 1)
-        fname = deblank(vols(v, :));
-        if ~isempty(fname)
-            [pth, nam, ext] = spm_fileparts(fname);
-            fname = fullfile(pth, [nam ext]);
-            hdr = spm_vol([fname ',1']);
-            fname = fullfile(pth, [nam '.mat']);
-            if exist(fname, 'file')
-                destname = fullfile(pth, [nam '_old.mat']);
-                copyfile(fname, destname);
-            end
-            hdr.mat(1,4) =  hdr.mat(1,4) - XYZ_mm(1);
-            hdr.mat(2,4) =  hdr.mat(2,4) - XYZ_mm(2);
-            hdr.mat(3,4) =  hdr.mat(3,4) - XYZ_mm(3);
-            spm_create_vol(hdr);
-            if exist(fname, 'file')
-                delete(fname);
-            end
-        end
+    for ii = 1:length(outfiles)
+        fname = outfiles{ii};
+        hdr = spm_vol(fname);
+        hdr.mat(1:3,4) = hdr.mat(1:3,4) - XYZ_mm(1:3);
+        spm_create_vol(hdr);
     end
 
     % Coregister images to the SPM template
     if verbose
-        fprintf('- Coregistering %s to the SPM OldNorm/T1.nii template\n', basename(vols(1, :)));
+        fprintf('- Coregistering %s to the SPM12 OldNorm T1 template\n', basename(outfiles{1}));
     end
-    coregSub(vols);
-    for v = 1:size(vols,1)
-        [pth, nam, ~] = spm_fileparts(deblank(vols(v, :)));
-        fname = fullfile(pth,[nam '.mat']);
-        if exist(fname, 'file')
-            delete(fname);
-        end
-    end
+    coregSub(outfiles);
+
+    % % Delete any .mat files created by SPM
+    % for ii = 1:size(outfiles)
+    %     [pth, nam, ~] = spm_fileparts(outfiles{ii});
+    %     fname = fullfile(pth, [nam '.mat']);
+    %     if exist(fname, 'file')
+    %         delete(fname);
+    %     end
+    % end
 end
 
-function coregSub(vols)
-    % Coregister vols to the T1 template
+
+function coregSub(infiles)
+    % Coregister images to the SPM template
     template = fullfile(spm('Dir'), 'toolbox', 'OldNorm', 'T1.nii');
     matlabbatch{1}.spm.spatial.coreg.estimate.ref = {template};
-    matlabbatch{1}.spm.spatial.coreg.estimate.source = {[deblank(vols(1,:)),',1']};
-    matlabbatch{1}.spm.spatial.coreg.estimate.other = cellstr(vols(2:end,:));
+    matlabbatch{1}.spm.spatial.coreg.estimate.source = infiles(1);
+    matlabbatch{1}.spm.spatial.coreg.estimate.other = infiles(2:end);
     matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
     matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
     matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];

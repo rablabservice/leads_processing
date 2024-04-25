@@ -1,4 +1,4 @@
-function process_mris(data_dir, log_dir, overwrite, verbose)
+function process_mris(data_dir, log_dir, segment_brainstem, overwrite, verbose)
     % High-level function to select and process MRIs
     %
     % Parameters
@@ -14,6 +14,7 @@ function process_mris(data_dir, log_dir, overwrite, verbose)
     arguments
         data_dir {mustBeFolder} = '/mnt/coredata/processing/leads/data'
         log_dir {mustBeFolder} = '/mnt/coredata/processing/leads/metadata/log'
+        segment_brainstem logical = true
         overwrite logical = false
         verbose logical = true
     end
@@ -27,6 +28,6 @@ function process_mris(data_dir, log_dir, overwrite, verbose)
 
     % Process MRIs in parallel
     parfor i = 1:length(mris_to_process)
-        process_single_mri(mris_to_process(i), data_dir, overwrite, verbose);
+        process_single_mri(mris_to_process(i), data_dir, segment_brainstem, overwrite, verbose);
     end
 end

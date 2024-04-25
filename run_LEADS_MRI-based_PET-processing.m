@@ -55,7 +55,7 @@
 restoredefaultpath;
 addpath("/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12");
 addpath("/home/mac/ycobigo/neuroimaging/neuroimaging_CentOS7/SPM/spm12/toolbox");
-addpath(genpath(dirname(mfilename('fullpath'))));
+addpath(genpath(fileparts(mfilename('fullpath'))));
 
 % Define directory paths
 PATHS = containers.Map;

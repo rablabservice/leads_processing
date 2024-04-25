@@ -19,7 +19,7 @@ function setup_leads_processing(data_dir, overwrite, cleanup, verbose)
     pyenv(Version=python);
 
     % Add paths to the Python environment
-    code_dir = dirname(mfilename('fullpath'));
+    code_dir = fileparts(mfilename('fullpath'));
     if count(py.sys.path, code_dir) == 0
         insert(py.sys.path, int32(0), code_dir);
     end
@@ -53,12 +53,5 @@ function setup_leads_processing(data_dir, overwrite, cleanup, verbose)
     if ~verbose
         cmd = append(cmd, ' -q');
     end
-    cmd = append(cmd, ' 2>&1');
-    [status, cmdout] = system(cmd);
-    if status ~= 0
-        fprintf('\nError executing create_pet_proc_dirs.py\n');
-    end
-    if verbose
-        fprintf('%s\n', cmdout)
-    end
+    run_system_cmd(cmd);
 end

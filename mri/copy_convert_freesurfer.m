@@ -1,6 +1,33 @@
-function copy_convert_freesurfer(mri_dir, segment_brainstem, overwrite, verbose)
-    % Copy FreeSurfer files to the subject's processed mri directory
-    % and convert them from .mgz to .nii
+function [nu_niif, aparc_niif, varargout] = copy_convert_freesurfer(mri_dir, segment_brainstem, overwrite, verbose)
+    % Convert FreeSurfer files from .mgz to .nii and return nifti paths
+    %
+    % Nifti outputs are saved in the processed MRI directory.
+    %
+    % Usage
+    % -----
+    % [nuf, aparcf, brainstemf] = copy_convert_freesurfer(mri_dir)
+    % [nuf, aparcf] = copy_convert_freesurfer(mri_dir, false)
+    %
+    % Parameters
+    % ----------
+    % mri_dir : char or str array
+    %     Path to the processed MRI directory where converted files will be stored.
+    % segment_brainstem : logical, optional
+    %     If true (default), convert and return the brainstem .mgz file as .nii.
+    % overwrite : logical, optional
+    %     If true, overwrite existing .nii files (default is false).
+    % verbose : logical, optional
+    %     If true (default), print details of the conversion process to the console.
+    %
+    % Returns
+    % -------
+    % nu_niif : char or str array
+    %     Path to the converted nu.nii file.
+    % aparc_niif : char or str array
+    %     Path to the converted aparc+aseg.nii file.
+    % brainstem_niif : char or str array, optional
+    %     Path to the converted brainstem.nii file, returned only if
+    %     segment_brainstem is true.
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeFolder}
@@ -32,29 +59,34 @@ function copy_convert_freesurfer(mri_dir, segment_brainstem, overwrite, verbose)
             end
 
             % Convert the nu.mgz
-            cmd_nu = char(append(mri_convert, nu_mgzf, ' ', nu_niif));
+            cmd_nu = append(mri_convert, nu_mgzf, ' ', nu_niif);
             if verbose
                 fprintf('  $ %s\n', cmd_nu);
             end
-            system(cmd_nu);
+            run_system_cmd(cmd_nu, true, false);
 
             % Convert the aparc+aseg.mgz
-            cmd_aparc = char(append(mri_convert, aparc_mgzf, ' ', aparc_niif));
+            cmd_aparc = append(mri_convert, aparc_mgzf, ' ', aparc_niif);
             if verbose
                 fprintf('  $ %s\n', cmd_aparc);
             end
-            system(cmd_aparc);
+            run_system_cmd(cmd_aparc, true, false);
 
             % Convert the brainstem.mgz
             if segment_brainstem
-                cmd_brainstem = char(append(mri_convert, brainstem_mgzf, ' ', brainstem_niif));
+                cmd_brainstem = append(mri_convert, brainstem_mgzf, ' ', brainstem_niif);
                 if verbose
                     fprintf('  $ %s\n', cmd_brainstem);
                 end
-                system(cmd_brainstem);
+                run_system_cmd(cmd_brainstem, true, false);
             end
         end
     else
         fprintf('Missing one or more expected FreeSurfer outputs for %s', mri_dir);
+    end
+
+    % Format varargout
+    if segment_brainstem
+        varargout{1} = brainstem_niif;
     end
 end

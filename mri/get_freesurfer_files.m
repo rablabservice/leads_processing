@@ -1,13 +1,24 @@
 function varargout = get_freesurfer_files(mri_dir, fmt, segment_brainstem, fs_dir);
-    % Return nu, aparc+aseg, and optionally brainstem_sublabels files
-    % for the given scan directory, in that order. The first argument
-    % out is a logical indicating whether all files exist.
+    % Locate and return paths to FreeSurfer files we want to work with
+    %
+    % The first argument out is a logical indicating whether all files
+    % exist, and subsequent arguments out are paths to the files. This
+    % function does not require mri_dir or any of the output files to
+    % exist when called.
+    %
+    % Usage
+    % -----
+    % [~, nuf, aparcf, brainstemf] = get_freesurfer_files(mri_dir)
+    % [all_exist, nu_mgzf, aparc_mgzf, brainstem_mgzf] = get_freesurfer_files(mri_dir, 'mgz', true)
+    % [all_exist, nu_niif, aparc_niif, brainstem_niif] = get_freesurfer_files(mri_dir, 'nii', true)
+    % [all_exist, nu_niif, aparc_niif] = get_freesurfer_files(mri_dir, 'nii', false)
     %
     % Parameters
     % ----------
     % mri_dir : char or str array
-    %     Path to the processed scan directory where the FreeSurfer
-    %     output files are located after converting them to .nii
+    %     Path to the processed MRI directory. Output files are written
+    %     here. Unless fs_dir is passed, input files are assumed to be
+    %     at <mri_dir>/freesurfer/mri/ when fmt is 'mgz'
     % fmt : char or str array, optional
     %     - If 'nii' (default), the FreeSurfer output files are expected
     %       to be in .nii format in <mri_dir>.
@@ -20,6 +31,17 @@ function varargout = get_freesurfer_files(mri_dir, fmt, segment_brainstem, fs_di
     %     Path to the FreeSurfer directory where the output files from
     %     recon-all are located. If empty (default), it is assumed to be
     %     <mri_dir>/freesurfer.
+    %
+    % Returns
+    % -------
+    % all_exist : logical
+    %     True if all output files exist, false otherwise
+    % nu_niif : char or str array
+    %     Path to the nu file
+    % aparc_niif : char or str array
+    %     Path to the aparc+aseg file
+    % brainstem_niif : char or str array
+    %     Path to the brainstem sublabels file
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeText}

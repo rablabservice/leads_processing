@@ -44,6 +44,6 @@ function convert_dicoms(newdata_dir, verbose)
     for i = 1:n_conv
         scan_dir = abspath(conv_dirs{i});
         cmd = char(append(dcm2niix, ' -o ', scan_dir, ' ', scan_dir));
-        [status, cmdout] = system(cmd);
+        run_system_cmd(cmd);
     end
 end

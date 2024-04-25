@@ -8,7 +8,7 @@ function coreg_mri_to_baseline(mri_dir, segment_brainstem)
 
     % Format inputs
     mri_dir = abspath(mri_dir);
-    subj_dir = dirname(mri_dir);
+    subj_dir = fileparts(mri_dir);
 
     % Get the source files
     if segment_brainstem
@@ -23,4 +23,4 @@ function coreg_mri_to_baseline(mri_dir, segment_brainstem)
     baseline_nuf = get_baseline_mri(subj_dir);
     mustBeFile(baseline_nuf);
 
-    % Coregister the MRI to the baseline MRI
+    % Coregister MRI to the baseline MRI

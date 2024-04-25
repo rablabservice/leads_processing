@@ -49,7 +49,7 @@ function process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite,
         fprintf('- Processing MRI through FreeSurfer\n')
         fprintf('  $ %s\n', cmd_fs);
     end
-    system(cmd_fs);
+    run_system_cmd(cmd_fs);
 
     % Segment the brainstem
     if segment_brainstem
@@ -58,6 +58,6 @@ function process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite,
         if verbose
             fprintf('  $ %s\n', cmd_bs);
         end
-        system(cmd_bs);
+        run_system_cmd(cmd_bs);
     end
 end
