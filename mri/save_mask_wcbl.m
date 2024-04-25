@@ -43,30 +43,4 @@ function wcbl_maskf = save_wcbl_mask(aparcf, in_dir, out_dir, overwrite, verbose
     % Save the mask
     outfile = fullfile(out_dir, append(scan_tag, '_mask-wcbl.nii'));
     create_nii_mask(aparcf, mask_idx, outfile, overwrite, verbose);
-
-    % % Check if the output file already exists
-    % outfile = fullfile(out_dir, append(scan_tag, '_mask-wcbl.nii'));
-    % if exist(outfile, 'file') && ~overwrite
-    %     if verbose
-    %         fprintf('  - File already exists, will not overwrite: %s\n', basename(outfile));
-    %     end
-    %     return
-    % end
-
-    % % Use SPM ImCalc to create the mask file
-    % if verbose
-    %     fprintf('  - Saving %s\n', basename(outfile));
-    % end
-    % imcalc_expr = 'ismember(i1, mask_idx)';
-    % clear matlabbatch;
-    % matlabbatch{1}.spm.util.imcalc.input = cellstr(aparcf);
-    % matlabbatch{1}.spm.util.imcalc.output = basename(outfile);
-    % matlabbatch{1}.spm.util.imcalc.outdir = fileparts(outfile);
-    % matlabbatch{1}.spm.util.imcalc.expression = imcalc_expr;
-    % matlabbatch{1}.spm.util.imcalc.var = struct('name', 'mask_idx', 'value', mask_idx);
-    % matlabbatch{1}.spm.util.imcalc.options.dmtx = 0;
-    % matlabbatch{1}.spm.util.imcalc.options.mask = 0;
-    % matlabbatch{1}.spm.util.imcalc.options.interp = 0;
-    % matlabbatch{1}.spm.util.imcalc.options.dtype = spm_type('uint8');
-    % spm_jobman('run',matlabbatch);
 end
