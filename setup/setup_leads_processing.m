@@ -24,6 +24,13 @@ function setup_leads_processing(data_dir, overwrite, cleanup, verbose)
         insert(py.sys.path, int32(0), code_dir);
     end
 
+    % Print welcome message
+    if verbose
+        fprintf('\nSETUP MODULE');
+        fprintf('\nPrepare new MRI and PET scan data to be processed');
+        fprintf('\n-------------------------------------------------');
+    end
+
     % Convert dicoms to nifti
     convert_dicoms(newdata_dir, verbose);
 
@@ -36,16 +43,16 @@ function setup_leads_processing(data_dir, overwrite, cleanup, verbose)
         verbose=verbose ...
     );
 
-    % % Find scans that need to be processed
-    % py.find_scans_to_process.find_scans_to_process(...
-    %     raw_dir=raw_dir, ...
-    %     processed_dir=processed_dir, ...
-    %     overwrite=overwrite, ...
-    %     verbose=verbose ...
-    % );
+    % Save a CSV file of MRI + PET scans that need to be processed
+    cmd = append(python, ' ', fullfile(code_dir, 'find_scans_to_process.py'));
+    if ~verbose
+        cmd = append(cmd, ' -q');
+    end
+    run_system_cmd(cmd)
 
-    % Create processed PET directories, link them to their appropriate
-    % MRI directories, and copy in the raw PET niftis
+    % Create processed scan directories for MRI and PET scans that need
+    % to be processed, link each PET scan to its closest MRI, and copy
+    % PET niftis from their raw to processed directories
     cmd = append(python, ' ', fullfile(code_dir, 'create_pet_proc_dirs.py'));
     if overwrite
         cmd = append(cmd, ' -o');

@@ -12,16 +12,19 @@ function convert_dicoms(newdata_dir, verbose)
 
     % If newdata_dir is empty, there's nothing to do here
     if isempty(dir(newdata_dir))
+        if verbose
+            fprintf('- No newdata to convert to nifti\n');
+        end
         return
-    end
-
-    % Print the welcome message
-    if verbose
-        fprintf('\nConverting dicoms to nifti\n--------------------------\n');
     end
 
     % Get path to dcm2niix
     dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix';
+
+    % Print the welcome message
+    if verbose
+        fprintf('\n- Converting newdata dicoms to nifti');
+    end
 
     % Find all dicoms in raw
     dcm_files = dir(fullfile(newdata_dir, '**', '*.dcm'));
@@ -37,7 +40,7 @@ function convert_dicoms(newdata_dir, verbose)
     conv_dirs = setdiff(dcm_dirs, nii_dirs);
     n_conv = length(conv_dirs);
     if verbose
-        fprintf('- Will convert dicoms in %d directories with no nifti\n', n_conv, newdata_dir);
+        fprintf('  * %d directories have dicoms but no nifti\n', n_conv, newdata_dir);
     end
 
     % Convert dicoms to nifti

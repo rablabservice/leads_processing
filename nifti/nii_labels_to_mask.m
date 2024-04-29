@@ -1,14 +1,14 @@
-function mask = create_nii_mask(infile, mask_idx, outfile, overwrite, verbose)
+function mask = nii_labels_to_mask(infile, labels, outfile, overwrite, verbose)
     % Create a binary mask from a nifti file and array of integer labels
     %
     % Mask is 1 for all elements in the input file whose values are in
-    % mask_idx, and 0 otherwise.
+    % labels, and 0 otherwise.
     %
     % Parameters
     % ----------
     % infile : str|char
     %     Path to the input nifti file.
-    % mask_idx : array
+    % labels : array
     %     Array of integers that represent the indices of the elements
     %     that should be included in the mask.
     % outfile : char
@@ -22,7 +22,7 @@ function mask = create_nii_mask(infile, mask_idx, outfile, overwrite, verbose)
     % ------------------------------------------------------------------
     arguments
         infile {mustBeFile}
-        mask_idx {mustBeNumeric}
+        labels {mustBeNumeric}
         outfile {mustBeText} = ''
         overwrite logical = false
         verbose logical = true
@@ -38,9 +38,9 @@ function mask = create_nii_mask(infile, mask_idx, outfile, overwrite, verbose)
         return
     end
 
-    % Make sure mask_idx is not empty
-    if isempty(mask_idx)
-        error('mask_idx cannot be empty');
+    % Make sure labels is not empty
+    if isempty(labels)
+        error('labels cannot be empty');
     end
 
     % Determine if we should save the output
@@ -56,13 +56,13 @@ function mask = create_nii_mask(infile, mask_idx, outfile, overwrite, verbose)
     dat = spm_read_vols(img);
 
     % Create the mask
-    mask = ismember(dat, mask_idx);
+    mask = ismember(dat, labels);
 
     % Save the mask
     if save_output
         mask_img = img;
         mask_img.fname = outfile;
-        mask_img.dt = [spm_type('uint8') 0]; % uint8 type, native format
+        mask_img.dt = [spm_type('uint8') 0];
         spm_write_vol(mask_img, mask);
         if verbose
             fprintf('  - Saved %s\n', basename(outfile));

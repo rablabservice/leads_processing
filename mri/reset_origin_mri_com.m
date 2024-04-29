@@ -1,4 +1,4 @@
-function outfiles = mri_reset_origin_com(infiles, verbose, prefix)
+function outfiles = reset_origin_mri_com(infiles, verbose, prefix)
     % Recenter T1 to center-of-mass then coregister to the SPM template
     %
     % Strictly rigid-body coregistration (no reslicing is done). Only
@@ -64,9 +64,6 @@ function outfiles = mri_reset_origin_com(infiles, verbose, prefix)
         end
     end
 
-    % Initialize SPM
-    spm_jobman('initcfg');
-
     % Load the first image and find the center of mass
     hdr = spm_vol(outfiles{1});
     img = spm_read_vols(hdr);
@@ -79,6 +76,7 @@ function outfiles = mri_reset_origin_com(infiles, verbose, prefix)
     coivox(3) = sum(squeeze(sum(sum(img,2),1))'.*(1:size(img,3)))/sumTotal;
     XYZ_mm = hdr.mat * coivox;
     disp(XYZ_mm);
+
     % Update the origin in the header of each image
     for ii = 1:length(outfiles)
         fname = outfiles{ii};
@@ -91,21 +89,13 @@ function outfiles = mri_reset_origin_com(infiles, verbose, prefix)
     if verbose
         fprintf('- Coregistering %s to the SPM12 OldNorm T1 template\n', basename(outfiles{1}));
     end
-    coregSub(outfiles);
-
-    % % Delete any .mat files created by SPM
-    % for ii = 1:size(outfiles)
-    %     [pth, nam, ~] = spm_fileparts(outfiles{ii});
-    %     fname = fullfile(pth, [nam '.mat']);
-    %     if exist(fname, 'file')
-    %         delete(fname);
-    %     end
-    % end
+    coreg_to_t1(outfiles);
 end
 
 
-function coregSub(infiles)
+function coreg_to_t1(infiles)
     % Coregister images to the SPM template
+    spm_jobman('initcfg');
     template = fullfile(spm('Dir'), 'toolbox', 'OldNorm', 'T1.nii');
     matlabbatch{1}.spm.spatial.coreg.estimate.ref = {template};
     matlabbatch{1}.spm.spatial.coreg.estimate.source = infiles(1);

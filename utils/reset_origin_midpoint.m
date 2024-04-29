@@ -1,16 +1,69 @@
-function reset_origin_midpoint(nii_file)
-    % Remove any trailing whitespace from the file path
-    nii_file = deblank(nii_file);
+function reset_origin_axis_midpoint(infiles, verbose, prefix)
+    % Reset origin of each image to the midpoint along each axis
+    %
+    % Only the affine transform in the nifti headers are changed; data
+    % arrays are unaffected.
+    %
+    % Parameters
+    % ----------
+    % infiles : str/char or cell array of str/chars of nifti filenames
+    %     One or more .nii images to reorient
+    % verbose : logical, optional
+    %     If true, print diagnostic information
+    % prefix : str/char, optional
+    %     Prefix to prepend to the output filenames. Empty by default
+    %     (infiles are overwritten).
+    % ------------------------------------------------------------------
+    arguments
+        infiles {mustBeText}
+        verbose logical = true
+        prefix {mustBeText} = ''
+    end
 
-    % Load the image volume using SPM's spm_vol function
-    st.vol = spm_vol(nii_file);
+    % Ensure infiles is a flattened cell array
+    if ~iscell(infiles)
+        infiles = cellstr(infiles);
+    end
+    infiles = infiles(:);
 
-    % Compute the inverse of the affine transformation matrix
-    vs = st.vol.mat \ eye(4);
+    % Check that all input files exist, and format them correctly
+    for ii = 1:length(infiles)
+        infiles{ii} = abspath(infiles{ii});
+        if ~exist(infiles{ii}, 'file')
+            error('File not found: %s', infiles{ii});
+        end
+    end
 
-    % Update the translation part of the matrix to the midpoint of the image dimensions
-    vs(1:3,4) = (st.vol.dim + 1) / 2;
+    % Copy the input files if a prefix is specified
+    outfiles = cell(size(infiles));
+    for ii = 1:length(infiles)
+        if isempty(prefix)
+            outfiles{ii} = infiles{ii};
+        else
+            [pth, nam, ext] = fileparts(infiles{ii});
+            outfiles{ii} = fullfile(pth, [prefix nam ext]);
+            copyfile(infiles{ii}, outfiles{ii});
+        end
+    end
 
-    % Update the image's affine transformation space using the modified inverse matrix
-    spm_get_space(st.vol.fname, inv(vs));
+    % Reset origin of the affine transform in each image header
+    for ii = 1:length(outfiles)
+        % Load the image volume
+        hdr = spm_vol(outfiles{ii});
+
+        % Compute the inverse of the affine transformation matrix
+        aff_inv = hdr.mat \ eye(4);
+
+        % Update translation to the midpoint of the image dimensions
+        aff_inv(1:3,4) = (hdr.dim + 1) / 2;
+
+        % Update the affine transformation using the modified matrix
+        aff = inv(aff_inv);
+        spm_get_space(hdr.fname, aff);
+
+        % Print diagnostic information
+        if verbose
+            fprintf('- Reset origin to axis midpoint: %s\n', basename(outfiles{ii}));
+        end
+    end
 end

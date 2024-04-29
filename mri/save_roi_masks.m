@@ -1,4 +1,4 @@
-function save_aparc_roi_masks(mri_dir, overwrite, verbose)
+function outfiles = save_roi_masks(mri_dir, overwrite, verbose)
     % Save out mask files used as reference regions or target ROIs.
     %
     % Parameters
@@ -42,18 +42,21 @@ function save_aparc_roi_masks(mri_dir, overwrite, verbose)
         return
     end
 
+    % Initialize output
+    outfiles = struct([]);
+
     % Call the individual ROI creation functions
     if verbose
         fprintf('- Saving ROI masks\n');
     end
     if save_aparc_masks
-        save_mask_wcbl(aparcf, mri_dir, mri_dir, overwrite, verbose);
-        % save_mask_brainstem(aparcf, mri_dir, mri_dir, overwrite, verbose);
-        % save_mask_amyloid_cortical_summary(aparcf, mri_dir, mri_dir, overwrite, verbose);
-        % save_mask_eroded_subcortwm(aparcf, mri_dir, mri_dir, overwrite, verbose);
-        % save_mask_infcblgm(aparcf, mri_dir, mri_dir, overwrite, verbose);
+        outfiles.wcbl = save_mask_wcbl(aparcf, '', '', overwrite, verbose);
+        outfiles.brainstem = save_mask_brainstem(aparcf, '', '', overwrite, verbose);
+        outfiles.cortical_summary = save_mask_amyloid_cortical_summary(aparcf, '', '', overwrite, verbose);
+        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, 8, 0.7, '', '', overwrite, verbose));
+        outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, '', '', overwrite, verbose));
     end
-    % if save_brainstem_masks
-    %     save_mask_pons(brainstemf, mri_dir, mri_dir, overwrite, verbose);
-    % end
+    if save_brainstem_masks
+        outfiles.pons = save_mask_pons(brainstemf, '', '', overwrite, verbose);
+    end
 end

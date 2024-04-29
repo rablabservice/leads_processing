@@ -8,12 +8,10 @@ import pandas as pd
 
 
 # Define directory paths
-PATHS = {
-    "proj": "/mnt/coredata/processing/leads",
-}
+PATHS = {"proj": "/mnt/coredata/processing/leads"}
 PATHS["data"] = op.join(PATHS["proj"], "data")
 PATHS["metadata"] = op.join(PATHS["proj"], "metadata")
-PATHS["newdata"] = op.join(PATHS["proj"], "newdata")
+PATHS["newdata"] = op.join(PATHS["data"], "newdata")
 PATHS["raw"] = op.join(PATHS["data"], "raw")
 PATHS["processed"] = op.join(PATHS["data"], "processed")
 
@@ -338,3 +336,56 @@ def main():
         n = len(raw_scans.query(f"scan_type=='{tracer}'"))
         print(f"  {n:>3} {tracer}")
     print(f"Saved raw_scans to {outf}")
+
+
+def _parse_args():
+    """Parse and return command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Find MRI and PET scans that need to be processed by comparing data in raw vs. processed directories",
+        formatter_class=argparse.RawTextHelpFormatter,
+        exit_on_error=False,
+    )
+    parser.add_argument(
+        "--raw",
+        type=str,
+        default="/mnt/coredata/processing/leads/data/raw",
+        help=(
+            "Path to the directory that contains all unprocessed MRI + PET scan directories.\n"
+            + "Can be named something other than 'raw'\n"
+            + "(default: %(default)s)"
+        ),
+    )
+    parser.add_argument(
+        "--proc",
+        type=str,
+        default="/mnt/coredata/processing/leads/data/processed",
+        help=(
+            "Path to the directory that contains all processed MRI + PET scan directories.\n"
+            + "Can be named something other than 'processed'\n"
+            + "(default: %(default)s)"
+        ),
+    )
+    parser.add_argument(
+        "--outdir",
+        type=str,
+        default="/mnt/coredata/processing/leads/metadata/log",
+        help=(
+            "Path to the directory where the output CSV file is saved.\n"
+            + "(default: %(default)s)"
+        ),
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="store_true", help="Run without printing output"
+    )
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+    if (len(sys.argv) == 1) and not all(op.isdir(args.newdata), op.isdir(args.raw)):
+        parser.print_help()
+        sys.exit()
+    return args
+
+
+if __name__ == "__main__":
+    # Get command line arguments.
+    args = _parse_args()

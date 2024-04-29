@@ -16,11 +16,11 @@ def move_newdata_to_raw(
     ----------
     newdata_dir : str
         The directory containing the new scan data. Must format like:
-            <newdata_dir>/<subj>/<...>/<nifti_or_dicom_files>
+            <newdata_dir>/<subj>/<...>/<nifti_files>
     raw_dir : str
         The directory to move the new scan data to. Structure after
         moving will be:
-            <raw_dir>/<subj>/<...>/<nifti_or_dicom_files>
+            <raw_dir>/<subj>/<...>/<nifti_files>
     overwrite : bool
         If True, overwrite existing scan directories in raw_dir with
         directories from newdata_dir. If False, skip existing
@@ -40,7 +40,7 @@ def move_newdata_to_raw(
     def do_cleanup():
         """Remove all files and folders from newdata."""
         if verbose:
-            print(f"- Cleaning up {newdata_dir}")
+            print(f"  * Cleaning up {newdata_dir}")
         for file in os.listdir(newdata_dir):
             filepath = op.join(newdata_dir, file)
             if op.isdir(filepath):
@@ -52,50 +52,52 @@ def move_newdata_to_raw(
     newdata_dir = op.abspath(newdata_dir)
     raw_dir = op.abspath(raw_dir)
 
-    # Find all nifti and dicom files in newdata
-    check_exts = (".nii", ".nii.gz", ".IMA", ".dcm")
+    # Find all niftis in newdata
+    check_exts = (".nii", ".nii.gz")
     glob_files = []
     for ext in check_exts:
         glob_files.extend(glob(op.join(newdata_dir, f"**/*{ext}"), recursive=True))
 
     # Print the welcome message
     if verbose:
-        title = "\nMoving data from newdata to raw"
-        print(title, "-" * len(title), sep="\n")
-        print(f"- newdata: {newdata_dir}")
-        print(f"- raw    : {raw_dir}")
+        print("- Moving MRI and PET scan data from newdata to raw")
+        print(f" (newdata = {newdata_dir})")
+        print(f" (raw     = {raw_dir})")
 
-    # If no nifti or dicom files are found, print a message and return
+    # If no niftis are found, print a message and return
     if len(glob_files) == 0:
         if verbose:
-            print(f"- No nifti or dicom files found in {newdata_dir}")
+            print(f"  * No niftis found in {newdata_dir}")
         if cleanup:
             do_cleanup()
         if verbose:
             print("")
         return
 
-    # Find all unique nifti- or dicom-containing directories in newdata
+    # Find all unique nifti-containing directories in newdata
     source_dirs = set([op.dirname(f) for f in glob_files])
     if verbose:
-        print(
-            f"- Found {len(source_dirs)} nifti- or dicom-containing directories in {newdata_dir}"
-        )
+        print(f"  * Found {len(source_dirs)} directories with niftis")
 
+    skip_dirs = ["LEADS", "ADNI", "IDEAS", "SCAN", "PAD"]
     for source_dir in source_dirs:
         # Create a matching file hierarchy in raw as in newdata
-        target_dir = op.join(raw_dir, op.relpath(source_dir, newdata_dir))
+        scan_path = op.relpath(source_dir, newdata_dir)
+        scan_path_parts = scan_path.split("/")
+        if scan_path_parts[0].upper() in skip_dirs:
+            scan_path = op.join(*scan_path_parts[1:])
+        target_dir = op.join(raw_dir, scan_path)
 
         # Check if the target directory exists
         if op.exists(target_dir):
             # If overwrite is True, remove the existing directory
             if overwrite:
                 if verbose:
-                    print(f"- Overwriting existing raw directory: {target_dir}")
+                    print(f"  * Overwriting existing raw directory: {target_dir}")
                 shutil.rmtree(target_dir)
             else:
                 if verbose:
-                    print(f"- Skipping existing raw directory: {target_dir}")
+                    print(f"  * Skipping existing raw directory: {target_dir}")
                 continue
 
         # Create the necessary directory structure, then copy source to
@@ -103,7 +105,7 @@ def move_newdata_to_raw(
         os.makedirs(op.dirname(target_dir), exist_ok=True)
         shutil.move(source_dir, target_dir)
         if verbose:
-            print(f"- Moved {source_dir} to {target_dir}")
+            print(f"  * Moved {source_dir} to {target_dir}")
 
     # Clean up empty directories in newdata
     if cleanup:
@@ -164,17 +166,13 @@ if __name__ == "__main__":
     # Get command line arguments.
     args = _parse_args()
 
-    # Format CL args
-    cleanup = not args.no_clean
-    verbose = not args.quiet
-
     # Move newdata to raw
     move_newdata_to_raw(
         newdata_dir=args.newdata,
         raw_dir=args.raw,
         overwrite=args.overwrite,
-        cleanup=cleanup,
-        verbose=verbose,
+        cleanup=not args.no_clean,
+        verbose=not args.quiet,
     )
 
     sys.exit(0)
