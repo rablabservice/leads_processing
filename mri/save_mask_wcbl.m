@@ -8,14 +8,14 @@ function outfile = save_mask_wcbl(aparcf, in_dir, out_dir, overwrite, verbose)
     % Parameters
     % ----------
     % aparcf : char or str array
-    %   Path to the aparc+aseg.nii file
+    %   Path to the aparc+aseg.nii file.
     % in_dir : char or str array
     %   The input directory. If aparcf is empty, this is where the
     %   function looks for the aparc+aseg.nii file. This parameter is
-    %   disregarded if aparcf is not empty
+    %   disregarded if aparcf is not empty.
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
-    %   the same directory as the aparc+aseg.nii file
+    %   the same directory as the aparc+aseg.nii file.
     % overwrite : logical, optional
     %   If true, overwrite existing file
     % verbose : logical, optional
@@ -42,5 +42,5 @@ function outfile = save_mask_wcbl(aparcf, in_dir, out_dir, overwrite, verbose)
 
     % Save the mask
     outfile = fullfile(out_dir, append(scan_tag, '_mask-wcbl.nii'));
-    nii_labels_to_mask(aparcf, mask_idx, outfile, overwrite, verbose);
+    create_nii_mask(aparcf, mask_idx, outfile, overwrite, verbose);
 end

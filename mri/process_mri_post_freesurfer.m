@@ -8,9 +8,11 @@ function process_mri_post_freesurfer(mri_dir, segment_brainstem, overwrite, verb
         verbose logical = true
     end
 
-    % Format inputs
+    % Format inputs; initialize SPM jobman and PET parameter defaults
     mri_dir = abspath(mri_dir);
     subj_dir = fileparts(mri_dir);
+    spm_jobman('initcfg');
+    spm('defaults','PET');
 
     % Copy FreeSurfer files to the subject's processed mri directory
     % and convert them from .mgz to .nii

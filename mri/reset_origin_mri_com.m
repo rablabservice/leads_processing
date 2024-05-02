@@ -95,8 +95,8 @@ end
 
 function coreg_to_t1(infiles)
     % Coregister images to the SPM template
-    spm_jobman('initcfg');
     template = fullfile(spm('Dir'), 'toolbox', 'OldNorm', 'T1.nii');
+    clear matlabbatch;
     matlabbatch{1}.spm.spatial.coreg.estimate.ref = {template};
     matlabbatch{1}.spm.spatial.coreg.estimate.source = infiles(1);
     matlabbatch{1}.spm.spatial.coreg.estimate.other = infiles(2:end);
