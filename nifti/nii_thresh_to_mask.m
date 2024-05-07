@@ -1,4 +1,4 @@
-function mask = nii_labels_to_mask(infile, lower, upper, outfile, overwrite, verbose)
+function mask = nii_thresh_to_mask(infile, lower, upper, outfile, overwrite)
     % Create a binary mask of infile values > lower and < upper
     %
     % Mask is 1 for all elements in the input file whose values are in
@@ -6,7 +6,7 @@ function mask = nii_labels_to_mask(infile, lower, upper, outfile, overwrite, ver
     %
     % Parameters
     % ----------
-    % infile : str|char
+    % infile : char|string
     %     Path to the input nifti file.
     % labels : array
     %     Array of integers that represent the indices of the elements
@@ -15,10 +15,10 @@ function mask = nii_labels_to_mask(infile, lower, upper, outfile, overwrite, ver
     %     Path to the output nifti file.
     % overwrite : bool
     %     If true, overwrite the output file if it already exists.
-    % verbose : bool
-    %     If true, print status messages.
     %
     % Returns
+    % mask : logical array
+    %     Mask array in the shape of the input file
     % ------------------------------------------------------------------
     arguments
         infile {mustBeFile}
@@ -26,22 +26,19 @@ function mask = nii_labels_to_mask(infile, lower, upper, outfile, overwrite, ver
         upper {mustBeNumeric} = Inf
         outfile {mustBeText} = ''
         overwrite logical = false
-        verbose logical = true
     end
 
     % If the output file exists and overwrite is false, load the outfile
     % and return its data array
     if exist(outfile, 'file') && ~overwrite
-        if verbose
-            fprintf('  - File already exists, will not overwrite: %s\n', basename(outfile));
-        end
+        fprintf('  * %s already exists, will not overwrite\n', basename(outfile));
         mask = spm_read_vols(spm_vol(outfile));
         return
     end
 
-    % Make sure labels is not empty
-    if isempty(labels)
-        error('labels cannot be empty');
+    % Make sure at least one threshold is specified
+    if ~isfinite(lower) && ~isfinite(upper)
+        error('At least one of lower or upper must be finite');
     end
 
     % Determine if we should save the output
@@ -65,8 +62,6 @@ function mask = nii_labels_to_mask(infile, lower, upper, outfile, overwrite, ver
         mask_img.fname = outfile;
         mask_img.dt = [spm_type('uint8') 0];
         spm_write_vol(mask_img, mask);
-        if verbose
-            fprintf('  - Saved %s\n', basename(outfile));
-        end
+        fprintf('  * Saved %s\n', basename(outfile));
     end
 end

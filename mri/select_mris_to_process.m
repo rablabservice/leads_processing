@@ -1,9 +1,8 @@
-function mri_dirs = select_mris_to_process(log_dir, verbose)
+function mri_dirs = select_mris_to_process(log_dir)
     % Return an array of MRIs to process by comparing raw to processed.
     % ------------------------------------------------------------------
     arguments
         log_dir {mustBeFolder} = '/mnt/coredata/processing/leads/metadata/log'
-        verbose logical = true
     end
 
     % Format paths
@@ -17,7 +16,5 @@ function mri_dirs = select_mris_to_process(log_dir, verbose)
     % Get all unique MRI directories
     mri_dirs = unique(raw_scans.mri_dir);
 
-    if verbose
-        fprintf('- Found %d unique MRI directories\n', length(mri_dirs));
-    end
+    fprintf('- Found %d unique MRI directories\n', length(mri_dirs));
 end

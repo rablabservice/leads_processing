@@ -1,11 +1,7 @@
 function outfiles = save_mask_eroded_subcortwm( ...
-    aparcf, smooth_by, erosion_thresh, in_dir, out_dir, overwrite, verbose ...
+    aparcf, smooth_by, erosion_thresh, in_dir, out_dir, overwrite ...
 )
     % Load the aparc+aseg and save eroded subcortical white matter mask
-    %
-    % Usage
-    % -----
-    % >> save_mask_eroded_subcortwm(aparcf)
     %
     % Parameters
     % ----------
@@ -26,18 +22,12 @@ function outfiles = save_mask_eroded_subcortwm( ...
     %   the same directory as the aparc+aseg.nii file
     % overwrite : logical, optional
     %   If true, overwrite existing file
-    % verbose : logical, optional
-    %   If true, print diagnostic information
-    %
-    % Output
-    % ------
-
     %
     % Files created
     % -------------
-    % - <mri_dir>/<scan_tag>_mask-eroded-subcortwm.nii
-    % - <mri_dir>/<scan_tag>_mask-subcortwm.nii
-    % - <mri_dir>/s<scan_tag>_mask-subcortwm.nii
+    % - <scan_tag>_mask-eroded-subcortwm.nii
+    % - <scan_tag>_mask-subcortwm.nii
+    % - s<scan_tag>_mask-subcortwm.nii
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
@@ -46,7 +36,6 @@ function outfiles = save_mask_eroded_subcortwm( ...
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
         overwrite logical = false
-        verbose logical = true
     end
 
     % Define aparc indices for the subcortical white matter
@@ -56,29 +45,36 @@ function outfiles = save_mask_eroded_subcortwm( ...
     [aparcf, out_dir] = format_mask_inputs(aparcf, in_dir, out_dir);
     scan_tag = get_scan_tag(aparcf);
 
+    % Define output files
+    outfiles.mask_subcortwm = fullfile(out_dir, append(scan_tag, '_mask-subcortwm.nii'));
+    outfiles.ssubcortwm = add_presuf(outfiles.mask_subcortwm, 's');
+    outfiles.mask_eroded_subcortwm = fullfile(out_dir, append(scan_tag, '_mask-eroded-subcortwm.nii'));
+
+    % Check if all output files already exist
+    if all(structfun(@isfile, outfiles)) && ~overwrite
+        fprintf('  * Subcortical white matter mask files already exist, will not overwrite\n')
+        return
+    end
+
     % Save the mask
-    outfiles.subcortwm = fullfile(out_dir, append(scan_tag, '_mask-subcortwm.nii'));
-    nii_labels_to_mask(aparcf, mask_idx, outfiles.subcortwm, overwrite, verbose);
+    nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_subcortwm, overwrite);
 
     % Smooth the mask
-    outfiles.ssubcortwm = fullfile( ...
-        out_dir, append('s', scan_tag, '_mask-subcortwm.nii') ...
-    );
     clear matlabbatch;
-    matlabbatch{2}.spm.spatial.smooth.data = cellstr(outfiles.subcortwm);
-    matlabbatch{2}.spm.spatial.smooth.fwhm = [smooth_by smooth_by smooth_by];
-    matlabbatch{2}.spm.spatial.smooth.dtype = 0;  % same as input
-    matlabbatch{2}.spm.spatial.smooth.im = 0;  % no implicit masking
-    matlabbatch{2}.spm.spatial.smooth.prefix = 's';
-    spm('defaults', 'PET');
+    matlabbatch{1}.spm.spatial.smooth.data = cellstr(outfiles.mask_subcortwm);
+    matlabbatch{1}.spm.spatial.smooth.fwhm = [smooth_by smooth_by smooth_by];
+    matlabbatch{1}.spm.spatial.smooth.dtype = spm_type('float32');
+    matlabbatch{1}.spm.spatial.smooth.im = 0;  % no implicit masking
+    matlabbatch{1}.spm.spatial.smooth.prefix = 's';
     spm_jobman('run', matlabbatch);
+    fprintf('  * Saved %s\n', basename(outfiles.ssubcortwm));
 
     % Erode the mask
-    outfiles.eroded_subcortwm = fullfile( ...
+    outfiles.mask_eroded_subcortwm = fullfile( ...
         out_dir, append(scan_tag, '_mask-eroded-subcortwm.nii') ...
     );
     nii_thresh_to_mask( ...
-        outfiles.ssubcortwm, erosion_thresh, Inf, outfiles.eroded_subcortwm, ...
-        overwrite, verbose ...
+        outfiles.ssubcortwm, erosion_thresh, Inf, outfiles.mask_eroded_subcortwm, ...
+        overwrite ...
     );
 end

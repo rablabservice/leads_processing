@@ -1,5 +1,5 @@
-function outfiles = basename(infiles)
-    % Return the basenames of one or more file paths.
+function outfiles = dirname(infiles)
+    % Return the parent directories of one or more filepaths
     %
     % Parameters
     % ----------
@@ -9,19 +9,21 @@ function outfiles = basename(infiles)
     % Returns
     % -------
     % outfiles : char|string|cellstr|struct of filenames
-    %     Paths to basenames of the input files, in the same order and
-    %     object class as the input files
+    %     Paths to parent directories of the input files, in the same
+    %     order and object class as the input files
     % ------------------------------------------------------------------
     function outfile = fmt_path(infile)
         % Format a single path
-        [~, n, x] = fileparts(deblank(infile));
-        outfile = append(n, x);
+        outfile = fileparts(deblank(infile));
         if ischar(infile)
             outfile = char(outfile);
         elseif isstring(infile)
             outfile = string(outfile);
         end
     end
+
+    % Format paths as absolute paths
+    infiles = abspath(infiles);
 
     % Return outfiles in the correct format
     if ischar(infiles)

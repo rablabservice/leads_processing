@@ -1,10 +1,9 @@
-function convert_dicoms(newdata_dir, verbose)
+function convert_dicoms(newdata_dir)
     % Convert .dcm files to .nii for all nested directories in newdata_dir
     % with dicoms but no existing nifti.
     % ------------------------------------------------------------------
     arguments
         newdata_dir {mustBeFolder}
-        verbose logical = true
     end
 
     % Format paths
@@ -12,19 +11,15 @@ function convert_dicoms(newdata_dir, verbose)
 
     % If newdata_dir is empty, there's nothing to do here
     if isempty(dir(newdata_dir))
-        if verbose
-            fprintf('- No newdata to convert to nifti\n');
-        end
+        fprintf('- No newdata to convert to nifti\n');
         return
     end
 
     % Get path to dcm2niix
-    dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix';
+    dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix -d 9';
 
     % Print the welcome message
-    if verbose
-        fprintf('\n- Converting newdata dicoms to nifti');
-    end
+    fprintf('\n- Converting newdata dicoms to nifti\n');
 
     % Find all dicoms in raw
     dcm_files = dir(fullfile(newdata_dir, '**', '*.dcm'));
@@ -39,9 +34,7 @@ function convert_dicoms(newdata_dir, verbose)
     % Find directories with dicoms but no nifti
     conv_dirs = setdiff(dcm_dirs, nii_dirs);
     n_conv = length(conv_dirs);
-    if verbose
-        fprintf('  * %d directories have dicoms but no nifti\n', n_conv, newdata_dir);
-    end
+    fprintf('  * %d directories have dicoms but no nifti\n', n_conv);
 
     % Convert dicoms to nifti
     for i = 1:n_conv

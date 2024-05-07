@@ -1,9 +1,5 @@
-function outfile = save_mask_brainstem(aparcf, in_dir, out_dir, overwrite, verbose)
+function outfiles = save_mask_brainstem(aparcf, in_dir, out_dir, overwrite)
     % Load the aparc+aseg and save the brainstem mask
-    %
-    % Usage
-    % -----
-    % >> save_mask_brainstem(aparcf, in_dir, out_dir, overwrite, verbose)
     %
     % Parameters
     % ----------
@@ -18,19 +14,16 @@ function outfile = save_mask_brainstem(aparcf, in_dir, out_dir, overwrite, verbo
     %   the same directory as the aparc+aseg.nii file
     % overwrite : logical, optional
     %   If true, overwrite existing file
-    % verbose : logical, optional
-    %   If true, print diagnostic information
     %
     % Files created
     % -------------
-    % - <out_dir>/<scan_tag>_mask-brainstem.nii
+    % - <scan_tag>_mask-brainstem.nii
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
         overwrite logical = false
-        verbose logical = true
     end
 
     % Define aparc index for the brainstem
@@ -41,6 +34,6 @@ function outfile = save_mask_brainstem(aparcf, in_dir, out_dir, overwrite, verbo
     scan_tag = get_scan_tag(aparcf);
 
     % Save the mask
-    outfile = fullfile(out_dir, append(scan_tag, '_mask-brainstem.nii'));
-    nii_labels_to_mask(aparcf, mask_idx, outfile, overwrite, verbose);
+    outfiles.mask_bstem = fullfile(out_dir, append(scan_tag, '_mask-brainstem.nii'));
+    nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_bstem, overwrite);
 end

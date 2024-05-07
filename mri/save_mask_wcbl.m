@@ -1,9 +1,5 @@
-function outfile = save_mask_wcbl(aparcf, in_dir, out_dir, overwrite, verbose)
+function outfiles = save_mask_wcbl(aparcf, in_dir, out_dir, overwrite)
     % Load the aparc+aseg and save the whole cerebellum mask
-    %
-    % Usage
-    % -----
-    % >> save_mask_wcbl(aparcf, in_dir, out_dir, overwrite, verbose)
     %
     % Parameters
     % ----------
@@ -18,19 +14,16 @@ function outfile = save_mask_wcbl(aparcf, in_dir, out_dir, overwrite, verbose)
     %   the same directory as the aparc+aseg.nii file.
     % overwrite : logical, optional
     %   If true, overwrite existing file
-    % verbose : logical, optional
-    %   If true, print diagnostic information
     %
     % Files created
     % -------------
-    % - <out_dir>/<scan_tag>_mask-wcbl.nii
+    % - <scan_tag>_mask-wcbl.nii
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
         overwrite logical = false
-        verbose logical = true
     end
 
     % Define aparc indices for the whole cerebellum
@@ -41,6 +34,6 @@ function outfile = save_mask_wcbl(aparcf, in_dir, out_dir, overwrite, verbose)
     scan_tag = get_scan_tag(aparcf);
 
     % Save the mask
-    outfile = fullfile(out_dir, append(scan_tag, '_mask-wcbl.nii'));
-    create_nii_mask(aparcf, mask_idx, outfile, overwrite, verbose);
+    outfiles.mask_wcbl = fullfile(out_dir, append(scan_tag, '_mask-wcbl.nii'));
+    nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_wcbl, overwrite);
 end

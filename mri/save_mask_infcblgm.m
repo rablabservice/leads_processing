@@ -1,4 +1,4 @@
-function outfiles = save_mask_infcblgm(aparcf, iyf, in_dir, out_dir, overwrite, verbose)
+function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite)
     % Save the inferior cerebellar gray matter mask
     %
     % Usage
@@ -9,111 +9,107 @@ function outfiles = save_mask_infcblgm(aparcf, iyf, in_dir, out_dir, overwrite, 
     % ----------
     % aparcf : char or str array
     %   Path to the aparc+aseg.nii file
-    % iyf : char or str array
-    %   Path to the inverse warp file
+    % suitf : char or str array
+    %   Path to the SUIT atlas in native MRI space
     % in_dir : char or str array
     %   The input directory. If aparcf is empty, this is where the
-    %   function looks for the aparc+aseg.nii file. This parameter is
+    %   function looks for the aparc_dat+aseg.nii file. This parameter is
     %   disregarded if aparcf is not empty
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
-    %   the same directory as the aparc+aseg.nii file
+    %   the same directory as the aparc_dat+aseg.nii file
     % overwrite : logical, optional
     %   If true, overwrite existing file
-    % verbose : logical, optional
-    %   If true, print diagnostic information
     %
     % Files created
     % -------------
-    % - <out_dir>/<scan_tag>_cbl-suit.nii
-    % - <out_dir>/<scan_tag>_mask-infcblgm.nii
+    % - <scan_tag>_cbl-suit.nii
+    % - <scan_tag>_mask-cblgm.nii
+    % - <scan_tag>_mask-infcblgm.nii
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
+        suitf {mustBeText} = ''
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
         overwrite logical = false
-        verbose logical = true
     end
 
-    % Define aparc indices for cerebellar gray matter
+    function smooth_mask(infile)
+        % Smooth infile by 8mm^3 FWHM and save as s<infile>
+        prefix = 's';
+        clear matlabbatch;
+        matlabbatch{1}.spm.spatial.smooth.data = cellstr(infile);
+        matlabbatch{1}.spm.spatial.smooth.fwhm = [8 8 8];
+        matlabbatch{1}.spm.spatial.smooth.dtype = spm_type('float32');
+        matlabbatch{1}.spm.spatial.smooth.im = 0;
+        matlabbatch{1}.spm.spatial.smooth.prefix = prefix;
+        spm_jobman('run', matlabbatch);
+        fprintf('  * Saved %s\n', basename(add_presuf(infile, prefix)));
+    end
+
+    % Define aparc_dat indices for cerebellar gray matter
     mask_idx = [8; 47];
 
     % Format inputs
     [aparcf, out_dir] = format_mask_inputs(aparcf, in_dir, out_dir);
     scan_tag = get_scan_tag(aparcf);
 
+    % Define outputs
+    outfiles.mask_cblgm = fullfile(out_dir, append(scan_tag, '_mask-cblgm.nii'));
+    % outfiles.cbl_suit = fullfile(out_dir, append(scan_tag, '_cbl-suit.nii'));
+    outfiles.mask_infcblgm = fullfile(out_dir, append(scan_tag, '_mask-infcblgm.nii'));
+
     % Save the mask
-    cblgmf = fullfile(out_dir, append(scan_tag, '_mask-cblgm.nii'));
-    nii_labels_to_mask(aparcf, mask_idx, outfile, overwrite, verbose);
+    mask_cblgm = nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_cblgm, overwrite);
 
-    % Inverse warp the SUIT template to subject MRI space
-    template_suitf = '/mnt/coredata/Projects/Resources/scripts/rCerebellum-SUIT.nii'
+    % % Inverse warp the SUIT template to native MRI space
+    % if isfile(outfiles.cbl_suit) && ~overwrite
+    %     fprintf('  * Reverse-normalized SUIT template already exists, will not overwrite\n');
+    % else
+    %     template_suitf = '/mnt/coredata/Projects/Resources/scripts/rCerebellum-SUIT.nii';
+    %     mustBeFile(template_suitf);
+    %     interp = 0;
+    %     vox = [1 1 1];
+    %     prefix = 'v';
+    %     bb = [Inf Inf Inf; Inf Inf Inf];
+    %     outf = apply_invwarp_from_mni(template_suitf, iyf, interp, vox, prefix, bb, overwrite);
+    %     movefile(outf, outfiles.cbl_suit);
+    %     fprintf('  * Saved %s\n', basename(outfiles.cbl_suit));
+    % end
 
-    spm('defaults','PET');
-    clear matlabbatch;
-    matlabbatch{1}.spm.spatial.normalise.write.subj.def = cellstr(iyf);
-    matlabbatch{1}.spm.spatial.normalise.write.subj.resample = cellstr(template_suitf);
-    matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70
-                                                            78 76 85];
-    matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [2 2 2];
-    matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 0;
-    matlabbatch{1}.spm.spatial.normalise.write.woptions.prefix = 'w';
-    matlabbatch{2}.spm.spatial.coreg.write.ref = cellstr(nuscan);
-    matlabbatch{2}.spm.spatial.coreg.write.source = cellstr(strcat(pathftp,'/wrCerebellum-SUIT.nii'));
-    matlabbatch{2}.spm.spatial.coreg.write.roptions.interp = 4;
-    matlabbatch{2}.spm.spatial.coreg.write.roptions.wrap = [0 0 0];
-    matlabbatch{2}.spm.spatial.coreg.write.roptions.mask = 0;
-    matlabbatch{2}.spm.spatial.coreg.write.roptions.prefix = 'r';
-    spm_jobman('run',matlabbatch); clear matlabbatch;
+    % Define intermediary files
+    interfs.mask_keep = fullfile(out_dir, append(scan_tag, '_mask-keep.nii'));
+    interfs.smask_keep = add_presuf(interfs.mask_keep, 's');
+    interfs.mask_toss = fullfile(out_dir, append(scan_tag, '_mask-toss.nii'));
+    interfs.smask_toss = add_presuf(interfs.mask_toss, 's');
 
-    %%% we have the reverse normalized SUIT template now.
-    %%% Let's take into account the aparc+aseg
+    % Create a mask of SUIT subregions we want to keep, then smooth it
+    labels_keep = [6, 8:28, 33:34]';
+    mask_keep = nii_labels_to_mask(outfiles.cbl_suit, labels_keep, interfs.mask_keep, overwrite);
+    smooth_mask(interfs.mask_keep);
+    smask_keep = spm_read_vols(spm_vol(interfs.smask_keep));
 
-    % Code straight from ADNI processing sent from Deniz and available at /home/jagust/dkorman/matlab/MakeSUITCerebMask_ADNI.m
+    % Create a mask of SUIT subregions we want to keep, then smooth it
+    labels_toss = [0:5, 7]';
+    mask_toss = nii_labels_to_mask(outfiles.cbl_suit, labels_toss, interfs.mask_toss, overwrite);
+    smooth_mask(interfs.mask_toss);
+    smask_toss = spm_read_vols(spm_vol(interfs.smask_toss));
 
-    Vaparc=spm_vol(aparcf);
-    aparc=spm_read_vols(Vaparc);
-    [sz1,sz2,sz3]=size(aparc);
-    raparc=reshape(aparc,sz1*sz2*sz3,1);
+    % Save the inferior cerebellar gray matter mask
+    keep_gt_toss = smask_keep > smask_toss;
+    out_img = spm_vol(aparcf);
+    out_img.fname = fullfile(fileparts(outfiles.cbl_suit), 'keep_gt_toss.nii');
+    out_img.dt = [spm_type('uint8') 0];
+    spm_write_vol(out_img, keep_gt_toss);
 
-    Vcere=spm_vol(char(strcat(pathftp,'/rwrCerebellum-SUIT.nii')));
-    cere=spm_read_vols(Vcere);
-    rcere=reshape(cere,sz1*sz2*sz3,1);
-    % find voxels we want to keep and toss in reverse-normalized cerebellum
-    % atlas
-    indkeep=find(rcere==6 | (rcere>=8 & rcere<=28) | rcere==33 | rcere==34);
-    indtoss=find(rcere<=5 | rcere==7);
-    rkeep=zeros(sz1*sz2*sz3,1);
-    rtoss=zeros(sz1*sz2*sz3,1);
-    % create binary masks for voxels we want to keep or toss
-    rkeep(indkeep)=ones(length(indkeep),1);
-    rtoss(indtoss)=ones(length(indtoss),1);
-    keep=reshape(rkeep,sz1,sz2,sz3);
-    toss=reshape(rtoss,sz1,sz2,sz3);
-    skeep=zeros(sz1,sz2,sz3);
-    stoss=zeros(sz1,sz2,sz3);
-    % smooth the binary masks for voxels we want to keep or toss, doing this bc
-    % there is not perfect overlap bw freesurfer's gray matter segmentation of
-    % cerebellum and the reversenormalized mask, so want a freesurfer gray
-    % matter voxel to be characterized in keep or toss group depending on how
-    % close it is to keep or toss regions in reverse normalized cerebellum
-    % template, even if it isn't defined as part of cerebellum in the template
-    spm_smooth(keep,skeep,[8 8 8]);
-    spm_smooth(toss,stoss,[8 8 8]);
-    rskeep=reshape(skeep,sz1*sz2*sz3,1);
-    rstoss=reshape(stoss,sz1*sz2*sz3,1);
-    ind=find((raparc==8 | raparc==47) & rskeep>rstoss);
-    szwholecere=length(ind);
-    rcereaparc=zeros(sz1*sz2*sz3,1);
-    rcereaparc(ind)=ones(length(ind),1);
+    mask_infcblgm = mask_cblgm & (smask_keep > smask_toss);
+    out_img = spm_vol(aparcf);
+    out_img.fname = outfiles.mask_infcblgm;
+    out_img.dt = [spm_type('uint8') 0];
+    spm_write_vol(out_img, mask_infcblgm);
+    fprintf('  * Saved %s\n', basename(outfiles.mask_infcblgm));
 
-    cereaparc=reshape(rcereaparc,sz1,sz2,sz3);
-    Vcereaparc=Vaparc;
-    Vcereaparc.fname=[pathftp '/infcblg_ref_mask.nii']; %% saved the inferior cbl gray mask
-    spm_write_vol(Vcereaparc,cereaparc);
-
-    % Create the inferior cerebellar gray matter mask
-
-
+    % Delete intermediary files
+    % structfun(@delete, interfs);
 end

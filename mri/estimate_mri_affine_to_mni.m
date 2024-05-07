@@ -1,5 +1,5 @@
-function atf = estimate_mri_affine_to_mni(nuf, templatef, overwrite, verbose)
-    % Estimate affine transformation from subject MRI to MNI space
+function atf = estimate_mri_affine_to_mni(nuf, templatef, overwrite)
+    % Estimate affine transformation from native MRI to MNI space
     %
     % Parameters
     % ----------
@@ -15,31 +15,30 @@ function atf = estimate_mri_affine_to_mni(nuf, templatef, overwrite, verbose)
         nuf {mustBeFile}
         templatef = []
         overwrite logical = false
-        verbose logical = true
     end
 
     % Format parameters
-    nuf = cellfun(@(x) abspath(x), cellstr(nuf), 'UniformOutput', false);
+    nuf = abspath(nuf);
     if isempty(templatef)
-        templatef = cellstr(fullfile(fileparts(which('spm')), '/toolbox/OldNorm/T1.nii'));
+        templatef = fullfile(fileparts(which('spm')), '/toolbox/OldNorm/T1.nii');
     end
 
     % Check if the output file exists
-    mri_dir = fileparts(nuf{1});
+    mri_dir = fileparts(nuf);
     scan_tag = get_scan_tag(mri_dir);
-    atf = fullfile(mri_dir, append('aff_', scan_tag,'.mat'));
+    atf = fullfile(mri_dir, append('atf_', scan_tag,'.mat'));
     if isfile(atf) && ~overwrite
+        fprintf('- Affine transformation file already exists, will not re-estimate\n');
         return
+    else
+        fprintf('- Estimating affine transformation to MNI space\n');
     end
 
     % Run Old Normalise: Estimate
-    if verbose
-        fprintf('- Estimating affine transformation to MNI space\n');
-    end
     clear matlabbatch;
-    matlabbatch{1}.spm.tools.oldnorm.estwrite.subj(1).source = nuf;
+    matlabbatch{1}.spm.tools.oldnorm.estwrite.subj(1).source = cellstr(nuf);
     matlabbatch{1}.spm.tools.oldnorm.estwrite.subj(1).wtsrc = '';
-    matlabbatch{1}.spm.tools.oldnorm.est.eoptions.template = templatef;
+    matlabbatch{1}.spm.tools.oldnorm.est.eoptions.template = cellstr(templatef);
     matlabbatch{1}.spm.tools.oldnorm.est.eoptions.weight = '';
     matlabbatch{1}.spm.tools.oldnorm.est.eoptions.smosrc = 8;
     matlabbatch{1}.spm.tools.oldnorm.est.eoptions.smoref = 0;

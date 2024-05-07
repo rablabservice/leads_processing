@@ -1,21 +1,34 @@
-function outfiles = basename(infiles)
-    % Return the basenames of one or more file paths.
+function outfiles = add_presuf(infiles, prefix, suffix)
+    % Add a prefix and/or suffix to one or more filenames
     %
     % Parameters
     % ----------
     % infiles : char|string|cellstr|struct of filenames
-    %    Paths to files or directories
+    %     Paths to files
+    % prefix : char
+    %     Prefix to add to the filenames
     %
     % Returns
     % -------
     % outfiles : char|string|cellstr|struct of filenames
-    %     Paths to basenames of the input files, in the same order and
-    %     object class as the input files
+    %     Paths to the input files with prefix and/or suffix added, in
+    %     the same order and object class as the input files
     % ------------------------------------------------------------------
+    arguments
+        infiles
+        prefix {mustBeText} = ''
+        suffix {mustBeText} = ''
+    end
+
     function outfile = fmt_path(infile)
         % Format a single path
-        [~, n, x] = fileparts(deblank(infile));
-        outfile = append(n, x);
+        [d, n, x] = fileparts(deblank(infile));
+        if strcmp(x, '.gz')
+            parts = strsplit(n, '.');
+            n = strjoin(parts(1:end-1), '.');
+            x = append('.', parts{end}, x);
+        end
+        outfile = fullfile(d, append(prefix, n, suffix, x));
         if ischar(infile)
             outfile = char(outfile);
         elseif isstring(infile)

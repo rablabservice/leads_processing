@@ -1,4 +1,4 @@
-function mask = nii_labels_to_mask(infile, labels, outfile, overwrite, verbose)
+function mask = nii_labels_to_mask(infile, labels, outfile, overwrite)
     % Create a binary mask from a nifti file and array of integer labels
     %
     % Mask is 1 for all elements in the input file whose values are in
@@ -6,7 +6,7 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite, verbose)
     %
     % Parameters
     % ----------
-    % infile : str|char
+    % infile : char|string
     %     Path to the input nifti file.
     % labels : array
     %     Array of integers that represent the indices of the elements
@@ -15,25 +15,22 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite, verbose)
     %     Path to the output nifti file.
     % overwrite : bool
     %     If true, overwrite the output file if it already exists.
-    % verbose : bool
-    %     If true, print status messages.
     %
     % Returns
+    % mask : logical array
+    %     Mask array in the shape of the input file
     % ------------------------------------------------------------------
     arguments
         infile {mustBeFile}
         labels {mustBeNumeric}
         outfile {mustBeText} = ''
         overwrite logical = false
-        verbose logical = true
     end
 
     % If the output file exists and overwrite is false, load the outfile
     % and return its data array
     if exist(outfile, 'file') && ~overwrite
-        if verbose
-            fprintf('  - File already exists, will not overwrite: %s\n', basename(outfile));
-        end
+        fprintf('  * %s already exists, will not overwrite\n', basename(outfile));
         mask = spm_read_vols(spm_vol(outfile));
         return
     end
@@ -64,8 +61,6 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite, verbose)
         mask_img.fname = outfile;
         mask_img.dt = [spm_type('uint8') 0];
         spm_write_vol(mask_img, mask);
-        if verbose
-            fprintf('  - Saved %s\n', basename(outfile));
-        end
+        fprintf('  * Saved %s\n', basename(outfile));
     end
 end

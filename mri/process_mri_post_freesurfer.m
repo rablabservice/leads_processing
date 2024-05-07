@@ -1,47 +1,51 @@
-function process_mri_post_freesurfer(mri_dir, segment_brainstem, overwrite, verbose)
+function outfiles = process_mri_post_freesurfer(mri_dir, overwrite)
     % Complete post-FreeSurfer MRI processing, mainly SPM12 operations
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeText}
-        segment_brainstem logical = true
         overwrite logical = false
-        verbose logical = true
     end
 
-    % Format inputs; initialize SPM jobman and PET parameter defaults
+    % Format inputs
     mri_dir = abspath(mri_dir);
     subj_dir = fileparts(mri_dir);
+
+    % Initialize SPM jobman and PET parameter defaults
     spm_jobman('initcfg');
     spm('defaults','PET');
 
     % Copy FreeSurfer files to the subject's processed mri directory
     % and convert them from .mgz to .nii
-    mri_files = cell(1, 2 + segment_brainstem);
-    [mri_files{:}] = copy_convert_freesurfer( ...
-        mri_dir, segment_brainstem, overwrite, verbose ...
-    );
+    outfiles = copy_convert_freesurfer(mri_dir, overwrite);
 
     % Reset origin of the nu.nii to its center-of-mass, then coregister
-    % it to the OldNorm T1 template. Apply transforms to aparc+aseg and
+    % to the OldNorm T1 template. Apply transforms to aparc+aseg and
     % brainstem seg files. This step overwrites affine transforms in the
     % input image headers but does not affect their data arrays
-    mri_files = reset_origin_mri_com(mri_files, verbose);
+    reset_origin_mri_com(outfiles, '', false);
 
-    % % Coregister nu.nii to subject's baseline nu.nii. Apply transforms
-    % % to aparc+aseg and brainstem seg files. Overwrites affines in the
-    % % input image headers but does not affect their data arrays
-    % mri_files = coreg_mri_to_baseline(mri_files);
+    % Coregister nu.nii to subject's baseline nu.nii. Apply transforms
+    % to aparc+aseg and brainstem seg files. Overwrites affines in the
+    % input image headers but does not affect their data arrays
+    coreg_mri_to_baseline(outfiles);
 
     % % Segment the nu.nii and save forward and reverse deformation fields
-    % % for later use in warping images from subject MRI to MNI space
-    % segment_mri(mri_dir, overwrite, verbose);
+    % % for later use in warping images from native MRI to MNI space
+    outfiles = catstruct(outfiles, segment_mri(outfiles.nu, overwrite));
 
-    % % Warp MRI files to MNI space
-    % warp_to_mni(nuf, mri_dir, overwrite, verbose);
+    % Warp nu to MNI space
+    interp = 4;
+    vox = [1.5 1.5 1.5];
+    prefix = 'w';
+    bb = [Inf Inf Inf; Inf Inf Inf];
+    outfiles.wnu = apply_warp_to_mni(outfiles.nu, outfiles.y, interp, vox, prefix, bb, overwrite);
 
     % % Calculate affine transform from MRI native space to MNI
-    % affine_mri_to_mni(mri_dir, overwrite, verbose);
+    % estimate_mri_affine_to_mni(mri_dir, overwrite);
+
+    % Run SUIT to get the cerebellar atlas in native MRI space
+    outfiles = catstruct(outfiles, suit_normalize(mri_dir, overwrite));
 
     % Save reference region and target ROI mask files
-    save_roi_masks(mri_dir, overwrite, verbose);
+    outfiles = catstruct(outfiles, save_roi_masks(mri_dir, overwrite));
 end

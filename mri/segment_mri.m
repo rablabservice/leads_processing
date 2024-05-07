@@ -1,4 +1,4 @@
-function outfiles = segment_mri(nuf, overwrite, verbose)
+function outfiles = segment_mri(nuf, overwrite)
     % Segment nu.nii and save forward and inverse deformations to MNI space
     %
     % Also smooths the mwc1 image by 8mm^3 FWHM to create the smwc1
@@ -10,35 +10,35 @@ function outfiles = segment_mri(nuf, overwrite, verbose)
     %   Path to the T1 image to segment
     % overwrite : logical, optional
     %   If true, overwrite existing files
-    % verbose : logical, optional
-    %   If true, print diagnostic information
+    %
+    % Returns
+    % -------
+    % outfiles : struct
+    %   Struct array with paths to each output file
     %
     % Files created
     % -------------
-    % <mri_dir>/c1<scan_tag>_nu.nii
-    % <mri_dir>/c2<scan_tag>_nu.nii
-    % <mri_dir>/c3<scan_tag>_nu.nii
-    % <mri_dir>/c4<scan_tag>_nu.nii
-    % <mri_dir>/c5<scan_tag>_nu.nii
-    % <mri_dir>/iy_<scan_tag>_nu.nii
-    % <mri_dir>/smwc1<scan_tag>_nu.nii
-    % <mri_dir>/w<scan_tag>_nu.nii
-    % <mri_dir>/y_<scan_tag>_nu.nii
+    % c1<scan_tag>_nu.nii
+    % c2<scan_tag>_nu.nii
+    % c3<scan_tag>_nu.nii
+    % c4<scan_tag>_nu.nii
+    % c5<scan_tag>_nu.nii
+    % iy_<scan_tag>_nu.nii
+    % smwc1<scan_tag>_nu.nii
+    % w<scan_tag>_nu.nii
+    % y_<scan_tag>_nu.nii
     % ------------------------------------------------------------------
     arguments
         nuf {mustBeFile}
         overwrite logical = false
-        verbose logical = true
     end
 
     % Format parameters
-    nuf = cellstr(abspath(nuf));
-    mri_dir = fileparts(nuf{1});
+    nuf = abspath(nuf);
+    mri_dir = fileparts(nuf);
     scan_tag = get_scan_tag(mri_dir);
-    tpmf = fullfile(fileparts(which('spm')), 'tpm/TPM.nii');
-    mustBeFile(tpmf);
 
-    % Get the output filenames
+    % Define the output filenames
     outfiles.c1 = fullfile(mri_dir, append('c1', scan_tag, '_nu.nii'));
     outfiles.c2 = fullfile(mri_dir, append('c2', scan_tag, '_nu.nii'));
     outfiles.c3 = fullfile(mri_dir, append('c3', scan_tag, '_nu.nii'));
@@ -51,14 +51,15 @@ function outfiles = segment_mri(nuf, overwrite, verbose)
 
     % Check if output files already exist
     if all(structfun(@(x) exist(x, 'file'), outfiles)) && ~overwrite
-        fprintf('- Segmentation already complete, will not overwrite existing files\n')
+        fprintf('- Segmentation already complete, will not rerun\n')
         return
+    else
+        fprintf('- Segmenting %s\n', basename(nuf));
     end
 
     % Run Segment
-    if verbose
-        fprintf('- Segmenting %s\n', basename(nuf));
-    end
+    tpmf = fullfile(fileparts(which('spm')), 'tpm/TPM.nii');
+    mustBeFile(tpmf);
     clear matlabbatch;
     matlabbatch{1}.spm.spatial.preproc.channel.vols = cellstr(nuf);  % input volumes to segment
     matlabbatch{1}.spm.spatial.preproc.channel.biasreg = 0.001;  % bias regularizatoin
@@ -78,11 +79,11 @@ function outfiles = segment_mri(nuf, overwrite, verbose)
     matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [0 0];
     matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {[tpmf ',4']};
     matlabbatch{1}.spm.spatial.preproc.tissue(4).ngaus = 3;
-    matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [1 0];  % save native space Pr(Extracranial tissue)
+    matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [1 0];  % save native space Pr(Bone)
     matlabbatch{1}.spm.spatial.preproc.tissue(4).warped = [0 0];
     matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {[tpmf ',5']};
     matlabbatch{1}.spm.spatial.preproc.tissue(5).ngaus = 4;
-    matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [1 0];  % save native space Pr(Skull)
+    matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [1 0];  % save native space Pr(Extracranial soft tissue)
     matlabbatch{1}.spm.spatial.preproc.tissue(5).warped = [0 0];
     matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {[tpmf ',6']};
     matlabbatch{1}.spm.spatial.preproc.tissue(6).ngaus = 2;
@@ -107,6 +108,10 @@ function outfiles = segment_mri(nuf, overwrite, verbose)
     matlabbatch{1}.spm.spatial.smooth.prefix = 's';
     spm_jobman('run', matlabbatch);
 
-    % Delete intermediary files
+    % Delete the intermediary files
+    seg_matf = fullfile(mri_dir, append(scan_tag, '_nu_seg8.mat'));
+    if isfile(seg_matf)
+        delete(seg_matf);
+    end
     delete(mwc1f);
 end

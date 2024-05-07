@@ -7,7 +7,7 @@ function baseline_nuf = get_baseline_mri(subj_dir, scan_type)
     end
 
     % Format inputs
-    subj_dir = abspath(subj_dir);
+    subj_dir = char(abspath(subj_dir));
     scan_type = char(scan_type);
 
     % Find all processed scan directories

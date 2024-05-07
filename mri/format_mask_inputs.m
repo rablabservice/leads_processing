@@ -24,17 +24,18 @@ function [atlasf, out_dir] = format_mask_inputs(atlasf, in_dir, out_dir)
         else
             in_dir = abspath(in_dir);
         end
-        [~, ~, atlasf, ~] = get_freesurfer_files(in_dir);
+        mrifs = get_freesurfer_files(in_dir);
+        atlasf = mrifs.aparc;
     else
         atlasf = abspath(atlasf);
     end
-    if ~exist(atlasf, 'file')
+    if ~isfile(atlasf)
         error('File not found: %s', atlasf);
     end
     if isempty(out_dir)
         out_dir = fileparts(atlasf);
     end
-    if ~exist(out_dir, 'dir')
+    if ~isfolder(out_dir)
         error('Output directory not found: %s', out_dir);
     end
 end
