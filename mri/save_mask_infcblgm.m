@@ -54,6 +54,8 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
     % Format inputs
     [aparcf, out_dir] = format_mask_inputs(aparcf, in_dir, out_dir);
     scan_tag = get_scan_tag(aparcf);
+    mustBeFile(aparcf);
+    mustBeFile(suitf);
 
     % Define outputs
     outfiles.mask_cblgm = fullfile(out_dir, append(scan_tag, '_mask-cblgm.nii'));
@@ -83,23 +85,24 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
     interfs.smask_keep = add_presuf(interfs.mask_keep, 's');
     interfs.mask_toss = fullfile(out_dir, append(scan_tag, '_mask-toss.nii'));
     interfs.smask_toss = add_presuf(interfs.mask_toss, 's');
+    interfs.keep_gt_toss = fullfile(out_dir, 'keep_gt_toss.nii');
 
     % Create a mask of SUIT subregions we want to keep, then smooth it
     labels_keep = [6, 8:28, 33:34]';
-    mask_keep = nii_labels_to_mask(outfiles.cbl_suit, labels_keep, interfs.mask_keep, overwrite);
+    mask_keep = nii_labels_to_mask(suitf, labels_keep, interfs.mask_keep, overwrite);
     smooth_mask(interfs.mask_keep);
     smask_keep = spm_read_vols(spm_vol(interfs.smask_keep));
 
     % Create a mask of SUIT subregions we want to keep, then smooth it
     labels_toss = [0:5, 7]';
-    mask_toss = nii_labels_to_mask(outfiles.cbl_suit, labels_toss, interfs.mask_toss, overwrite);
+    mask_toss = nii_labels_to_mask(suitf, labels_toss, interfs.mask_toss, overwrite);
     smooth_mask(interfs.mask_toss);
     smask_toss = spm_read_vols(spm_vol(interfs.smask_toss));
 
     % Save the inferior cerebellar gray matter mask
     keep_gt_toss = smask_keep > smask_toss;
-    out_img = spm_vol(aparcf);
-    out_img.fname = fullfile(fileparts(outfiles.cbl_suit), 'keep_gt_toss.nii');
+    out_img = spm_vol(suitf);
+    out_img.fname = interfs.keep_gt_toss;
     out_img.dt = [spm_type('uint8') 0];
     spm_write_vol(out_img, keep_gt_toss);
 

@@ -44,7 +44,7 @@ function outfiles = process_mri_post_freesurfer(mri_dir, overwrite)
     % estimate_mri_affine_to_mni(mri_dir, overwrite);
 
     % Run SUIT to get the cerebellar atlas in native MRI space
-    outfiles = catstruct(outfiles, suit_normalize(mri_dir, overwrite));
+    outfiles = catstruct(outfiles, run_suit(mri_dir, overwrite));
 
     % Save reference region and target ROI mask files
     outfiles = catstruct(outfiles, save_roi_masks(mri_dir, overwrite));

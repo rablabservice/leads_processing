@@ -14,12 +14,12 @@ function outfiles = run_suit(mri_dir, overwrite)
 
     % Check if SUIT files already exist
     suitfs.t1 = fullfile(suit_dir, 't1.nii');  % The nu.nii in LPI orientation
-    suitfs.gray = fullfile(suit_dir, 't1_seg1.nii');  % The cerebellar gray matter probability map in subject MRI space
-    suitfs.white = fullfile(suit_dir, 't1_seg2.nii');  % The cerebellar white matter probability map in subject MRI space
-    suitfs.isolation = fullfile(suit_dir, 'c_t1_pcereb.nii');  % The cerebellar mask in subject MRI space
+    suitfs.gray = fullfile(suit_dir, 't1_seg1.nii');  % The cerebellar gray matter probability map in native MRI space
+    suitfs.white = fullfile(suit_dir, 't1_seg2.nii');  % The cerebellar white matter probability map in native MRI space
+    suitfs.isolation = fullfile(suit_dir, 'c_t1_pcereb.nii');  % The cerebellar mask in native MRI space
     suitfs.affineTr = fullfile(suit_dir, 'Affine_t1_seg1.mat');  % The affine transformation matrix
     suitfs.flowfield = fullfile(suit_dir, 'u_a_t1_seg1.nii');  % The flow field
-    suitfs.iwAtlas = fullfile(suit_dir, 'iw_atl-Anatom_space-SUIT_dseg_u_a_t1_seg1.nii');  % The SUIT atlas in subject MRI space
+    suitfs.iwAtlas = fullfile(suit_dir, 'iw_atl-Anatom_space-SUIT_dseg_u_a_t1_seg1.nii');  % The SUIT atlas in native MRI space
     suitfs.wgray = fullfile(suit_dir, 'wt1_seg1.nii');  % The modulated cerebellar gray matter probability map in SUIT space
     outfiles.suit_vols = fullfile(mri_dir, append(scan_tag, '_cbl-suit-vols.csv')); % The SUIT ROI volumes
     outfiles.suit_atlas = fullfile(mri_dir, append(scan_tag, '_cbl-suit.nii')); % The SUIT atlas in RAS orientation
@@ -59,7 +59,7 @@ function outfiles = run_suit(mri_dir, overwrite)
     end
 
     % Normalize to the SUIT template
-    fprintf('  * Estimating transform from subject MRI to SUIT space\n');
+    fprintf('  * Estimating transform from native MRI to SUIT space\n');
     if overwrite || ~all(isfile({suitfs.affineTr, suitfs.flowfield}))
         clear job;
         job.subjND(1).gray = {suitfs.gray};
@@ -68,8 +68,8 @@ function outfiles = run_suit(mri_dir, overwrite)
         suit_normalize_dartel(job);
     end
 
-    % Inverse warp the SUIT template to subject MRI space
-    fprintf('  * Inverse warping the SUIT template to subject MRI space\n');
+    % Inverse warp the SUIT template to native MRI space
+    fprintf('  * Inverse warping the SUIT template to native MRI space\n');
     if overwrite || ~isfile(suitfs.iwAtlas)
         clear job;
         job.Affine = {suitfs.affineTr};
@@ -87,10 +87,12 @@ function outfiles = run_suit(mri_dir, overwrite)
     end
 
     % Convert SUIT files in subject space back to RAS orientation
-    fprintf('  * Converting LPI back to RAS orientation\n')
+    fprintf('  * Converting back to the original orientation\n')
     if overwrite || ~isfile(outfiles.suit_atlas)
         % Change the datatype from int8 to int6 so mri_convert can handle it
         nii_change_datatype(suitfs.iwAtlas, spm_type('int16'));
+
+        % Convert LPI to RAS orientation
         mri_convert = 'mri_convert --out_orientation RAS -rt nearest';
         infile = add_presuf(suitfs.iwAtlas, 'p');
         outfile = outfiles.suit_atlas;
@@ -98,11 +100,24 @@ function outfiles = run_suit(mri_dir, overwrite)
         fprintf('    - %s -> %s\n', basename(infile), basename(outfile));
         run_system_cmd(cmd, true, false);
         delete(infile);
+
+        % Reslice to match the original T1
+        clear matlabbatch;
+        matlabbatch{1}.spm.spatial.coreg.write.ref = cellstr(fsfs.nu);
+        matlabbatch{1}.spm.spatial.coreg.write.source = cellstr(outfiles.suit_atlas);
+        matlabbatch{1}.spm.spatial.coreg.write.roptions.interp = 0;
+        matlabbatch{1}.spm.spatial.coreg.write.roptions.wrap = [0 0 0];
+        matlabbatch{1}.spm.spatial.coreg.write.roptions.mask = 0;
+        matlabbatch{1}.spm.spatial.coreg.write.roptions.prefix = 'r';
+        spm_jobman('run',matlabbatch); clear matlabbatch;
+        infile = add_presuf(outfiles.suit_atlas, 'r');
+        outfile = outfiles.suit_atlas;
+        movefile(infile, outfile);
     end
 
     % Warp cerebellar gray matter mask to SUIT space in preparation for VBM
     % analysis. GM probability is modulated based on the Jacobian
-    fprintf('  * Warping cerebellar GM probability map from subject MRI to SUIT space\n');
+    fprintf('  * Warping cerebellar GM probability map from native MRI to SUIT space\n');
     if overwrite || ~isfile(suitfs.iwAtlas)
         clear job;
         job.subj.affineTr = {suitfs.affineTr};

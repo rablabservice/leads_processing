@@ -46,7 +46,7 @@ function outfiles = save_roi_masks(mri_dir, aparcf, bstemf, overwrite)
         bstemf = abspath(bstemf);
     end
     scan_tag = get_scan_tag(mri_dir);
-    iyf = fullfile(mri_dir, append('iy_', scan_tag, '_nu.nii'));
+    suitf = fullfile(mri_dir, append(scan_tag, '_cbl-suit.nii'));
 
     % Check that atlas files exist
     save_aparc_masks = isfile(aparcf);
@@ -66,8 +66,8 @@ function outfiles = save_roi_masks(mri_dir, aparcf, bstemf, overwrite)
         outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, '', '', overwrite));
         outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, '', '', overwrite));
         outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, 8, 0.7, '', '', overwrite));
-        if isfile(iyf)
-            outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, iyf, '', '', overwrite));
+        if isfile(suitf)
+            outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, '', '', overwrite));
         end
     end
     if save_brainstem_masks
