@@ -1,38 +1,39 @@
-function print_title(title, subtitle, border_char_start, border_char_end, border_step)
+function print_title(title, subtitle)
     % Print a title and optional subtitle with a border before and after
     % ------------------------------------------------------------------
     arguments
         title {mustBeText}
         subtitle {mustBeText} = ''
-        border_char_start {mustBeText} = '~'
-        border_char_end {mustBeText} = '~'
-        border_step {mustBePositive} = 4
     end
 
     % Figure out the border lengths
     border_len = max(length(title), length(subtitle));
-    border_lens_rev = [border_len:-border_step:0];
-    border_lens_fwd = flip(border_lens_rev);
 
     % Print the starting border
-    fprintf('\n');
-    if ~isempty(border_char_start)
-        for ii = 1:numel(border_lens_fwd)
-            fprintf('%s\n', repmat(border_char_start, 1, border_lens_fwd(ii)));
-        end
+    if border_len < 12
+        topbot = append(repmat('=', 1, border_len), '\n');
+
+    else
+        topbot = append('+..', repmat('=', 1, border_len - 6), '..+');
     end
+    fprintf('\n%s\n', topbot);
+    fprintf('%s\n', repmat('-', 1, border_len));
 
     % Print the title and subtitle
-    fprintf('%s\n\n', title);
-    if ~isempty(subtitle)
+    if isempty(subtitle)
+        fprintf('\n%s\n\n', title);
+    else
+        pad = floor((border_len - min(length(title), length(subtitle))) / 2);
+        if length(title) > length(subtitle)
+            subtitle = append(repmat(' ', 1, pad), subtitle, repmat(' ', 1, pad));
+        elseif length(title) < length(subtitle)
+            title = append(repmat(' ', 1, pad), title, repmat(' ', 1, pad));
+        end
+        fprintf('%s\n\n', title);
         fprintf('%s\n', subtitle);
     end
 
     % Print the ending border
-    if ~isempty(border_char_end)
-        for ii = 1:numel(border_lens_rev)
-            fprintf('%s\n', repmat(border_char_end, 1, border_lens_rev(ii)));
-        end
-    end
-    fprintf('\n');
+    fprintf('%s\n', repmat('_', 1, border_len));
+    fprintf('%s\n\n', topbot);
 end
