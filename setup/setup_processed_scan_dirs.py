@@ -102,6 +102,7 @@ def setup_processed_scan_dirs(
                 os.makedirs(scan["mri_proc_dir"])
         else:
             os.makedirs(scan["mri_proc_dir"])
+        print(f"  * Created {scan['mri_proc_dir']}")
 
         # Create a symlink to the raw MRI directory
         link_src = op.dirname(scan["mri_raw_niif"])
@@ -139,6 +140,7 @@ def setup_processed_scan_dirs(
                 os.makedirs(scan["pet_proc_dir"])
         else:
             os.makedirs(scan["pet_proc_dir"])
+        print(f"  * Created {scan['pet_proc_dir']}")
 
         # Create a symlink to the raw PET directory
         link_src = op.dirname(scan["pet_raw_niif"])

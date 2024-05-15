@@ -1,10 +1,6 @@
 function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir)
     % Save the inferior cerebellar gray matter mask
     %
-    % Usage
-    % -----
-    % >> save_mask_infcblgm(aparcf)
-    %
     % Parameters
     % ----------
     % aparcf : char or str array
@@ -15,8 +11,8 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir
     %   If true, overwrite existing file
     % in_dir : char or str array
     %   The input directory. If aparcf is empty, this is where the
-    %   function looks for the aparc_dat+aseg.nii file. This parameter is
-    %   disregarded if aparcf is not empty
+    %   function looks for the aparc_dat+aseg.nii file. This parameter
+    %   is disregarded if aparcf is not empty
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
     %   the same directory as the aparc_dat+aseg.nii file
