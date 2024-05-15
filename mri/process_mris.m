@@ -1,30 +1,33 @@
-function process_mris(data_dir, log_dir, segment_brainstem, overwrite)
+function process_mris(overwrite, log_dir, segment_brainstem)
     % High-level function to select and process MRIs
     %
     % Parameters
     % ----------
-    % data_dir:
-    %   The directory that contains raw (unprocessed) MRI data in
-    %   <data_dir>/raw and processed data in <data_dir>/processed
-    % overwrite:
-    %   If true, overwrite existing processed data
+    % overwrite : logical
+    %     If true, overwrite existing processed data
+    % data_dir : char or str
+    %     The directory that contains raw (unprocessed) MRI data in
+    %     <data_dir>/raw and processed data in <data_dir>/processed
+    % log_dir : char or str
+    %     The directory that stores log files
+    % segment_brainstem : logical
+    %     If true, segment the brainstem using segmentBS.sh
     % ------------------------------------------------------------------
     arguments
-        data_dir {mustBeFolder} = '/mnt/coredata/processing/leads/data'
+        overwrite logical = false
         log_dir {mustBeFolder} = '/mnt/coredata/processing/leads/metadata/log'
         segment_brainstem logical = true
-        overwrite logical = false
+
     end
 
     % Format paths
-    data_dir = abspath(data_dir);
     log_dir = abspath(log_dir);
 
     % Select MRIs to process
-    mri_dirs = select_mris_to_process(log_dir);
+    [raw_mrifs, mri_dirs] = select_mris_to_process(log_dir);
 
     % Process MRIs in parallel
     parfor ii = 1:length(mri_dirs)
-        process_single_mri(mri_dirs(ii), data_dir, segment_brainstem, overwrite);
+        process_single_mri(raw_mrifs(ii), mri_dirs(ii), overwrite, segment_brainstem);
     end
 end

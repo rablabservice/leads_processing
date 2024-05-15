@@ -1,6 +1,6 @@
 function convert_dicoms(newdata_dir)
-    % Convert .dcm files to .nii for all nested directories in newdata_dir
-    % with dicoms but no existing nifti.
+    % Convert .dcm files to .nii for all nested directories in
+    % newdata_dir with dicoms but no existing nifti.
     % ------------------------------------------------------------------
     arguments
         newdata_dir {mustBeFolder}

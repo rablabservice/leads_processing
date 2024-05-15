@@ -1,4 +1,4 @@
-function outfiles = coreg_mri_to_baseline(infiles, baseline_nuf, prefix, overwrite)
+function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, prefix)
     % Coregister MRI to baseline and ovewrite input image headers
     %
     % First looks up if infiles already correspond to the baseline
@@ -11,20 +11,20 @@ function outfiles = coreg_mri_to_baseline(infiles, baseline_nuf, prefix, overwri
     %     element should be the MRI to coregister (the source image),
     %     and any additional elements are paths to other images to apply
     %     the transform to
+    % overwrite : logical, optional
+    %     If true, overwrite existing files. Default is true
     % baseline_nuf : char/str, optional
     %     Path to the baseline MRI to coregister to. If empty, the
-    %     baseline MRI is looked up in the subject directory.
+    %     baseline MRI is looked up in the subject directory
     % prefix : char/str, optional
     %     Prefix to prepend to the output filenames. Empty by default
     %     (infiles are overwritten)
-    % overwrite : logical, optional
-    %     If true, overwrite existing files. Default is true
     % ------------------------------------------------------------------
     arguments
         infiles
+        overwrite logical = true
         baseline_nuf {mustBeText} = ''
         prefix {mustBeText} = ''
-        overwrite logical = true
     end
 
     % Check that all input files exist, and format them correctly
@@ -48,7 +48,7 @@ function outfiles = coreg_mri_to_baseline(infiles, baseline_nuf, prefix, overwri
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Will not coregister MRI to baseline, as output files already exist\n')
+        fprintf('- Will not coregister MRI to baseline, as output files exist\n')
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else

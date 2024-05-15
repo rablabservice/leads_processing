@@ -47,7 +47,7 @@ function outfiles = copy_convert_freesurfer(mri_dir, overwrite)
                 fprintf('  * %s -> %s\n', basename(mgzf), basename(niif));
                 run_system_cmd(cmd, true, false);
             else
-                fprintf('  * %s already exists, will not overwrite\n', basename(niif));
+                fprintf('  * %s exists, will not overwrite\n', basename(niif));
             end
         end
         % Keep only outfiles that exist

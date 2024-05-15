@@ -1,5 +1,28 @@
 function [atlasf, out_dir] = format_mask_inputs(atlasf, in_dir, out_dir)
-    % Return atlasf and out_dir and raise an error if they don't exist
+    % Given a known input path, return paths to atlasf and out_dir.
+    %
+    % Only one input is used to infer atlasf. Order of precedence is:
+    % atlasf > in_dir > out_dir. Out_dir is set to atlasf directory if
+    % not specified. Raises an error if atlasf or out_dir do not exist.
+    %
+    % Parameters
+    % ----------
+    % atlasf : char or str array
+    %     Path to the atlas file
+    % in_dir : char or str array
+    %     The input directory. If atlasf is empty, this is where the
+    %     function looks for the atlas file. This parameter is
+    %     disregarded if atlasf is not empty
+    % out_dir : char or str array
+    %     The output directory. If out_dir is empty, the mask is saved
+    %     in the same directory as the atlas file
+    %
+    % Returns
+    % -------
+    % atlasf : char
+    %   Nicely formatted absolute path to the atlas file
+    % out_dir : char
+    %   Nicely formatted absolute path to the output directory
     % ------------------------------------------------------------------
     arguments
         atlasf {mustBeText} = ''

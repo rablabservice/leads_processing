@@ -1,4 +1,4 @@
-function reset_origin_axis_midpoint(infiles, prefix, overwrite)
+function outfiles = reset_origin_axis_midpoint(infiles, overwrite, prefix)
     % Reset origin of each image to the midpoint along each axis
     %
     % Only the affine transform in the nifti headers are changed; data
@@ -8,16 +8,16 @@ function reset_origin_axis_midpoint(infiles, prefix, overwrite)
     % ----------
     % infiles : str/char or cell array of str/chars of nifti filenames
     %     One or more .nii images to reorient
+    % overwrite : logical, optional
+    %     If true, overwrite existing files. Default is true
     % prefix : str/char, optional
     %     Prefix to prepend to the output filenames. Empty by default
     %     (infiles are overwritten)
-    % overwrite : logical, optional
-    %     If true, overwrite existing files. Default is true
     % ------------------------------------------------------------------
     arguments
         infiles
-        prefix {mustBeText} = ''
         overwrite logical = true
+        prefix {mustBeText} = ''
     end
 
     % Check that all input files exist, and format them correctly
@@ -28,7 +28,7 @@ function reset_origin_axis_midpoint(infiles, prefix, overwrite)
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Will not reset origin to axis midpoint, as output files already exist\n')
+        fprintf('- Will not reset origin to axis midpoint, as output files exist\n')
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else

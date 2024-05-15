@@ -1,4 +1,4 @@
-function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite)
+function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir)
     % Save the inferior cerebellar gray matter mask
     %
     % Usage
@@ -11,6 +11,8 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
     %   Path to the aparc+aseg.nii file
     % suitf : char or str array
     %   Path to the SUIT atlas in native MRI space
+    % overwrite : logical, optional
+    %   If true, overwrite existing file
     % in_dir : char or str array
     %   The input directory. If aparcf is empty, this is where the
     %   function looks for the aparc_dat+aseg.nii file. This parameter is
@@ -18,21 +20,18 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
     %   the same directory as the aparc_dat+aseg.nii file
-    % overwrite : logical, optional
-    %   If true, overwrite existing file
     %
     % Files created
     % -------------
-    % - <scan_tag>_cbl-suit.nii
     % - <scan_tag>_mask-cblgm.nii
     % - <scan_tag>_mask-infcblgm.nii
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
         suitf {mustBeText} = ''
+        overwrite logical = false
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
-        overwrite logical = false
     end
 
     function smooth_mask(infile)
@@ -59,26 +58,16 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
 
     % Define outputs
     outfiles.mask_cblgm = fullfile(out_dir, append(scan_tag, '_mask-cblgm.nii'));
-    % outfiles.cbl_suit = fullfile(out_dir, append(scan_tag, '_cbl-suit.nii'));
     outfiles.mask_infcblgm = fullfile(out_dir, append(scan_tag, '_mask-infcblgm.nii'));
+
+    % Check if all output files already exist
+    if all(structfun(@isfile, outfiles)) && ~overwrite
+        fprintf('  * Subcortical white matter mask files exist, will not overwrite\n')
+        return
+    end
 
     % Save the mask
     mask_cblgm = nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_cblgm, overwrite);
-
-    % % Inverse warp the SUIT template to native MRI space
-    % if isfile(outfiles.cbl_suit) && ~overwrite
-    %     fprintf('  * Reverse-normalized SUIT template already exists, will not overwrite\n');
-    % else
-    %     template_suitf = '/mnt/coredata/Projects/Resources/scripts/rCerebellum-SUIT.nii';
-    %     mustBeFile(template_suitf);
-    %     interp = 0;
-    %     vox = [1 1 1];
-    %     prefix = 'v';
-    %     bb = [Inf Inf Inf; Inf Inf Inf];
-    %     outf = apply_invwarp_from_mni(template_suitf, iyf, interp, vox, prefix, bb, overwrite);
-    %     movefile(outf, outfiles.cbl_suit);
-    %     fprintf('  * Saved %s\n', basename(outfiles.cbl_suit));
-    % end
 
     % Define intermediary files
     interfs.mask_keep = fullfile(out_dir, append(scan_tag, '_mask-keep.nii'));
@@ -100,12 +89,6 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
     smask_toss = spm_read_vols(spm_vol(interfs.smask_toss));
 
     % Save the inferior cerebellar gray matter mask
-    keep_gt_toss = smask_keep > smask_toss;
-    out_img = spm_vol(suitf);
-    out_img.fname = interfs.keep_gt_toss;
-    out_img.dt = [spm_type('uint8') 0];
-    spm_write_vol(out_img, keep_gt_toss);
-
     mask_infcblgm = mask_cblgm & (smask_keep > smask_toss);
     out_img = spm_vol(aparcf);
     out_img.fname = outfiles.mask_infcblgm;
@@ -114,5 +97,5 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, in_dir, out_dir, overwrite
     fprintf('  * Saved %s\n', basename(outfiles.mask_infcblgm));
 
     % Delete intermediary files
-    % structfun(@delete, interfs);
+    structfun(@delete, interfs);
 end

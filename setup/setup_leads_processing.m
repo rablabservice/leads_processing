@@ -1,9 +1,10 @@
-function setup_leads_processing(data_dir, overwrite, cleanup)
+function setup_leads_processing(data_dir, overwrite, process_unused_mris, cleanup)
     % High-level function that sets up the LEADS processing pipeline
     % ------------------------------------------------------------------
     arguments
         data_dir {mustBeFolder} = '/mnt/coredata/processing/leads/data'
         overwrite logical = false
+        process_unused_mris logical = false
         cleanup logical = true
     end
 
@@ -11,7 +12,6 @@ function setup_leads_processing(data_dir, overwrite, cleanup)
     data_dir = abspath(data_dir);
     newdata_dir = fullfile(data_dir, 'newdata');
     raw_dir = fullfile(data_dir, 'raw');
-    processed_dir = fullfile(data_dir, 'processed');
 
     % Set path to the python interpreter
     python = "/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python";
@@ -23,18 +23,18 @@ function setup_leads_processing(data_dir, overwrite, cleanup)
         insert(py.sys.path, int32(0), code_dir);
     end
 
-    % Print welcome message
+    % Print the module header
     title = 'SETUP MODULE';
-    subcap = 'Prepare new MRI and PET scans for processing';
-    border_len = max(length(title), length(subcap));
-    border_char = '~';
-    fprintf('%s\n', repmat(border_char, 1, border_len));
-    fprintf('%s\n\n', repmat(border_char, 1, border_len));
-    fprintf('%s\n\n', title);
-    fprintf('%s\n\n', subcap);
-    while border_len > 0
-        fprintf('%s\n', repmat(border_char, 1, border_len));
-        border_len = border_len - 4;
+    subtitle = 'Prepare new MRI and PET scans for processing';
+    print_title(title, subtitle);
+
+    % Unzip files in newdata
+    zipfs = glob_sort_mtime(fullfile(newdata_dir, '*.zip'));
+    for ii = 1:numel(zipfs)
+        fprintf('- Unzipping %s\n', zipfs{ii});
+        unzip(zipfs{ii}, newdata_dir);
+        % Remove the zip file
+        delete(zipfs{ii});
     end
 
     % Convert dicoms to nifti
@@ -48,16 +48,29 @@ function setup_leads_processing(data_dir, overwrite, cleanup)
         cleanup=cleanup ...
     );
 
-    % % Save a CSV file of MRI + PET scans that need to be processed
-    % cmd = append(python, ' ', fullfile(code_dir, 'find_scans_to_process.py'));
-    % run_system_cmd(cmd)
+    % Exit early
+    return
 
-    % % Create processed scan directories for MRI and PET scans that need
-    % % to be processed, link each PET scan to its closest MRI, and copy
-    % % PET niftis from their raw to processed directories
-    % cmd = append(python, ' ', fullfile(code_dir, 'create_pet_proc_dirs.py'));
+    % % Save CSVs files of MRI and PET scans in the raw directory, and
+    % % indicate which scans are scheduled for processing
+    % cmd = append(python, ' ', fullfile(code_dir, 'select_scans_to_process.py'));
     % if overwrite
     %     cmd = append(cmd, ' -o');
     % end
-    % run_system_cmd(cmd);
+    % if process_unused_mris
+    %     cmd = append(cmd, ' -p');
+    % end
+    % run_system_cmd(cmd)
+
+    % Create processed scan directories for MRI and PET scans that need
+    % to be processed, link each PET scan to its closest MRI, and copy
+    % PET niftis from their raw to processed directories
+    cmd = append(python, ' ', fullfile(code_dir, 'setup_processed_scan_dirs.py'));
+    if overwrite
+        cmd = append(cmd, ' -o');
+    end
+    run_system_cmd(cmd);
+
+    % Print the module footer
+    print_footer('Setup module complete');
 end

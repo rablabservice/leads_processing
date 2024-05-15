@@ -1,4 +1,4 @@
-function outfiles = apply_invwarp_from_mni(infiles, iyf, interp, vox, prefix, bb, overwrite)
+function outfiles = apply_invwarp_from_mni(infiles, iyf, overwrite, interp, vox, prefix, bb)
     % Warp images from MNI to native MRI space using an existing iy_ file
     %
     % Parameters
@@ -8,6 +8,8 @@ function outfiles = apply_invwarp_from_mni(infiles, iyf, interp, vox, prefix, bb
     % iyf : char|string|cellstr|struct
     %   Path to the iy_* deformation field file created during
     %   segmentation that will now be used for warping
+    % overwrite : logical, optional
+    %   If true, overwrite existing files
     % interp : int, optional
     %   Interpolation method (0-7):
     %     0: Nearest-neighbor
@@ -22,8 +24,6 @@ function outfiles = apply_invwarp_from_mni(infiles, iyf, interp, vox, prefix, bb
     %   Voxel size to reslice the output files to, in mm
     % prefix : char|string, optional
     %   Prefix to append to the output filenames
-    % overwrite : logical, optional
-    %   If true, overwrite existing files
     %
     % Files created
     % -------------
@@ -34,11 +34,11 @@ function outfiles = apply_invwarp_from_mni(infiles, iyf, interp, vox, prefix, bb
     arguments
         infiles
         iyf
+        overwrite logical = false
         interp {mustBeMember(interp,0:7)} = 0
         vox (1,3) {mustBePositive} = [1 1 1]
         prefix {mustBeText} = 'v'
         bb (2,3) {mustBePositive} = [Inf Inf Inf; Inf Inf Inf]
-        overwrite logical = false
     end
 
     % Check that all input files exist, and format them correctly
@@ -51,7 +51,7 @@ function outfiles = apply_invwarp_from_mni(infiles, iyf, interp, vox, prefix, bb
     % Check existence of output files
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Inverse warp files already exist, will not overwrite\n')
+        fprintf('- Inverse warp files exist, will not overwrite\n')
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     end

@@ -30,7 +30,7 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite)
     % If the output file exists and overwrite is false, load the outfile
     % and return its data array
     if exist(outfile, 'file') && ~overwrite
-        fprintf('  * %s already exists, will not overwrite\n', basename(outfile));
+        fprintf('  * %s exists, will not overwrite\n', basename(outfile));
         mask = spm_read_vols(spm_vol(outfile));
         return
     end

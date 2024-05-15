@@ -1,4 +1,4 @@
-function outfiles = reset_origin_mri_com(infiles, prefix, overwrite)
+function outfiles = reset_origin_mri_com(infiles, overwrite, prefix)
     % Recenter T1 to center-of-mass then coregister to the SPM template
     %
     % Strictly rigid-body coregistration (no reslicing is done). Only
@@ -11,11 +11,11 @@ function outfiles = reset_origin_mri_com(infiles, prefix, overwrite)
     %     Images to reorient, assumed to be from same individual and
     %     session. The first image should be the T1 MRI. The transform
     %     is estimated for the first image but applied to all infiles
+    % overwrite : logical, optional
+    %     If true, overwrite existing files. Default is true
     % prefix : str/char, optional
     %     Prefix to prepend to the output filenames. Empty by default
     %     (infiles are overwritten)
-    % overwrite : logical, optional
-    %     If true, overwrite existing files. Default is true
     %
     % Returns
     % -------
@@ -25,8 +25,8 @@ function outfiles = reset_origin_mri_com(infiles, prefix, overwrite)
     % ------------------------------------------------------------------
     arguments
         infiles
-        prefix {mustBeText} = ''
         overwrite logical = true
+        prefix {mustBeText} = ''
     end
 
     % Check that all input files exist, and format them correctly
@@ -34,13 +34,10 @@ function outfiles = reset_origin_mri_com(infiles, prefix, overwrite)
     infiles = abspath(cellvec(infiles));
     mustBeFile(infiles);
 
-    % Print runtime info
-
-
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Will not reset MRI origin to center-of-mass, as output files already exist\n')
+        fprintf('- Will not reset MRI origin to center-of-mass, as output files exist\n')
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else

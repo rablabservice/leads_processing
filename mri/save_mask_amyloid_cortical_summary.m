@@ -1,10 +1,12 @@
-function outfiles = save_mask_amyloid_cortical_summary(aparcf, in_dir, out_dir, overwrite)
+function outfiles = save_mask_amyloid_cortical_summary(aparcf, overwrite, in_dir, out_dir)
     % Load the aparc+aseg and save the amyloid cortical summary ROI mask
     %
     % Parameters
     % ----------
     % aparcf : char or str array
     %   Path to the aparc+aseg.nii file
+    % overwrite : logical, optional
+    %   If true, overwrite existing file
     % in_dir : char or str array
     %   The input directory. If aparcf is empty, this is where the
     %   function looks for the aparc+aseg.nii file. This parameter is
@@ -12,8 +14,6 @@ function outfiles = save_mask_amyloid_cortical_summary(aparcf, in_dir, out_dir, 
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
     %   the same directory as the aparc+aseg.nii file
-    % overwrite : logical, optional
-    %   If true, overwrite existing file
     %
     % Files created
     % -------------
@@ -21,9 +21,9 @@ function outfiles = save_mask_amyloid_cortical_summary(aparcf, in_dir, out_dir, 
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
+        overwrite logical = false
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
-        overwrite logical = false
     end
 
     % Define aparc indices for the cortical summary ROI

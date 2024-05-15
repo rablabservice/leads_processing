@@ -1,5 +1,10 @@
-function process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite)
-    % Process raw MRIs using FreeSurfer recon-all and segmendBS.sh
+function process_mri_freesurfer(raw_mrif, mri_dir, overwrite, segment_brainstem)
+    % Process raw MRIs using FreeSurfer recon-all and segmentBS.sh
+    %
+    % Overview
+    % --------
+    % 1.  Run recon-all on the raw MRI file
+    % 2.  Optionally segment the brainstem using segmentBS.sh
     %
     % Parameters
     % ----------
@@ -7,16 +12,16 @@ function process_mri_freesurfer(raw_mrif, mri_dir, segment_brainstem, overwrite)
     %     Full path to the raw MRI file
     % mri_dir : char or str array
     %     Full path to the FreeSurfer directory that will be created
-    % segment_brainstem : logical
-    %     If true, segment the brainstem using segmentBS.sh
     % overwrite : logical
     %     If true, overwrite the FreeSurfer directory if it already exists
+    % segment_brainstem : logical
+    %     If true, segment the brainstem using segmentBS.sh
     % ------------------------------------------------------------------
     arguments
         raw_mrif {mustBeFile}
         mri_dir {mustBeFolder}
-        segment_brainstem logical = true
         overwrite logical = false
+        segment_brainstem logical = true
     end
 
     % Format paths

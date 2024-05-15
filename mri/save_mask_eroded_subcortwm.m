@@ -1,5 +1,5 @@
 function outfiles = save_mask_eroded_subcortwm( ...
-    aparcf, smooth_by, erosion_thresh, in_dir, out_dir, overwrite ...
+    aparcf, overwrite, smooth_by, erosion_thresh, in_dir, out_dir ...
 )
     % Load the aparc+aseg and save eroded subcortical white matter mask
     %
@@ -7,6 +7,8 @@ function outfiles = save_mask_eroded_subcortwm( ...
     % ----------
     % aparcf : char or str array
     %   Path to the aparc+aseg.nii file
+    % overwrite : logical, optional
+    %   If true, overwrite existing file
     % smooth_by : double
     %   FWHM of the smoothing kernel applied to the subcortical WM mask.
     %   Default is 8mm.
@@ -20,8 +22,6 @@ function outfiles = save_mask_eroded_subcortwm( ...
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
     %   the same directory as the aparc+aseg.nii file
-    % overwrite : logical, optional
-    %   If true, overwrite existing file
     %
     % Files created
     % -------------
@@ -31,11 +31,11 @@ function outfiles = save_mask_eroded_subcortwm( ...
     % ------------------------------------------------------------------
     arguments
         aparcf {mustBeText} = ''
+        overwrite logical = false
         smooth_by {mustBeNumeric} = 8
         erosion_thresh {mustBeNumeric} = 0.7
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
-        overwrite logical = false
     end
 
     % Define aparc indices for the subcortical white matter
@@ -52,7 +52,7 @@ function outfiles = save_mask_eroded_subcortwm( ...
 
     % Check if all output files already exist
     if all(structfun(@isfile, outfiles)) && ~overwrite
-        fprintf('  * Subcortical white matter mask files already exist, will not overwrite\n')
+        fprintf('  * Subcortical white matter mask files exist, will not overwrite\n')
         return
     end
 

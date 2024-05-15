@@ -1,4 +1,4 @@
-function outfiles = apply_warp_to_mni(infiles, yf, interp, vox, prefix, bb, overwrite)
+function outfiles = apply_warp_to_mni(infiles, yf, overwrite, interp, vox, prefix, bb)
     % Warp images from native MRI to MNI space using an existing y_ file
     %
     % Parameters
@@ -8,6 +8,8 @@ function outfiles = apply_warp_to_mni(infiles, yf, interp, vox, prefix, bb, over
     % yf : char|string|cellstr|struct
     %   Path to the y_* deformation field file created during
     %   segmentation that will now be used for warping
+    % overwrite : logical, optional
+    %   If true, overwrite existing files
     % interp : int, optional
     %   Interpolation method (0-7):
     %     0: Nearest-neighbor
@@ -22,8 +24,6 @@ function outfiles = apply_warp_to_mni(infiles, yf, interp, vox, prefix, bb, over
     %   Voxel size to reslice the output files to, in mm
     % prefix : char|string, optional
     %   Prefix to append to the output filenames
-    % overwrite : logical, optional
-    %   If true, overwrite existing files
     %
     % Returns
     % -------
@@ -40,11 +40,11 @@ function outfiles = apply_warp_to_mni(infiles, yf, interp, vox, prefix, bb, over
     arguments
         infiles
         yf
+        overwrite logical = false
         interp {mustBeMember(interp,0:7)} = 4
         vox (1,3) {mustBePositive} = [1.5 1.5 1.5]
         prefix {mustBeText} = 'w'
         bb (2,3) {mustBePositive} = [Inf Inf Inf; Inf Inf Inf]
-        overwrite logical = false
     end
 
     % Check that all input files exist, and format them correctly
@@ -57,7 +57,7 @@ function outfiles = apply_warp_to_mni(infiles, yf, interp, vox, prefix, bb, over
     % Check existence of output files
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Warped files already exist, will not overwrite\n')
+        fprintf('- Warped files exist, will not overwrite\n')
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else

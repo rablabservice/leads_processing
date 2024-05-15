@@ -1,4 +1,4 @@
-function outfiles = save_roi_masks(mri_dir, aparcf, bstemf, overwrite)
+function outfiles = save_roi_masks(mri_dir, overwrite, aparcf, bstemf)
     % Save out mask files used as reference regions or target ROIs.
     %
     % If mri_dir is passed, look up the aparc and brainstem files in
@@ -9,12 +9,12 @@ function outfiles = save_roi_masks(mri_dir, aparcf, bstemf, overwrite)
     % ----------
     % mri_dir : char or str array
     %   The directory that contains the processed MRI data
+    % overwrite : logical, optional
+    %   If true, overwrite existing files
     % aparcf : char or str array, optional
     %   Path to the aparc+aseg .nii file
     % bstemf : char or str array, optional
     %   Path to the brainstem sublabels .nii file
-    % overwrite : logical, optional
-    %   If true, overwrite existing files
     %
     % Files created
     % -------------
@@ -31,9 +31,9 @@ function outfiles = save_roi_masks(mri_dir, aparcf, bstemf, overwrite)
     % ------------------------------------------------------------------
     arguments
         mri_dir = ''
+        overwrite logical = false
         aparcf = ''
         bstemf = ''
-        overwrite logical = false
     end
 
     % Format parameters
@@ -62,15 +62,15 @@ function outfiles = save_roi_masks(mri_dir, aparcf, bstemf, overwrite)
     % Call the individual ROI creation functions
     fprintf('- Saving ROI masks\n');
     if save_aparc_masks
-        outfiles = catstruct(outfiles, save_mask_wcbl(aparcf, '', '', overwrite));
-        outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, '', '', overwrite));
-        outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, '', '', overwrite));
-        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, 8, 0.7, '', '', overwrite));
+        outfiles = catstruct(outfiles, save_mask_wcbl(aparcf, overwrite));
+        outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, overwrite));
+        outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, overwrite));
+        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, overwrite));
         if isfile(suitf)
-            outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, '', '', overwrite));
+            outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, overwrite));
         end
     end
     if save_brainstem_masks
-        outfiles.pons = save_mask_pons(bstemf, '', '', overwrite);
+        outfiles.pons = save_mask_pons(bstemf, overwrite);
     end
 end

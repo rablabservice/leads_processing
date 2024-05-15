@@ -1,10 +1,12 @@
-function outfiles = save_mask_pons(brainstemf, in_dir, out_dir, overwrite)
+function outfiles = save_mask_pons(brainstemf, overwrite, in_dir, out_dir)
     % Load the brainstem sublabels file and save the pons
     %
     % Parameters
     % ----------
     % brainstemf : char or str array
     %   Path to the brainstem-sublabels.nii file
+    % overwrite : logical, optional
+    %   If true, overwrite existing file
     % in_dir : char or str array
     %   The input directory. If brainstemf is empty, this is where the
     %   function looks for the brainstem-sublabels.nii file. This
@@ -12,8 +14,6 @@ function outfiles = save_mask_pons(brainstemf, in_dir, out_dir, overwrite)
     % out_dir : char or str array
     %   The output directory. If out_dir is empty, the mask is saved in
     %   the same directory as the brainstem-sublabels.nii file
-    % overwrite : logical, optional
-    %   If true, overwrite existing file
     %
     % Files created
     % -------------
@@ -21,9 +21,9 @@ function outfiles = save_mask_pons(brainstemf, in_dir, out_dir, overwrite)
     % ------------------------------------------------------------------
     arguments
         brainstemf {mustBeText} = ''
+        overwrite logical = false
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
-        overwrite logical = false
     end
 
     % Define brainstem sublabel index for the pons

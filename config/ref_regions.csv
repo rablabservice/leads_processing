@@ -1,0 +1,6 @@
+﻿tracer,ref_region,masks
+FBB,wcbl,wcbl
+FBB,compwm,brainstem;eroded-subcortwm;wcbl
+FDG,pons,pons
+FTP,infcblgm,infcblgm
+FTP,eroded-subcortwm,eroded-subcortwm

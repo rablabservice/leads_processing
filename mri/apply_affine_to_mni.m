@@ -1,4 +1,4 @@
-function outfiles = apply_affine_to_mni(infiles, atf, interp, vox, prefix, bb, overwrite)
+function outfiles = apply_affine_to_mni(infiles, atf, overwrite, interp, vox, prefix, bb)
     % Transform images from native MRI to MNI space using an existing affine
     %
     % Parameters
@@ -7,6 +7,8 @@ function outfiles = apply_affine_to_mni(infiles, atf, interp, vox, prefix, bb, o
     %   Path to scan(s) to be affine transformed to MNI space
     % atf : char or str array
     %   Path to the affine transform .mat file
+    % overwrite : logical, optional
+    %   If true, overwrite existing files
     % interp : int, optional
     %   Interpolation method (0-7):
     %     0: Nearest-neighbor
@@ -21,8 +23,6 @@ function outfiles = apply_affine_to_mni(infiles, atf, interp, vox, prefix, bb, o
     %   Voxel size to reslice the output files to, in mm
     % prefix : char|string, optional
     %   Prefix to append to the output filenames
-    % overwrite : logical, optional
-    %   If true, overwrite existing files
     %
     % Files created
     % -------------
@@ -31,26 +31,26 @@ function outfiles = apply_affine_to_mni(infiles, atf, interp, vox, prefix, bb, o
     % ...
     % ------------------------------------------------------------------
     arguments
-        infiles {mustBeFile}
-        atf {mustBeFile}
+        infiles
+        atf
+        overwrite logical = false
         interp {mustBeMember(interp,0:7)} = 4
-        vox (1,3) {mustBePositive} = [1 1 1]
+        vox (1,3) {mustBePositive} = [1.5 1.5 1.5]
         prefix {mustBeText} = 'a'
         bb (2,3) {mustBePositive} = [Inf Inf Inf; Inf Inf Inf]
-        overwrite logical = false
     end
 
     % Check that all input files exist, and format them correctly
     infiles_cp = infiles;
     infiles = abspath(cellvec(infiles));
     mustBeFile(infiles);
-    atf = abspath(atf);
+    atf = abspath(cellvec(atf));
     mustBeFile(atf);
 
     % Check existence of output files
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Affine transformed files already exist, will not overwrite\n');
+        fprintf('- Affine transformed files exist, will not overwrite\n');
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else
@@ -66,7 +66,7 @@ function outfiles = apply_affine_to_mni(infiles, atf, interp, vox, prefix, bb, o
 
     % Run Old Normalise: Write (subject -> MNI)
     clear matlabbatch;
-    matlabbatch{1}.spm.tools.oldnorm.write.subj(1).matname = cellstr(atf);
+    matlabbatch{1}.spm.tools.oldnorm.write.subj(1).matname = atf;
     matlabbatch{1}.spm.tools.oldnorm.write.subj(1).resample = infiles;
     matlabbatch{1}.spm.tools.oldnorm.write.roptions.preserve = 0;
     matlabbatch{1}.spm.tools.oldnorm.write.roptions.bb = bb;
@@ -75,4 +75,7 @@ function outfiles = apply_affine_to_mni(infiles, atf, interp, vox, prefix, bb, o
     matlabbatch{1}.spm.tools.oldnorm.write.roptions.wrap = [0 0 0];
     matlabbatch{1}.spm.tools.oldnorm.write.roptions.prefix = prefix;
     spm_jobman('run',matlabbatch);
+
+    % Format the output filenames
+    outfiles = format_outfiles(infiles_cp, prefix);
 end
