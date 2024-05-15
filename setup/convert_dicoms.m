@@ -6,20 +6,14 @@ function convert_dicoms(newdata_dir)
         newdata_dir {mustBeFolder}
     end
 
+    % Print the welcome message
+    fprintf('\n- Converting newdata dicoms to nifti\n');
+
     % Format paths
     newdata_dir = abspath(newdata_dir);
 
-    % If newdata_dir is empty, there's nothing to do here
-    if isempty(dir(newdata_dir))
-        fprintf('- No newdata to convert to nifti\n');
-        return
-    end
-
     % Get path to dcm2niix
     dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix -d 9';
-
-    % Print the welcome message
-    fprintf('\n- Converting newdata dicoms to nifti\n');
 
     % Find all dicoms in raw
     dcm_files = dir(fullfile(newdata_dir, '**', '*.dcm'));
@@ -34,12 +28,12 @@ function convert_dicoms(newdata_dir)
     % Find directories with dicoms but no nifti
     conv_dirs = setdiff(dcm_dirs, nii_dirs);
     n_conv = length(conv_dirs);
-    fprintf('  * %d directories have dicoms but no nifti\n', n_conv);
+    fprintf('  * Converting dicoms in %d directories\n', n_conv);
 
     % Convert dicoms to nifti
     for i = 1:n_conv
         scan_dir = abspath(conv_dirs{i});
         cmd = char(append(dcm2niix, ' -o ', scan_dir, ' ', scan_dir));
-        run_system_cmd(cmd);
+        run_system_cmd(cmd, true, false);
     end
 end

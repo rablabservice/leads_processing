@@ -1,13 +1,11 @@
 function process_mris(overwrite, log_dir, segment_brainstem)
-    % High-level function to select and process MRIs
+    % Process all MRIs that are scheduled for processing
+    % in the latest log file
     %
     % Parameters
     % ----------
     % overwrite : logical
     %     If true, overwrite existing processed data
-    % data_dir : char or str
-    %     The directory that contains raw (unprocessed) MRI data in
-    %     <data_dir>/raw and processed data in <data_dir>/processed
     % log_dir : char or str
     %     The directory that stores log files
     % segment_brainstem : logical
@@ -23,8 +21,8 @@ function process_mris(overwrite, log_dir, segment_brainstem)
     % Format paths
     log_dir = abspath(log_dir);
 
-    % Select MRIs to process
-    [raw_mrifs, mri_dirs] = select_mris_to_process(log_dir);
+    % Load the list of MRIs to process
+    [raw_mrifs, mri_dirs] = queue_mris_to_process(log_dir);
 
     % Process MRIs in parallel
     parfor ii = 1:length(mri_dirs)

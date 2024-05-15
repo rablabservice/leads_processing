@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+
+"""
+Move scans from newdata to raw, keeping file hierarchies intact
+"""
+
+
 import argparse
 import os
 import os.path as op
@@ -7,10 +13,8 @@ import sys
 from glob import glob
 
 
-def move_newdata_to_raw(
-    newdata_dir, raw_dir, overwrite=False, cleanup=True, verbose=True
-):
-    """Move scans from newdata to raw, keeping file hierarchies intact.
+def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, cleanup=True):
+    """Move scans from newdata to raw, keeping file hierarchies intact
 
     Parameters
     ----------
@@ -28,9 +32,6 @@ def move_newdata_to_raw(
     cleanup : bool
         If True, remove all files and folders from newdata_dir after
         moving everything eligible to be moved to raw_dir.
-    verbose : bool
-        If True, print messages about what is happening as the function
-        runs.
 
     Returns
     -------
@@ -39,8 +40,7 @@ def move_newdata_to_raw(
 
     def do_cleanup():
         """Remove all files and folders from newdata."""
-        if verbose:
-            print(f"  * Cleaning up {newdata_dir}")
+        print(f"  * Cleaning up {newdata_dir}")
         for file in os.listdir(newdata_dir):
             filepath = op.join(newdata_dir, file)
             if op.isdir(filepath):
@@ -52,34 +52,29 @@ def move_newdata_to_raw(
     newdata_dir = op.abspath(newdata_dir)
     raw_dir = op.abspath(raw_dir)
 
+    # Print the welcome message
+    print(f"- Moving scans from {newdata_dir} to {raw_dir}")
+
     # Find all niftis in newdata
     check_exts = (".nii", ".nii.gz")
     glob_files = []
     for ext in check_exts:
         glob_files.extend(glob(op.join(newdata_dir, f"**/*{ext}"), recursive=True))
 
-    # Print the welcome message
-    if verbose:
-        print("- Moving MRI and PET scan data from newdata to raw")
-        print(f" (newdata = {newdata_dir})")
-        print(f" (raw     = {raw_dir})")
-
     # If no niftis are found, print a message and return
     if len(glob_files) == 0:
-        if verbose:
-            print(f"  * No niftis found in {newdata_dir}")
+        print(f"  * No niftis found in {newdata_dir}")
         if cleanup:
             do_cleanup()
-        if verbose:
-            print("")
+        print("")
         return
 
     # Find all unique nifti-containing directories in newdata
     source_dirs = set([op.dirname(f) for f in glob_files])
-    if verbose:
-        print(f"  * Found {len(source_dirs)} directories with niftis")
+    print(f"  * Found {len(source_dirs)} directories with niftis")
 
     skip_dirs = ["LEADS", "ADNI", "IDEAS", "SCAN", "PAD"]
+    count = 0
     for source_dir in source_dirs:
         # Create a matching file hierarchy in raw as in newdata
         scan_path = op.relpath(source_dir, newdata_dir)
@@ -92,27 +87,25 @@ def move_newdata_to_raw(
         if op.exists(target_dir):
             # If overwrite is True, remove the existing directory
             if overwrite:
-                if verbose:
-                    print(f"  * Overwriting existing raw directory: {target_dir}")
+                print(f"  * Overwriting existing raw directory: {target_dir}")
                 shutil.rmtree(target_dir)
             else:
-                if verbose:
-                    print(f"  * Skipping existing raw directory: {target_dir}")
+                print(f"  * Skipping existing raw directory: {target_dir}")
                 continue
 
         # Create the necessary directory structure, then copy source to
         # target
         os.makedirs(op.dirname(target_dir), exist_ok=True)
         shutil.move(source_dir, target_dir)
-        if verbose:
-            print(f"  * Moved {source_dir} to {target_dir}")
+        print(f"  * Moved {source_dir} to {target_dir}")
+        count += 1
+
+    # Print how many scans we moved over
+    print(f"  * Done; {count} scan directories moved to raw")
 
     # Clean up empty directories in newdata
     if cleanup:
         do_cleanup()
-
-    if verbose:
-        print("")
 
 
 def _parse_args():
@@ -150,9 +143,6 @@ def _parse_args():
     parser.add_argument(
         "--no-clean", action="store_true", help="Don't remove files from newdata"
     )
-    parser.add_argument(
-        "-q", "--quiet", action="store_true", help="Run without printing output"
-    )
 
     # Parse the command line arguments
     args = parser.parse_args()
@@ -172,7 +162,7 @@ if __name__ == "__main__":
         raw_dir=args.raw,
         overwrite=args.overwrite,
         cleanup=not args.no_clean,
-        verbose=not args.quiet,
     )
 
+    # Exit successfully
     sys.exit(0)

@@ -3,7 +3,7 @@ function outfiles = process_single_mri(raw_mrif, mri_dir, overwrite, segment_bra
     %
     % Overview
     % --------
-    % 1.  Run recon-all on the raw MRI file
+    % 1.  Run recon-all on the raw T1 MRI
     % 2.  Optionally segment the brainstem using segmentBS.sh
     % 3.  Copy and convert FreeSurfer files to NIfTI
     % 4.  Reset FreeSurfer file origins to the nu.nii center-of-mass,

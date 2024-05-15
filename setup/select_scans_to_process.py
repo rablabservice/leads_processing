@@ -1,32 +1,92 @@
 #!/usr/bin/env python
 
 """
-Find MRI and PET scans in the raw directory that need to be processed.
+Select MRI and PET scans to process and save the list to CSV files
 """
 
 
 import argparse
 import datetime
-from glob import glob
 import os
 import os.path as op
 import re
 import sys
+from glob import glob
 
 import numpy as np
 import pandas as pd
+
+
+PATHS = {}
+SCAN_TYPES = None
+TIMESTAMP = None
+
+
+def set_globals():
+    """Set module-level global variables"""
+    global PATHS, SCAN_TYPES, TIMESTAMP
+
+    root_dir = "/mnt/coredata"
+    if not __file__.startswith(root_dir):
+        raise ValueError(
+            f"Could not parse the project path because {__file__} is not in {root_dir}"
+        )
+
+    # The project directory is assumed to be the 4th directory up from /
+    # (e.g., /mnt/coredata/processing/leads)
+    PATHS["proj"] = "/".join(__file__.split("/")[:5])
+
+    # Set global paths and check that they exist
+    PATHS["code"] = op.join(PATHS["proj"], "code")
+    PATHS["config"] = op.join(PATHS["code"], "config")
+    PATHS["metadata"] = op.join(PATHS["proj"], "metadata")
+    PATHS["scans_to_process"] = op.join(PATHS["metadata"], "scans_to_process")
+    PATHS["ssheets"] = op.join(PATHS["metadata"], "ssheets")
+    PATHS["data"] = op.join(PATHS["proj"], "data")
+    PATHS["newdata"] = op.join(PATHS["data"], "newdata")
+    PATHS["raw"] = op.join(PATHS["data"], "raw")
+    PATHS["processed"] = op.join(PATHS["data"], "processed")
+    for k in PATHS:
+        if not op.isdir(PATHS[k]):
+            raise ValueError(f"Expected {PATHS[k]}, but this directory does not exist")
+
+    # Define the SCAN_TYPES dict
+    SCAN_TYPES = load_scan_typesf()
+
+    # Set the timestamp
+    TIMESTAMP = now()
+
+
+def load_scan_typesf(scan_typesf=None):
+    """Load scan types CSV and return a {name_in: name_out} dict."""
+    if scan_typesf is None:
+        scan_typesf = op.join(PATHS["config"], "scan_types_and_tracers.csv")
+    scan_types = pd.read_csv(scan_typesf)
+    scan_types["name_in"] = scan_types["name_in"].str.lower()
+    scan_types = scan_types.drop_duplicates("name_in").dropna()
+    scan_types = scan_types.set_index("name_in")["name_out"].to_dict()
+    return scan_types
+
+
+def now():
+    """Return the current date and time down to seconds."""
+    return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+
+set_globals()
 
 
 def main(overwrite, process_unused_mris):
     """Save CSV files for MRI and PET scans in the raw directory.
 
     Indicate which scans need to be processed.
-    """
-    # Define globals
-    set_globals()
 
+    Returns
+    -------
+    None
+    """
     # Get a list of all directories containing .nii files
-    print(f"- Searching {PATHS['raw']} for all *.nii files")
+    print(f"  * Searching {PATHS['raw']} for all *.nii files")
     raw_niis = fast_recursive_glob_nii(PATHS["raw"])
 
     # Find the subject ID, scan type, acquisition date, and LONI image ID
@@ -66,6 +126,11 @@ def main(overwrite, process_unused_mris):
 
     # Sort MRIs by subject and scan date
     raw_mris = raw_mris.sort_values(["subj", "mri_date"]).reset_index(drop=True)
+
+    # Sort PET scans by subject, tracer, and scan date
+    raw_pets = raw_pets.sort_values(["subj", "tracer", "pet_date"]).reset_index(
+        drop=True
+    )
 
     # Get PET resolution from filename
     raw_pets.insert(
@@ -217,50 +282,6 @@ def main(overwrite, process_unused_mris):
     save_pet_scan_index(raw_pets)
 
 
-def set_globals():
-    """Set global variables"""
-    global PATHS
-    global SCAN_TYPES
-    global TIMESTAMP
-
-    # Make sure the project directory has the expected root location
-    PATHS = {}
-    root_dir = "/mnt/coredata"
-    if not __file__.startswith(root_dir):
-        raise ValueError(
-            f"Could not parse the project path because {__file__} is not in {root_dir}"
-        )
-
-    # The project directory is assumed to be the 4th directory up from /
-    # (e.g., /mnt/coredata/processing/leads)
-    PATHS["proj"] = "/".join(__file__.split("/")[:5])
-
-    # Set global paths and check that they exist
-    PATHS["code"] = op.join(PATHS["proj"], "code")
-    PATHS["config"] = op.join(PATHS["code"], "config")
-    PATHS["metadata"] = op.join(PATHS["proj"], "metadata")
-    PATHS["scans_to_process"] = op.join(PATHS["metadata"], "scans_to_process")
-    PATHS["ssheets"] = op.join(PATHS["metadata"], "ssheets")
-    PATHS["data"] = op.join(PATHS["proj"], "data")
-    PATHS["newdata"] = op.join(PATHS["data"], "newdata")
-    PATHS["raw"] = op.join(PATHS["data"], "raw")
-    PATHS["processed"] = op.join(PATHS["data"], "processed")
-    for k in PATHS:
-        if not op.isdir(PATHS[k]):
-            raise ValueError(f"Expected {PATHS[k]}, but this directory does not exist")
-
-    # Define the SCAN_TYPES dict
-    SCAN_TYPES = load_scan_typesf()
-
-    # Set the timestamp
-    TIMESTAMP = now()
-
-
-def now():
-    """Return the current date and time down to seconds."""
-    return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-
-
 def fast_recursive_glob_nii(path):
     """Return a list of all files in path that end in .nii"""
 
@@ -364,17 +385,6 @@ def get_scan_type(filepath):
             return "FAILED TO IDENTIFY PET TRACER OR MRI MODALITY FROM FILENAME"
 
 
-def load_scan_typesf(scan_typesf=None):
-    """Load scan types CSV and return a {name_in: name_out} dict."""
-    if scan_typesf is None:
-        scan_typesf = op.join(PATHS["config"], "scan_types_and_tracers.csv")
-    scan_types = pd.read_csv(scan_typesf)
-    scan_types["name_in"] = scan_types["name_in"].str.lower()
-    scan_types = scan_types.drop_duplicates("name_in").dropna()
-    scan_types = scan_types.set_index("name_in")["name_out"].to_dict()
-    return scan_types
-
-
 def get_scan_date(filepath):
     """Search filepath and return the scan date"""
 
@@ -421,11 +431,12 @@ def get_scan_date(filepath):
     # If no date was found in the basename, try the dirname but limit
     # search to everything forward from the raw/ directory
     dirname = op.dirname(filepath)
-    raw_idx = dirname.find(f"/{PATHS['raw']}/")
+    raw_base = "/{}/".format(op.basename(PATHS["raw"]))
+    raw_idx = dirname.find(raw_base)
     if raw_idx == -1:
         return np.nan
-    dirname = dirname[raw_idx + len(f"/{PATHS['raw']}/") :]
-    parts = dirname.split("/")
+    search_path = dirname[raw_idx + len(raw_base) :]
+    parts = search_path.split("/")
     for part in parts:
         datestr = test_datestr(part)
         if datestr:
@@ -491,9 +502,7 @@ def add_mri_date_columns(mri_scans):
     ii = mri_scans_cp.columns.tolist().index("mri_date")
     grp = mri_scans_cp.groupby("subj")
     mri_scans_cp.insert(ii + 1, "mri_scan_number", grp.cumcount() + 1)
-    mri_scans_cp.insert(
-        ii + 2, "n_mri_scans", grp["mri_scan_number"].transform("count")
-    )
+    mri_scans_cp.insert(ii + 2, "n_mri_scans", grp["mri_date"].transform("count"))
 
     # Add columns for days from each PET scan to baseline and days between
     # consecutive PET scans per tracer
@@ -520,12 +529,9 @@ def add_pet_date_columns(pet_scans):
 
     # Add columns for PET scan number and total number of scans per tracer
     ii = pet_scans_cp.columns.tolist().index("pet_date")
-    # pet_scans_cp = pet_scans_cp.sort_values(["subj", "tracer", "pet_date"])
     grp = pet_scans_cp.groupby(["subj", "tracer"])
     pet_scans_cp.insert(ii + 1, "pet_scan_number", grp.cumcount() + 1)
-    pet_scans_cp.insert(
-        ii + 2, "n_pet_scans", grp["pet_scan_number"].transform("count")
-    )
+    pet_scans_cp.insert(ii + 2, "n_pet_scans", grp["pet_date"].transform("count"))
 
     # Add columns for days from each PET scan to baseline and days between
     # consecutive PET scans per tracer
@@ -587,13 +593,9 @@ def find_closest_mri_to_pet(pet_scans, mri_scans):
 
 def audit_pet(pet_scans):
     """Audit each PET scan and flag scans with potential issues"""
-    # Copy the input dataframe
     pet_scans_cp = pet_scans.copy()
-
     pet_scans_cp["flag"] = 0
     pet_scans_cp["notes"] = ""
-
-    # Record PET scans with some sort of problem
 
     # Missing tracer
     idx = pet_scans_cp.loc[
@@ -803,5 +805,5 @@ if __name__ == "__main__":
     # Call the main function
     main(overwrite=args.overwrite, process_unused_mris=args.process_unused_mris)
 
-    # Exit
+    # Exit successfully
     sys.exit(0)

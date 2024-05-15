@@ -44,14 +44,15 @@ function process_mri_freesurfer(raw_mrif, mri_dir, overwrite, segment_brainstem)
     % Run recon-all
     cmd_fs=char(append('recon-all -all -i ', raw_mrif, ' -sd ', mri_dir, ' -s ', fs_version));
     fprintf('- Processing MRI through FreeSurfer\n')
-    fprintf('  $ %s\n', cmd_fs);
+    fprintf('    $ %s\n', cmd_fs);
     run_system_cmd(cmd_fs);
 
     % Segment the brainstem
     if segment_brainstem
         % Run segmentBS.sh
         cmd_bs=char(append('segmentBS.sh ', fs_version, ' ', mri_dir));
-        fprintf('  $ %s\n', cmd_bs);
+        fprintf('- Segmenting brainstem into subregions\n')
+        fprintf('    $ %s\n', cmd_bs);
         run_system_cmd(cmd_bs);
     end
 end

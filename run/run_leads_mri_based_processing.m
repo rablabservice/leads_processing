@@ -60,6 +60,7 @@ log_dir = "/mnt/coredata/processing/leads/metadata/scans_to_process";
 segment_brainstem = true;
 
 % Say hi
+tic;
 say_hi();
 
 % Figure out what the user wants to do
@@ -99,4 +100,5 @@ end
 
 % End the program
 say_bye();
+toc;
 clear;
