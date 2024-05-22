@@ -45,9 +45,10 @@ function setup_leads_processing( ...
     end
 
     % Print the module header
-    title = 'SETUP MODULE';
-    subtitle = 'Prepare new MRI and PET scans for processing';
-    print_header(title, subtitle, 1, 0);
+    fprintf('\n--------------------------------------------\n');
+    fprintf('START SETUP MODULE\n');
+    fprintf('Prepare new MRI and PET scans for processing\n')
+    fprintf('--------------------------------------------\n\n');
 
     % Format paths to project directories
     proj_dir = abspath(proj_dir);
@@ -118,9 +119,11 @@ function setup_leads_processing( ...
     if overwrite
         cmd = append(cmd, ' -o');
     end
-    % fprintf('- Setting up scan directories ahead of processing\n');
-    % system(cmd);
+    fprintf('- Setting up scan directories ahead of processing\n');
+    system(cmd);
 
     % Print the module footer
-    print_footer('Setup module complete', 1, 0);
+    fprintf('\n----------------\n');
+    fprintf('END SETUP MODULE\n\n');
+
 end

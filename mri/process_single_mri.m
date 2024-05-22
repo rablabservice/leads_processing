@@ -85,9 +85,11 @@ function outfiles = process_single_mri( ...
     fid = log_start(mri_dir);
 
     % Print the module header
-    title = 'MRI PROCESSING MODULE';
-    subtitle = append('SCAN : ', scan_tag);
-    print_header(title, subtitle, fid);
+    log_append(fid, '', false, 0);
+    log_append(fid, 'START MRI PROCESSING MODULE', false, 0);
+    log_append(fid, '---------------------------', false, 0);
+    log_append(fid, '', false, 0);
+
 
     % Run FreeSurfer
     if process_freesurfer
@@ -104,7 +106,10 @@ function outfiles = process_single_mri( ...
     end
 
     % Print the module footer
-    print_footer('MRI processing module complete', fid);
+    log_append(fid, '', false, 0);
+    log_append(fid, '-------------------------', false, 0);
+    log_append(fid, 'END MRI PROCESSING MODULE', false, 0);
+    log_append(fid, '', false, 0);
 
     % Close the log file
     log_close(fid);

@@ -14,10 +14,15 @@ function log_close(fid)
     % Write the last log message
     add_timestamp = false;
     indent = 0;
-    log_append(fid, repmat('_', 1, 41), add_timestamp, indent);
-    log_append(fid, repmat('-', 1, 41), add_timestamp, indent);
-    log_append(fid, sprintf('Elapsed time: %dh, %dm, %ds', hh, mm, ss));
-    log_append(fid, append('+..', repmat('=', 1, 35), '..+'), add_timestamp, indent);
+    if elapsed > 3600
+        log_append(fid, sprintf('Elapsed time: %dh, %dm, %ds', hh, mm, ss), add_timestamp, indent);
+    elseif elapsed > 60
+        log_append(fid, sprintf('Elapsed time: %dm, %ds', mm, ss), add_timestamp, indent);
+    else
+        log_append(fid, sprintf('Elapsed time: %.3fs', elapsed), add_timestamp, indent);
+    end
+    log_append(fid, repmat('-', 1, 88), add_timestamp, indent);
+    log_append(fid, '', false, 0);
 
     % Close the log file
     fclose(fid);

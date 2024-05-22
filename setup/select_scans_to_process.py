@@ -350,20 +350,20 @@ def main(
 
     # Report how many MRI and PET scans are scheduled for processing
     print("")
-    print("  +.." + ("=" * 44) + "..+")
-    print("  |" + (" " * 47) + " |")
+    print("+.." + ("=" * 44) + "..+")
+    print("|" + (" " * 47) + " |")
     print(
-        "  |  {:>5,} MRIs are scheduled for processing       |".format(
+        "|  {:>5,} MRIs are scheduled for processing       |".format(
             len(raw_mris.loc[raw_mris["scheduled_for_processing"] == 1])
         )
     )
     print(
-        "  |  {:>5,} PET scans are scheduled for processing  |".format(
+        "|  {:>5,} PET scans are scheduled for processing  |".format(
             len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
         )
     )
-    print("  |" + (" " * 47) + " |")
-    print("  +.." + ("=" * 44) + "..+")
+    print("|" + (" " * 47) + " |")
+    print("+.." + ("=" * 44) + "..+")
     print("")
 
     return raw_mris, raw_pets

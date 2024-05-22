@@ -75,21 +75,21 @@ prompt_user = sprintf([
     '  [2] View scans that are scheduled for processing (but don''t do anything)\n', ...
     '  [3] Process MRIs\n', ...
     '  [4] Process PET scans\n', ...
-    '  [5] Nothing, I was just curious what happens when I run this script\n', ...
+    '  [5] Nothing, I was just curious what happens when I run this script\n\n', ...
     '>> '
 ]);
 action = input(prompt_user);
 
 % Run the selected action
-change_defaults_msg = 'Do you need to change any defaults?';
+change_defaults_msg = '\nDo you need to change any defaults?';
 overwrite_msg = 'Overwrite existing files?';
 switch action
     case 1
-        fprintf('\nDefaults parameters\n-------------------\n');
-        fprintf('  Project directory                           : %s\n', proj_dir);
-        fprintf('  Overwrite existing files                    : %d\n', overwrite);
-        fprintf('  Cleanup newdata after moving scans          : %d\n', cleanup_newdata);
-        fprintf('  Process all MRIs in raw (including orphans) : %d\n', process_all_mris);
+        fprintf('\nDefault parameters\n------------------\n');
+        fprintf('Project directory                           = %s\n', proj_dir);
+        fprintf('Overwrite existing files                    = %d\n', overwrite);
+        fprintf('Cleanup newdata after moving scans          = %d\n', cleanup_newdata);
+        fprintf('Process all MRIs in raw (including orphans) = %d\n', process_all_mris);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
             proj_dir = prompt_text('Enter path to project directory', proj_dir, true);
@@ -102,7 +102,7 @@ switch action
         setup_leads_processing(proj_dir, overwrite, cleanup_newdata, process_all_mris);
     case 2
         fprintf('\nDefaults parameters\n-------------------\n');
-        fprintf('  Directory with CSV files listing scans to process : %s\n', scans_to_process_dir);
+        fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
             scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
@@ -111,11 +111,11 @@ switch action
         queue_pets_to_process(scans_to_process_dir);
     case 3
         fprintf('\nDefaults parameters\n-------------------\n');
-        fprintf('  Overwrite existing files                          : %d\n', overwrite);
-        fprintf('  Directory with CSV files listing scans to process : %s\n', scans_to_process_dir);
-        fprintf('  Segment brainstem                                 : %d\n', segment_brainstem);
-        fprintf('  Run FreeSurfer processing                         : %d\n', process_freesurfer);
-        fprintf('  Run post-FreeSurfer processing                    : %d\n', process_post_freesurfer);
+        fprintf('Overwrite existing files                          = %d\n', overwrite);
+        fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
+        fprintf('Segment brainstem                                 = %d\n', segment_brainstem);
+        fprintf('Run FreeSurfer processing                         = %d\n', process_freesurfer);
+        fprintf('Run post-FreeSurfer processing                    = %d\n', process_post_freesurfer);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
             overwrite = prompt_bool(overwrite_msg, false, false, true);
@@ -127,8 +127,8 @@ switch action
         process_mris(overwrite, scans_to_process_dir, segment_brainstem, process_freesurfer, process_post_freesurfer);
     case 4
         fprintf('\nDefaults parameters\n-------------------\n');
-        fprintf('  Overwrite existing files                          : %d\n', overwrite);
-        fprintf('  Directory with CSV files listing scans to process : %s\n', scans_to_process_dir);
+        fprintf('Overwrite existing files                          = %d\n', overwrite);
+        fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
             overwrite = prompt_bool(overwrite_msg, false, false, true);
@@ -144,4 +144,5 @@ end
 % End the program
 say_bye();
 tock();
+fprintf('\n');
 clear;
