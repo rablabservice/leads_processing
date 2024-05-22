@@ -1,10 +1,12 @@
-function atf = estimate_mri_affine_to_mni(nuf, overwrite, templatef)
+function atf = estimate_mri_affine_to_mni(nuf, fid, overwrite, templatef)
     % Estimate affine transformation from native MRI to MNI space
     %
     % Parameters
     % ----------
     % nuf : char or str array
     %   Path to the T1 image to estimate the affine transformation for
+    % fid : int, optional
+    %   File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %   If true, overwrite existing files
     % templatef : char or str, optional
@@ -18,6 +20,7 @@ function atf = estimate_mri_affine_to_mni(nuf, overwrite, templatef)
     % ------------------------------------------------------------------
     arguments
         nuf {mustBeFile}
+        fid {mustBeNumeric} = 1
         overwrite logical = false
         templatef = []
     end
@@ -33,10 +36,10 @@ function atf = estimate_mri_affine_to_mni(nuf, overwrite, templatef)
     scan_tag = get_scan_tag(mri_dir);
     atf = fullfile(mri_dir, append('atf_', scan_tag,'_nu.mat'));
     if isfile(atf) && ~overwrite
-        fprintf('- Affine transformation file exists, will not re-estimate\n');
+        log_append(fid, '- Affine transformation file exists, will not re-estimate');
         return
     else
-        fprintf('- Estimating affine transformation to MNI space\n');
+        log_append(fid, '- Estimating affine transformation to MNI space');
     end
 
     % Run Old Normalise: Estimate

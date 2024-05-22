@@ -1,8 +1,9 @@
-function outfiles = run_suit(mri_dir, overwrite)
+function outfiles = run_suit(mri_dir, fid, overwrite)
     % Run the SUIT pipeline on a single MRI scan.
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeFolder}
+        fid {mustBeNumeric} = 1
         overwrite logical = false
     end
 
@@ -25,41 +26,41 @@ function outfiles = run_suit(mri_dir, overwrite)
     outfiles.suit_atlas = fullfile(mri_dir, append(scan_tag, '_cbl-suit.nii')); % The SUIT atlas in RAS orientation
 
     if all(structfun(@isfile, outfiles)) && all(structfun(@isfile, suitfs)) && ~overwrite
-        fprintf('- SUIT files already exist, will not rerun\n');
+        log_append(fid, '- SUIT files already exist, will not rerun');
         return
     else
-        fprintf('- Running SUIT\n');
+        log_append(fid, '- Running SUIT');
     end
 
     % Create the SUIT directory
     suit_dir_full = fullfile(mri_dir, append('suit_', SUIT_VERSION));
     if ~isfolder(suit_dir_full)
-        fprintf('  * Creating the SUIT directory\n')
+        log_append(fid, '  * Creating the SUIT directory');
         mkdir(suit_dir_full);
         cmd = sprintf('ln -s %s %s', suit_dir_full, suit_dir);
-        run_system_cmd(cmd, true, false);
+        system(cmd);
     end
 
     % Convert the T1 from RAS to LPI orientation
-    fprintf('  * Converting RAS to LPI orientation\n')
+    log_append(fid, '  * Converting RAS to LPI orientation');
     mri_convert = 'mri_convert --out_orientation LPI';
     fsfs = get_freesurfer_files(mri_dir);
     infile = fsfs.nu;
     outfile = suitfs.t1;
     if overwrite || ~isfile(outfile)
         cmd = sprintf('%s %s %s', mri_convert, infile, outfile);
-        fprintf('    - %s -> %s\n', basename(infile), basename(outfile));
-        run_system_cmd(cmd, true, false);
+        log_append(fid, sprintf('    - %s -> %s', basename(infile), basename(outfile)));
+        run_system(cmd, 1, false, true);
     end
 
     % Segment the cerebellum
-    fprintf('  * Segmenting the cerebellum\n');
-    if overwrite || ~all(isfile({suitfs.gray, suitfs.white, suitfs.isolation}))
+    log_append(fid, '  * Segmenting the cerebellum');
+    if overwrite || ~all(isfile({suitfs.gray, suitfs.white, suitfs.isolation}));
         suit_isolate_seg({suitfs.t1}, 'maskp', 0.3);
     end
 
     % Normalize to the SUIT template
-    fprintf('  * Estimating transform from native MRI to SUIT space\n');
+    log_append(fid, '  * Estimating transform from native MRI to SUIT space');
     if overwrite || ~all(isfile({suitfs.affineTr, suitfs.flowfield}))
         clear job;
         job.subjND(1).gray = {suitfs.gray};
@@ -69,7 +70,7 @@ function outfiles = run_suit(mri_dir, overwrite)
     end
 
     % Inverse warp the SUIT template to native MRI space
-    fprintf('  * Inverse warping the SUIT template to native MRI space\n');
+    log_append(fid, '  * Inverse warping the SUIT template to native MRI space');
     if overwrite || ~isfile(suitfs.iwAtlas)
         clear job;
         job.Affine = {suitfs.affineTr};
@@ -85,7 +86,7 @@ function outfiles = run_suit(mri_dir, overwrite)
     end
 
     % Convert SUIT files in subject space back to RAS orientation
-    fprintf('  * Converting back to the original orientation\n')
+    log_append(fid, '  * Converting back to the original orientation');
     if overwrite || ~isfile(outfiles.suit_atlas)
         % Change the datatype from int8 to int6 so mri_convert can handle it
         nii_change_datatype(suitfs.iwAtlas, spm_type('int16'));
@@ -95,8 +96,8 @@ function outfiles = run_suit(mri_dir, overwrite)
         infile = add_presuf(suitfs.iwAtlas, 'p');
         outfile = outfiles.suit_atlas;
         cmd = sprintf('%s %s %s', mri_convert, infile, outfile);
-        fprintf('    - %s -> %s\n', basename(infile), basename(outfile));
-        run_system_cmd(cmd, true, false);
+        log_append(fid, sprintf('    - %s -> %s', basename(infile), basename(outfile)));
+        run_system(cmd, 1, false, true);
 
         % Reslice to match the original T1
         clear matlabbatch;
@@ -114,7 +115,7 @@ function outfiles = run_suit(mri_dir, overwrite)
 
     % Warp cerebellar gray matter mask to SUIT space in preparation for VBM
     % analysis. GM probability is modulated based on the Jacobian
-    fprintf('  * Warping cerebellar GM probability map from native MRI to SUIT space\n');
+    log_append(fid, '  * Warping cerebellar GM probability map from native MRI to SUIT space');
     if overwrite || ~isfile(suitfs.wgray)
         clear job;
         job.subj.affineTr = {suitfs.affineTr};

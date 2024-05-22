@@ -42,7 +42,7 @@ function outfiles = process_single_pet(pet_dir, overwrite)
     % Print the module header
     title = 'PET PROCESSING MODULE';
     subtitle = append('SCAN = ', pet_tag);
-    print_title(title, subtitle);
+    print_header(title, subtitle);
 
     % Find the raw PET scan
     outfiles.raw_pet = fullfile(pet_dir, append(pet_tag, '.nii'));

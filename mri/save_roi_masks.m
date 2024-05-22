@@ -1,4 +1,4 @@
-function outfiles = save_roi_masks(mri_dir, overwrite, aparcf, bstemf)
+function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
     % Save out mask files used as reference regions or target ROIs.
     %
     % If mri_dir is passed, look up the aparc and brainstem files in
@@ -9,6 +9,8 @@ function outfiles = save_roi_masks(mri_dir, overwrite, aparcf, bstemf)
     % ----------
     % mri_dir : char or str array
     %   The directory that contains the processed MRI data
+    % fid : int, optional
+    %   File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %   If true, overwrite existing files
     % aparcf : char or str array, optional
@@ -31,6 +33,7 @@ function outfiles = save_roi_masks(mri_dir, overwrite, aparcf, bstemf)
     % ------------------------------------------------------------------
     arguments
         mri_dir = ''
+        fid {mustBeNumeric} = 1
         overwrite logical = false
         aparcf = ''
         bstemf = ''
@@ -52,7 +55,7 @@ function outfiles = save_roi_masks(mri_dir, overwrite, aparcf, bstemf)
     save_aparc_masks = isfile(aparcf);
     save_brainstem_masks = isfile(bstemf);
     if ~save_aparc_masks && ~save_brainstem_masks
-        fprintf('- No aparc or brainstem sublabel files found in %s\n', mri_dir);
+        log_append(fid, sprintf('- No aparc or brainstem sublabel files found in %s', mri_dir));
         return
     end
 
@@ -60,17 +63,17 @@ function outfiles = save_roi_masks(mri_dir, overwrite, aparcf, bstemf)
     outfiles = struct();
 
     % Call the individual ROI creation functions
-    fprintf('- Saving ROI masks\n');
+    log_append(fid, '- Saving ROI masks');
     if save_aparc_masks
-        outfiles = catstruct(outfiles, save_mask_wcbl(aparcf, overwrite));
-        outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, overwrite));
-        outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, overwrite));
-        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, overwrite));
+        outfiles = catstruct(outfiles, save_mask_wcbl(aparcf, fid, overwrite));
+        outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, fid, overwrite));
+        outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, fid, overwrite));
+        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, fid, overwrite));
         if isfile(suitf)
-            outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, overwrite));
+            outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, fid, overwrite));
         end
     end
     if save_brainstem_masks
-        outfiles.pons = save_mask_pons(bstemf, overwrite);
+        outfiles = catstruct(outfiles, save_mask_pons(bstemf, fid, overwrite));
     end
 end

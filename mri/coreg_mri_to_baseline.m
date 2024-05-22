@@ -1,4 +1,4 @@
-function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, prefix)
+function outfiles = coreg_mri_to_baseline(infiles, fid, overwrite, baseline_nuf, prefix)
     % Coregister MRI to baseline and ovewrite input image headers
     %
     % First looks up if infiles already correspond to the baseline
@@ -11,6 +11,8 @@ function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, pref
     %     element should be the MRI to coregister (the source image),
     %     and any additional elements are paths to other images to apply
     %     the transform to
+    % fid : int, optional
+    %     File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %     If true, overwrite existing files. Default is true
     % baseline_nuf : char/str, optional
@@ -22,6 +24,7 @@ function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, pref
     % ------------------------------------------------------------------
     arguments
         infiles
+        fid {mustBeNumeric} = 1
         overwrite logical = true
         baseline_nuf {mustBeText} = ''
         prefix {mustBeText} = ''
@@ -40,7 +43,7 @@ function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, pref
     end
     mustBeFile(baseline_nuf);
     if strcmp(infiles{1}, baseline_nuf)
-        fprintf('- This is the baseline MRI\n')
+        log_append(fid, '- This is the baseline MRI');
         outfiles = infiles_cp;
         return
     end
@@ -48,18 +51,18 @@ function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, pref
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Will not coregister MRI to baseline, as output files exist\n')
+        log_append(fid, '- Will not coregister MRI to baseline, as output files exist');
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else
-        fprintf('- Coregistering MRI files to baseline MRI\n');
+        log_append(fid, '- Coregistering MRI files to baseline MRI');
         for ii = 1:numel(infiles)
             if ii == 1
-                fprintf('  * Source image: %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('  * Source image: %s', basename(infiles{ii})));
             elseif ii == 2
-                fprintf('  * Other images: %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('  * Other images: %s', basename(infiles{ii})));
             else
-                fprintf('                  %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('                  %s', basename(infiles{ii})));
             end
         end
     end
@@ -70,8 +73,6 @@ function outfiles = coreg_mri_to_baseline(infiles, overwrite, baseline_nuf, pref
             copyfile(infiles{ii}, outfiles{ii});
         end
     end
-
-
 
     % Coregister images to the baseline MRI
     clear matlabbatch;

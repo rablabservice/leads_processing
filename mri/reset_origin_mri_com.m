@@ -1,4 +1,4 @@
-function outfiles = reset_origin_mri_com(infiles, overwrite, prefix)
+function outfiles = reset_origin_mri_com(infiles, fid, overwrite, prefix)
     % Recenter T1 to center-of-mass then coregister to the SPM template
     %
     % Strictly rigid-body coregistration (no reslicing is done). Only
@@ -11,6 +11,8 @@ function outfiles = reset_origin_mri_com(infiles, overwrite, prefix)
     %     Images to reorient, assumed to be from same individual and
     %     session. The first image should be the T1 MRI. The transform
     %     is estimated for the first image but applied to all infiles
+    % fid : int, optional
+    %     File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %     If true, overwrite existing files. Default is true
     % prefix : str/char, optional
@@ -25,6 +27,7 @@ function outfiles = reset_origin_mri_com(infiles, overwrite, prefix)
     % ------------------------------------------------------------------
     arguments
         infiles
+        fid {mustBeNumeric} = 1
         overwrite logical = true
         prefix {mustBeText} = ''
     end
@@ -37,18 +40,18 @@ function outfiles = reset_origin_mri_com(infiles, overwrite, prefix)
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Will not reset MRI origin to center-of-mass, as output files exist\n')
+        log_append(fid, '- Will not reset MRI origin to center-of-mass, as output files exist');
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else
-        fprintf('- Resetting MRI origin to center-of-mass\n')
+        log_append(fid, '- Resetting MRI origin to center-of-mass');
         for ii = 1:numel(infiles)
             if ii == 1
-                fprintf('  * Source image: %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('  * Source image: %s', basename(infiles{ii})));
             elseif ii == 2
-                fprintf('  * Other images: %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('  * Other images: %s', basename(infiles{ii})));
             else
-                fprintf('                  %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('                  %s', basename(infiles{ii})));
             end
         end
     end
@@ -85,7 +88,7 @@ function outfiles = reset_origin_mri_com(infiles, overwrite, prefix)
     mustBeFile(templatef);
 
     % Coregister images to the SPM template
-    fprintf('- Coregistering MRI to the OldNorm T1 template\n');
+    log_append(fid, '- Coregistering MRI to the OldNorm T1 template');
     clear matlabbatch;
     matlabbatch{1}.spm.spatial.coreg.estimate.ref = cellstr(templatef);
     matlabbatch{1}.spm.spatial.coreg.estimate.source = outfiles(1);

@@ -1,4 +1,4 @@
-function outfiles = copy_convert_freesurfer(mri_dir, overwrite)
+function outfiles = copy_convert_freesurfer(mri_dir, fid, overwrite)
     % Convert FreeSurfer files from .mgz to .nii and return nifti paths
     %
     % Converted .nii files are saved in mri_dir
@@ -6,9 +6,11 @@ function outfiles = copy_convert_freesurfer(mri_dir, overwrite)
     % Parameters
     % ----------
     % mri_dir : char or str array
-    %     Path to the processed MRI directory where converted files will be stored.
+    %     Path to the processed MRI directory where converted files will be stored
+    % fid : int, optional
+    %     File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
-    %     If true, overwrite existing .nii files (default is false).
+    %     If true, overwrite existing .nii files (default is false)
     %
     % Returns
     % -------
@@ -21,6 +23,7 @@ function outfiles = copy_convert_freesurfer(mri_dir, overwrite)
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeFolder}
+        fid {mustBeNumeric} = 1
         overwrite logical = false
     end
 
@@ -36,7 +39,7 @@ function outfiles = copy_convert_freesurfer(mri_dir, overwrite)
 
     % Loop over each file in fs_mgzfs, check if the corresponding file
     % in fs_niftis exists, and convert .mgz to .nii if necessary
-    fprintf('- Converting FreeSurfer .mgz files to .nii\n')
+    log_append(fid, '- Converting FreeSurfer .mgz files to .nii');
     fs_fields = fieldnames(fs_mgzfs);
     for ii = 1:length(fs_fields)
         mgzf = fs_mgzfs.(fs_fields{ii});
@@ -44,10 +47,10 @@ function outfiles = copy_convert_freesurfer(mri_dir, overwrite)
         if isfile(mgzf)
             if overwrite || ~isfile(niif)
                 cmd = sprintf('%s %s %s', mri_convert, mgzf, niif);
-                fprintf('  * %s -> %s\n', basename(mgzf), basename(niif));
-                run_system_cmd(cmd, true, false);
+                log_append(fid, sprintf('  * %s -> %s', basename(mgzf), basename(niif)));
+                run_system(cmd, fid);
             else
-                fprintf('  * %s exists, will not overwrite\n', basename(niif));
+                log_append(fid, sprintf('  * %s exists, will not overwrite', basename(niif)));
             end
         end
         % Keep only outfiles that exist

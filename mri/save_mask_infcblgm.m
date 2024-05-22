@@ -1,4 +1,4 @@
-function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir)
+function outfiles = save_mask_infcblgm(aparcf, suitf, fid, overwrite, in_dir, out_dir)
     % Save the inferior cerebellar gray matter mask
     %
     % Parameters
@@ -7,6 +7,8 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir
     %   Path to the aparc+aseg.nii file
     % suitf : char or str array
     %   Path to the SUIT atlas in native MRI space
+    % fid : int, optional
+    %   File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %   If true, overwrite existing file
     % in_dir : char or str array
@@ -25,6 +27,7 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir
     arguments
         aparcf {mustBeText} = ''
         suitf {mustBeText} = ''
+        fid {mustBeNumeric} = 1
         overwrite logical = false
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
@@ -40,7 +43,7 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir
         matlabbatch{1}.spm.spatial.smooth.im = 0;
         matlabbatch{1}.spm.spatial.smooth.prefix = prefix;
         spm_jobman('run', matlabbatch);
-        fprintf('  * Saved %s\n', basename(add_presuf(infile, prefix)));
+        log_append(fid, sprintf('  * Saved %s', basename(add_presuf(infile, prefix))));
     end
 
     % Define aparc_dat indices for cerebellar gray matter
@@ -58,29 +61,28 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir
 
     % Check if all output files already exist
     if all(structfun(@isfile, outfiles)) && ~overwrite
-        fprintf('  * Subcortical white matter mask files exist, will not overwrite\n')
+        log_append(fid, '  * Subcortical white matter mask files exist, will not overwrite');
         return
     end
 
     % Save the mask
-    mask_cblgm = nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_cblgm, overwrite);
+    mask_cblgm = nii_labels_to_mask(aparcf, mask_idx, outfiles.mask_cblgm, fid, overwrite);
 
     % Define intermediary files
     interfs.mask_keep = fullfile(out_dir, append(scan_tag, '_mask-keep.nii'));
     interfs.smask_keep = add_presuf(interfs.mask_keep, 's');
     interfs.mask_toss = fullfile(out_dir, append(scan_tag, '_mask-toss.nii'));
     interfs.smask_toss = add_presuf(interfs.mask_toss, 's');
-    interfs.keep_gt_toss = fullfile(out_dir, 'keep_gt_toss.nii');
 
     % Create a mask of SUIT subregions we want to keep, then smooth it
     labels_keep = [6, 8:28, 33:34]';
-    mask_keep = nii_labels_to_mask(suitf, labels_keep, interfs.mask_keep, overwrite);
+    mask_keep = nii_labels_to_mask(suitf, labels_keep, interfs.mask_keep, fid, overwrite);
     smooth_mask(interfs.mask_keep);
     smask_keep = spm_read_vols(spm_vol(interfs.smask_keep));
 
     % Create a mask of SUIT subregions we want to keep, then smooth it
     labels_toss = [0:5, 7]';
-    mask_toss = nii_labels_to_mask(suitf, labels_toss, interfs.mask_toss, overwrite);
+    mask_toss = nii_labels_to_mask(suitf, labels_toss, interfs.mask_toss, fid, overwrite);
     smooth_mask(interfs.mask_toss);
     smask_toss = spm_read_vols(spm_vol(interfs.smask_toss));
 
@@ -90,7 +92,7 @@ function outfiles = save_mask_infcblgm(aparcf, suitf, overwrite, in_dir, out_dir
     out_img.fname = outfiles.mask_infcblgm;
     out_img.dt = [spm_type('uint8') 0];
     spm_write_vol(out_img, mask_infcblgm);
-    fprintf('  * Saved %s\n', basename(outfiles.mask_infcblgm));
+    log_append(fid, sprintf('  * Saved %s', basename(outfiles.mask_infcblgm)));
 
     % Delete intermediary files
     structfun(@delete, interfs);

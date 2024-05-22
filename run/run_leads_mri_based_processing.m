@@ -44,6 +44,12 @@
 %                                  Processing code by D. Schonhaut, 2024
 % ----------------------------------------------------------------------
 
+% Start the program timer
+tic;
+
+% Say hi
+say_hi();
+
 % Reset the MATLAB environment
 restoredefaultpath;
 addpath("/home/mac/dschonhaut/code/matlab/spm12");
@@ -51,48 +57,85 @@ addpath("/home/mac/dschonhaut/code/matlab/spm12/toolbox");
 addpath("/home/mac/dschonhaut/code/matlab/spm12/toolbox/suit");
 addpath(genpath("/mnt/coredata/processing/leads/code"));
 
-% Define globals
-data_dir = "/mnt/coredata/processing/leads/data";
+% Define defaults
+proj_dir = "/mnt/coredata/processing/leads";
+scans_to_process_dir = fullfile(proj_dir, 'metadata', 'scans_to_process');
 overwrite = false;
-process_unused_mris = false;
-cleanup = true;
-log_dir = "/mnt/coredata/processing/leads/metadata/scans_to_process";
+cleanup_newdata = true;
+process_all_mris = false;
 segment_brainstem = true;
-
-% Say hi
-tic;
-say_hi();
+process_freesurfer = true;
+process_post_freesurfer = true;
 
 % Figure out what the user wants to do
 prompt_user = sprintf([
     '\n~ Welcome to the LEADS processing pipeline ~\n\n', ...
     'What do you want to do?\n', ...
     '  [1] Setup scans for processing\n', ...
-    '  [2] Process MRIs\n', ...
-    '  [3] Process PET scans\n', ...
-    '  [4] Process MRIs and PET  ([2]-[3])\n', ...
-    '  [5] Run the full pipeline ([1]-[3])\n', ...
-    '  [6] Nothing, I was just curious what happens when I run this script\n', ...
+    '  [2] View scans that are scheduled for processing (but don''t do anything)\n', ...
+    '  [3] Process MRIs\n', ...
+    '  [4] Process PET scans\n', ...
+    '  [5] Nothing, I was just curious what happens when I run this script\n', ...
     '>> '
 ]);
 action = input(prompt_user);
 
 % Run the selected action
+change_defaults_msg = 'Do you need to change any defaults?';
+overwrite_msg = 'Overwrite existing files?';
 switch action
     case 1
-        setup_leads_processing(data_dir, overwrite, process_unused_mris, cleanup);
+        fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('  Project directory                           : %s\n', proj_dir);
+        fprintf('  Overwrite existing files                    : %d\n', overwrite);
+        fprintf('  Cleanup newdata after moving scans          : %d\n', cleanup_newdata);
+        fprintf('  Process all MRIs in raw (including orphans) : %d\n', process_all_mris);
+        change_defaults = prompt_bool(change_defaults_msg, false);
+        if change_defaults
+            proj_dir = prompt_text('Enter path to project directory', proj_dir, true);
+            overwrite = prompt_bool(overwrite_msg, false, false, true);
+            cleanup_newdata = prompt_bool('Wipe ''newdata'' after moving scans to ''raw''?', true);
+            process_all_mris = prompt_bool('Process all MRIs in ''raw'' (even orphans)?', false);
+        end
+        proj_dir = abspath(proj_dir);
+        mustBeFolder(proj_dir);
+        setup_leads_processing(proj_dir, overwrite, cleanup_newdata, process_all_mris);
     case 2
-        process_mris(overwrite, log_dir, segment_brainstem);
+        fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('  Directory with CSV files listing scans to process : %s\n', scans_to_process_dir);
+        change_defaults = prompt_bool(change_defaults_msg, false);
+        if change_defaults
+            scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+        end
+        queue_mris_to_process(scans_to_process_dir);
+        queue_pets_to_process(scans_to_process_dir);
     case 3
-        process_pets(overwrite, log_dir);
+        fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('  Overwrite existing files                          : %d\n', overwrite);
+        fprintf('  Directory with CSV files listing scans to process : %s\n', scans_to_process_dir);
+        fprintf('  Segment brainstem                                 : %d\n', segment_brainstem);
+        fprintf('  Run FreeSurfer processing                         : %d\n', process_freesurfer);
+        fprintf('  Run post-FreeSurfer processing                    : %d\n', process_post_freesurfer);
+        change_defaults = prompt_bool(change_defaults_msg, false);
+        if change_defaults
+            overwrite = prompt_bool(overwrite_msg, false, false, true);
+            scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+            segment_brainstem = prompt_bool('Segment brainstem?', true);
+            process_freesurfer = prompt_bool('Process MRIs through FreeSurfer?', true);
+            process_post_freesurfer = prompt_bool('Run post-FreeSurfer MRI processing?', true);
+        end
+        process_mris(overwrite, scans_to_process_dir, segment_brainstem, process_freesurfer, process_post_freesurfer);
     case 4
-        process_mris(overwrite, log_dir, segment_brainstem);
-        process_pets(overwrite, log_dir);
+        fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('  Overwrite existing files                          : %d\n', overwrite);
+        fprintf('  Directory with CSV files listing scans to process : %s\n', scans_to_process_dir);
+        change_defaults = prompt_bool(change_defaults_msg, false);
+        if change_defaults
+            overwrite = prompt_bool(overwrite_msg, false, false, true);
+            scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+        end
+        process_pets(overwrite, scans_to_process_dir);
     case 5
-        setup_leads_processing(data_dir, overwrite, process_unused_mris, cleanup);
-        process_mris(overwrite, log_dir, segment_brainstem);
-        process_pets(overwrite, log_dir);
-    case 6
         fprintf('Ok\n');
     otherwise
         fprintf('INVALID INPUT. Try again :(\n');
@@ -100,5 +143,5 @@ end
 
 % End the program
 say_bye();
-toc;
+tock();
 clear;

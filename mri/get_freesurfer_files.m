@@ -33,7 +33,7 @@ function outfiles = get_freesurfer_files(mri_dir, fmt, fs_dir);
     %     - bstem : The brainstem sublabels file
     % ------------------------------------------------------------------
     arguments
-        mri_dir {mustBeText}
+        mri_dir {mustBeText} = ''
         fmt {mustBeMember(fmt, {'nii', 'mgz'})} = 'nii'
         fs_dir {mustBeText} = ''
     end

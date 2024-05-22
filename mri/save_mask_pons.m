@@ -1,10 +1,12 @@
-function outfiles = save_mask_pons(brainstemf, overwrite, in_dir, out_dir)
+function outfiles = save_mask_pons(brainstemf, fid, overwrite, in_dir, out_dir)
     % Load the brainstem sublabels file and save the pons
     %
     % Parameters
     % ----------
     % brainstemf : char or str array
     %   Path to the brainstem-sublabels.nii file
+    % fid : int, optional
+    %   File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %   If true, overwrite existing file
     % in_dir : char or str array
@@ -21,6 +23,7 @@ function outfiles = save_mask_pons(brainstemf, overwrite, in_dir, out_dir)
     % ------------------------------------------------------------------
     arguments
         brainstemf {mustBeText} = ''
+        fid {mustBeNumeric} = 1
         overwrite logical = false
         in_dir {mustBeText} = ''
         out_dir {mustBeText} = ''
@@ -35,5 +38,5 @@ function outfiles = save_mask_pons(brainstemf, overwrite, in_dir, out_dir)
 
     % Save the mask
     outfiles.mask_pons = fullfile(out_dir, append(scan_tag, '_mask-pons.nii'));
-    nii_labels_to_mask(brainstemf, mask_idx, outfiles.mask_pons, overwrite);
+    nii_labels_to_mask(brainstemf, mask_idx, outfiles.mask_pons, fid, overwrite);
 end

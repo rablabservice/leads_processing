@@ -1,4 +1,4 @@
-function outfiles = apply_affine_to_mni(infiles, atf, overwrite, interp, vox, prefix, bb)
+function outfiles = apply_affine_to_mni(infiles, atf, fid, overwrite, interp, vox, prefix, bb)
     % Transform images from native MRI to MNI space using an existing affine
     %
     % Parameters
@@ -7,6 +7,8 @@ function outfiles = apply_affine_to_mni(infiles, atf, overwrite, interp, vox, pr
     %   Path to scan(s) to be affine transformed to MNI space
     % atf : char or str array
     %   Path to the affine transform .mat file
+    % fid : int, optional
+    %   File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %   If true, overwrite existing files
     % interp : int, optional
@@ -33,6 +35,7 @@ function outfiles = apply_affine_to_mni(infiles, atf, overwrite, interp, vox, pr
     arguments
         infiles
         atf
+        fid {mustBeNumeric} = 1
         overwrite logical = false
         interp {mustBeMember(interp,0:7)} = 4
         vox (1,3) {mustBePositive} = [1.5 1.5 1.5]
@@ -50,16 +53,16 @@ function outfiles = apply_affine_to_mni(infiles, atf, overwrite, interp, vox, pr
     % Check existence of output files
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Affine transformed files exist, will not overwrite\n');
+        log_append(fid, '- Affine transformed files exist, will not overwrite');
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else
-        fprintf('- Affine transforming images to MNI space:\n')
+        log_append(fid, '- Affine transforming images to MNI space:');
         for ii = 1:length(infiles)
             if ~isempty(prefix)
-                fprintf('  * %s -> %s\n', basename(infiles{ii}), basename(outfiles{ii}));
+                log_append(fid, sprintf('  * %s -> %s', basename(infiles{ii}), basename(outfiles{ii})));
             else
-                fprintf('  * %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('  * %s', basename(infiles{ii})));
             end
         end
     end

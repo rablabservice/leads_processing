@@ -1,4 +1,4 @@
-function mask = nii_labels_to_mask(infile, labels, outfile, overwrite)
+function mask = nii_labels_to_mask(infile, labels, outfile, fid, overwrite)
     % Create a binary mask from a nifti file and array of integer labels
     %
     % Mask is 1 for all elements in the input file whose values are in
@@ -7,14 +7,16 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite)
     % Parameters
     % ----------
     % infile : char|string
-    %     Path to the input nifti file.
+    %     Path to the input nifti file
     % labels : array
     %     Array of integers that represent the indices of the elements
-    %     that should be included in the mask.
+    %     that should be included in the mask
     % outfile : char
-    %     Path to the output nifti file.
+    %     Path to the output nifti file
+    % fid : int, optional
+    %     File identifier for logging (default is 1 for stdout)
     % overwrite : bool
-    %     If true, overwrite the output file if it already exists.
+    %     If true, overwrite the output file if it already exists
     %
     % Returns
     % mask : logical array
@@ -24,13 +26,14 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite)
         infile {mustBeFile}
         labels {mustBeNumeric}
         outfile {mustBeText} = ''
+        fid {mustBeNumeric} = 1
         overwrite logical = false
     end
 
     % If the output file exists and overwrite is false, load the outfile
     % and return its data array
     if exist(outfile, 'file') && ~overwrite
-        fprintf('  * %s exists, will not overwrite\n', basename(outfile));
+        log_append(fid, sprintf('  * %s exists, will not overwrite', basename(outfile)));
         mask = spm_read_vols(spm_vol(outfile));
         return
     end
@@ -61,6 +64,6 @@ function mask = nii_labels_to_mask(infile, labels, outfile, overwrite)
         mask_img.fname = outfile;
         mask_img.dt = [spm_type('uint8') 0];
         spm_write_vol(mask_img, mask);
-        fprintf('  * Saved %s\n', basename(outfile));
+        log_append(fid, sprintf('  * Saved %s', basename(outfile)));
     end
 end

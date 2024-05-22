@@ -1,4 +1,4 @@
-function outfiles = segment_mri(nuf, overwrite)
+function outfiles = segment_mri(nuf, fid, overwrite)
     % Segment nu.nii and save forward and inverse deformations to MNI space
     %
     % Also smooths the mwc1 image by 8mm^3 FWHM to create the smwc1
@@ -8,6 +8,8 @@ function outfiles = segment_mri(nuf, overwrite)
     % ----------
     % nuf : char or str array
     %   Path to the T1 image to segment
+    % fid : int, optional
+    %   File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %   If true, overwrite existing files
     %
@@ -30,6 +32,7 @@ function outfiles = segment_mri(nuf, overwrite)
     % ------------------------------------------------------------------
     arguments
         nuf {mustBeFile}
+        fid {mustBeNumeric} = 1
         overwrite logical = false
     end
 
@@ -51,10 +54,10 @@ function outfiles = segment_mri(nuf, overwrite)
 
     % Check if output files already exist
     if all(structfun(@(x) exist(x, 'file'), outfiles)) && ~overwrite
-        fprintf('- Segmentation already complete, will not rerun\n')
+        log_append(fid, '- Segmentation already complete, will not rerun');
         return
     else
-        fprintf('- Segmenting %s\n', basename(nuf));
+        log_append(fid, sprintf('- Segmenting %s', basename(nuf)));
     end
 
     % Run Segment
@@ -99,7 +102,7 @@ function outfiles = segment_mri(nuf, overwrite)
     spm_jobman('run',matlabbatch);
 
     % Smooth the mwc1 image
-    mwc1f = fullfile(mri_dir, append('mwc1', scan_tag, '_nu.nii'))
+    mwc1f = fullfile(mri_dir, append('mwc1', scan_tag, '_nu.nii'));
     clear matlabbatch;
     matlabbatch{1}.spm.spatial.smooth.data = cellstr(mwc1f);
     matlabbatch{1}.spm.spatial.smooth.fwhm = [8 8 8];

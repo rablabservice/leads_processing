@@ -1,4 +1,10 @@
-function process_mris(overwrite, log_dir, segment_brainstem)
+function process_mris( ...
+    overwrite, ...
+    scans_to_process_dir, ...
+    segment_brainstem, ...
+    process_freesurfer, ...
+    process_post_freesurfer ...
+)
     % Process all MRIs that are scheduled for processing
     % in the latest log file
     %
@@ -6,26 +12,43 @@ function process_mris(overwrite, log_dir, segment_brainstem)
     % ----------
     % overwrite : logical
     %     If true, overwrite existing processed data
-    % log_dir : char or str
+    % scans_to_process_dir : char or str
     %     The directory that stores log files
     % segment_brainstem : logical
     %     If true, segment the brainstem using segmentBS.sh
+    % process_freesurfer : logical
+    %     If true, run recon-all on the raw MRI
+    % process_post_freesurfer : logical
+    %     If true, run post-FreeSurfer processing
     % ------------------------------------------------------------------
     arguments
         overwrite logical = false
-        log_dir {mustBeFolder} = '/mnt/coredata/processing/leads/metadata/log'
+        scans_to_process_dir {mustBeFolder} = '/mnt/coredata/processing/leads/metadata/scans_to_process'
         segment_brainstem logical = true
-
+        process_freesurfer logical = true
+        process_post_freesurfer logical = true
     end
 
     % Format paths
-    log_dir = abspath(log_dir);
+    scans_to_process_dir = abspath(scans_to_process_dir);
 
     % Load the list of MRIs to process
-    [raw_mrifs, mri_dirs] = queue_mris_to_process(log_dir);
+    mri_dirs = queue_mris_to_process(scans_to_process_dir);
+    raw_mrif = '';
 
     % Process MRIs in parallel
     parfor ii = 1:length(mri_dirs)
-        process_single_mri(raw_mrifs(ii), mri_dirs(ii), overwrite, segment_brainstem);
+        try
+            process_single_mri( ...
+                mri_dirs{ii}, ...
+                raw_mrif, ...
+                overwrite, ...
+                segment_brainstem, ...
+                process_freesurfer, ...
+                process_post_freesurfer ...
+            );
+        catch ME
+            warning('\n\n\nERROR processing %s: %s\n\n\n', mri_dirs{ii}, ME.message);
+        end
     end
 end

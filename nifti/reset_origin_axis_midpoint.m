@@ -1,4 +1,4 @@
-function outfiles = reset_origin_axis_midpoint(infiles, overwrite, prefix)
+function outfiles = reset_origin_axis_midpoint(infiles, fid, overwrite, prefix)
     % Reset origin of each image to the midpoint along each axis
     %
     % Only the affine transform in the nifti headers are changed; data
@@ -8,6 +8,8 @@ function outfiles = reset_origin_axis_midpoint(infiles, overwrite, prefix)
     % ----------
     % infiles : str/char or cell array of str/chars of nifti filenames
     %     One or more .nii images to reorient
+    % fid : int, optional
+    %     File identifier for logging (default is 1 for stdout)
     % overwrite : logical, optional
     %     If true, overwrite existing files. Default is true
     % prefix : str/char, optional
@@ -16,6 +18,7 @@ function outfiles = reset_origin_axis_midpoint(infiles, overwrite, prefix)
     % ------------------------------------------------------------------
     arguments
         infiles
+        fid {mustBeNumeric} = 1
         overwrite logical = true
         prefix {mustBeText} = ''
     end
@@ -28,16 +31,16 @@ function outfiles = reset_origin_axis_midpoint(infiles, overwrite, prefix)
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf('- Will not reset origin to axis midpoint, as output files exist\n')
+        fprintf(fid, '- Will not reset origin to axis midpoint, as output files exist\n')
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else
-        fprintf('- Resetting origin to axis midpoint\n')
+        fprintf(fid, '- Resetting origin to axis midpoint\n')
         for ii = 1:numel(infiles)
             if isempty(prefix)
-                fprintf('  * %s\n', basename(infiles{ii}));
+                fprintf(fid, '  * %s\n', basename(infiles{ii}));
             else
-                fprintf('  * %s -> %s\n', basename(infiles{ii}), basename(outfiles{ii}));
+                fprintf(fid, '  * %s -> %s\n', basename(infiles{ii}), basename(outfiles{ii}));
             end
         end
     end

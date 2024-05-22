@@ -1,4 +1,11 @@
-function outfiles = process_single_mri(raw_mrif, mri_dir, overwrite, segment_brainstem)
+function outfiles = process_single_mri( ...
+    mri_dir, ...
+    raw_mrif, ...
+    overwrite, ...
+    segment_brainstem, ...
+    process_freesurfer, ...
+    process_post_freesurfer ...
+)
     % Run a single MRI scan through all the processing steps.
     %
     % Overview
@@ -27,38 +34,78 @@ function outfiles = process_single_mri(raw_mrif, mri_dir, overwrite, segment_bra
     %
     % Parameters
     % ----------
-    % raw_mrif : char or str array
-    %     Full path to the raw MRI nifti
     % mri_dir : char or str array
     %     Path to the processed MRI directory
+    % raw_mrif : char or str array
+    %     Full path to the raw MRI nifti. If not passed, this is assumed
+    %     to be the first .nii file in mri_dir/raw
     % overwrite : logical, optional
     %     If true, overwrite existing files. Default is false
     % segment_brainstem : logical, optional
     %     If true, segment the brainstem using segmentBS.sh. Default is
     %     true
+    % process_freesurfer : logical, optional
+    %     If true, run recon-all on the raw MRI. Default is true
+    % process_post_freesurfer : logical, optional
+    %     If true, run post-FreeSurfer processing. Default is true
     % ------------------------------------------------------------------
     arguments
-        raw_mrif {mustBeFile}
         mri_dir {mustBeFolder}
+        raw_mrif {mustBeText} = ''
         overwrite logical = false
         segment_brainstem logical = true
+        process_freesurfer logical = true
+        process_post_freesurfer logical = true
     end
 
     % Format paths
     mri_dir = abspath(mri_dir);
     scan_tag = get_scan_tag(mri_dir);
 
+    % If processing is already complete and overwrite is false, get
+    % the struct of processed MRI files and return
+    if processed_mri_files_exist(mri_dir) && ~overwrite
+        fprintf('%s processing already complete, returning output files\n', scan_tag)
+        outfiles = get_processed_mri_files(mri_dir);
+        return
+    end
+
+    % If raw_mrif is not passed, find in it mri_dir/raw
+    if isempty(raw_mrif)
+        files = dir(fullfile(mri_dir, 'raw', '*.nii'));
+        if isempty(files)
+            error('No raw MRI files found in %s', fullfile(mri_dir, 'raw'));
+        elseif length(files) > 1
+            error('Multiple raw MRI files found in %s', fullfile(mri_dir, 'raw'));
+        end
+        raw_mrif = abspath(fullfile({files.folder}, {files.name}));
+    end
+
+    % Start the log file
+    fid = log_start(mri_dir);
+
     % Print the module header
     title = 'MRI PROCESSING MODULE';
     subtitle = append('SCAN : ', scan_tag);
-    print_title(title, subtitle);
+    print_header(title, subtitle, fid);
 
     % Run FreeSurfer
-    process_mri_freesurfer(raw_mrif, mri_dir, overwrite, segment_brainstem);
+    if process_freesurfer
+        process_mri_freesurfer(raw_mrif, mri_dir, fid, overwrite, segment_brainstem);
+    end
 
     % Run post-FreeSurfer processing
-    outfiles = process_mri_post_freesurfer(mri_dir, overwrite);
+    if process_post_freesurfer
+        if freesurfer_files_exist(mri_dir)
+            outfiles = process_mri_post_freesurfer(mri_dir, fid, overwrite);
+        else
+            log_append(fid, '- Cannot complete post-FreeSurfer processing until all FreeSurfer files exist');
+        end
+    end
 
     % Print the module footer
-    print_footer('MRI processing module complete');
+    print_footer('MRI processing module complete', fid);
+
+    % Close the log file
+    log_close(fid);
 end

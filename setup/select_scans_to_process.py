@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 
+# Define global variables
 PATHS = {}
 SCAN_TYPES = None
 TIMESTAMP = None
@@ -70,13 +71,41 @@ def load_scan_typesf(scan_typesf=None):
 
 def now():
     """Return the current date and time down to seconds."""
-    return datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+    def is_dst():
+        today = datetime.datetime.now()
+        year = today.year
+        dst_start = datetime.datetime(year, 3, 8, 2, 0)  # Second Sunday in March
+        dst_end = datetime.datetime(year, 11, 1, 2, 0)  # First Sunday in November
+        dst_start += datetime.timedelta(
+            days=(6 - dst_start.weekday())
+        )  # Find the second Sunday
+        dst_end += datetime.timedelta(
+            days=(6 - dst_end.weekday())
+        )  # Find the first Sunday
+        return dst_start <= today < dst_end
+
+    # Get the current UTC time
+    utc_time = datetime.datetime.now(datetime.timezone.utc)
+
+    # Define the offset for Los Angeles time
+    la_offset = -8 if not is_dst() else -7
+
+    # Create a timezone-aware datetime object for Los Angeles
+    la_time = utc_time + datetime.timedelta(hours=la_offset)
+
+    # Format the time as specified
+    formatted_time = la_time.strftime("%Y-%m-%d-%H-%M-%S")
+
+    return formatted_time
 
 
 set_globals()
 
 
-def main(overwrite, process_unused_mris):
+def main(
+    process_all_mris=False, overwrite=False, max_days_from_present=100, save_csv=True
+):
     """Save CSV files for MRI and PET scans in the raw directory.
 
     Indicate which scans need to be processed.
@@ -163,36 +192,29 @@ def main(overwrite, process_unused_mris):
     raw_pets = add_pet_date_columns(raw_pets)
 
     # Match each PET scan to its closest MRI
+    print("  * Matching each PET scan to its closest MRI")
     raw_pets = find_closest_mri_to_pet(raw_pets, raw_mris)
-    print("  * Matching PET scans to their closest T1 MRIs")
 
     # Figure out which MRIs are actually used for PET processing
-    raw_mris["mri_used_for_pet_proc"] = raw_mris["mri_image_id"].apply(
-        lambda x: 1 if np.isin(x, raw_pets["mri_image_id"]) else 0
-    )
-    idx = raw_mris.loc[raw_mris["mri_used_for_pet_proc"] == 0].index.tolist()
-    if process_unused_mris:
-        msg = "      to any PET scan but will be processed in any case"
-    else:
-        msg = (
-            "      to any PET scan and will not be added to the list of MRIs to process"
-        )
+    raw_mris = get_orphan_mris(raw_mris, raw_pets, max_days_from_present)
     print(
-        "  * Auditing MRI scans",
-        "    - {:,}/{:,} MRIs in {} are not the closest MRI".format(
-            len(idx),
-            len(raw_mris),
-            PATHS["raw"],
+        f"  * Auditing MRIs in {PATHS['raw']}",
+        "    - {:,} MRIs are orphans (>{} days old and not linked to any PET scan).".format(
+            raw_mris["mri_is_orphan"].sum(), max_days_from_present
         ),
-        msg,
         sep="\n",
     )
+    if process_all_mris:
+        msg = "      These scans will still be scheduled for processing at the user's request"
+    else:
+        msg = "      These scans will not be scheduled for processing (process anyway with flag --all)"
+    print(msg)
 
     # Flag PET scans with issues that preclude processing
     raw_pets = audit_pet(raw_pets)
-    print("  * Auditing PET scans")
+    print(f"  * Auditing PET scans in {PATHS['raw']}")
     print(
-        "    - Flagged {:,} scans with issues to be resolved before processing".format(
+        "    - Flagged {:,} scans with issues to be resolved before processing (see 'flag_notes')".format(
             len(raw_pets.loc[raw_pets["flag"] == 1])
         )
     )
@@ -214,72 +236,137 @@ def main(overwrite, process_unused_mris):
     )
 
     # Determine which MRIs have been processed
-    raw_mris["freesurfer_run"] = raw_mris["mri_proc_dir"].apply(check_if_freesurfer_run)
-    print(
-        "  * {:,}/{:,} MRIs have been processed through Freesurfer".format(
-            len(raw_mris.loc[raw_mris["freesurfer_run"] == 1]),
-            len(raw_mris),
-        )
+    raw_mris["freesurfer_complete"] = raw_mris["mri_proc_dir"].apply(
+        check_if_freesurfer_run
+    )
+    raw_mris["mri_processing_complete"] = raw_mris["mri_proc_dir"].apply(
+        check_if_mri_processed
     )
 
-    raw_mris["mri_processed"] = raw_mris["mri_proc_dir"].apply(check_if_mri_processed)
-    print(
-        "  * {:,}/{:,} MRIs have been fully processed".format(
-            len(raw_mris.loc[raw_mris["mri_processed"] == 1]),
-            len(raw_mris),
-        )
+    # Schedule MRIs for processing
+    baseline_mri_processed = (
+        raw_mris.loc[raw_mris["mri_scan_number"] == 1]
+        .set_index("subj")["mri_processing_complete"]
+        .to_dict()
     )
-
-    # Determine which PET scans have been processed
-    raw_pets.insert(
-        ii + 1, "pet_processed", raw_pets["pet_proc_dir"].apply(check_if_pet_processed)
-    )
-    print(
-        "  * {:,}/{:,} PET scans have already been processed".format(
-            len(raw_pets.loc[raw_pets["pet_processed"] == 1]),
-            len(raw_pets),
-        )
-    )
-
-    # Determine which MRI scans need to be processed
-    raw_mris["need_to_process"] = raw_mris.apply(
+    raw_mris["scheduled_for_processing"] = raw_mris.apply(
         lambda x: get_mri_to_process(
-            x["mri_used_for_pet_proc"],
-            x["mri_processed"],
+            x["mri_scan_number"],
+            x["mri_is_orphan"],
+            x["mri_processing_complete"],
+            baseline_mri_processed[x["subj"]],
             overwrite,
-            process_unused_mris,
+            process_all_mris,
         ),
         axis=1,
     )
+
+    # Summarize how many MRIs have been or still need to be processed
+    raw_mris_req = raw_mris.query("(mri_scan_number==1) or (mri_is_orphan==0)")
+    raw_mris_opt = raw_mris.query("(mri_scan_number>1) and (mri_is_orphan==1)")
+    print("\n  * MRI scan review:")
     print(
-        "  * {:,}/{:,} MRIs are scheduled for processing".format(
-            len(raw_mris.loc[raw_mris["need_to_process"] == 1]),
-            len(raw_mris),
+        "    - {:,}/{:,} required MRIs have been processed through Freesurfer".format(
+            len(raw_mris_req.loc[raw_mris_req["freesurfer_complete"] == 1]),
+            len(raw_mris_req),
         )
     )
-
-    # Determine which PET scans need to be processed
-    raw_pets["need_to_process"] = raw_pets.apply(
-        lambda x: get_pet_to_process(x["flag"], x["pet_processed"], overwrite), axis=1
+    print(
+        "    - {:,}/{:,} required MRIs have been fully processed".format(
+            len(raw_mris_req.loc[raw_mris_req["mri_processing_complete"] == 1]),
+            len(raw_mris_req),
+        )
     )
     print(
-        "  * {:,}/{:,} PET scans are scheduled for processing".format(
-            len(raw_pets.loc[raw_pets["need_to_process"] == 1]),
+        "    - {:,}/{:,} optional MRIs have been processed through Freesurfer".format(
+            len(raw_mris_opt.loc[raw_mris_opt["freesurfer_complete"] == 1]),
+            len(raw_mris_opt),
+        )
+    )
+    print(
+        "    - {:,}/{:,} optional MRIs have been fully processed".format(
+            len(raw_mris_opt.loc[raw_mris_opt["mri_processing_complete"] == 1]),
+            len(raw_mris_opt),
+        )
+    )
+    _n = len(
+        raw_mris_req.query(
+            "(mri_processing_complete == 0) & (scheduled_for_processing == 0)"
+        )
+    )
+    if _n:
+        print(
+            f"    - {_n:,} required, follow-up MRIs cannot be processed until baseline MRI is processed"
+        )
+
+    # Determine which PET scans have been processed
+    ii = raw_pets.columns.tolist().index("mri_raw_niif")
+    mri_processed = raw_mris.set_index("mri_image_id")[
+        "mri_processing_complete"
+    ].to_dict()
+    raw_pets.insert(
+        ii + 1,
+        "mri_processing_complete",
+        raw_pets["mri_image_id"].apply(lambda x: mri_processed.get(x, np.nan)),
+    )
+    raw_pets.insert(
+        ii + 2,
+        "pet_processing_complete",
+        raw_pets["pet_proc_dir"].apply(check_if_pet_processed),
+    )
+
+    # Schedule PET scans for processing
+    raw_pets["scheduled_for_processing"] = raw_pets.apply(
+        lambda x: get_pet_to_process(
+            x["pet_processing_complete"],
+            x["mri_processing_complete"],
+            x["flag"],
+            overwrite,
+        ),
+        axis=1,
+    )
+
+    # Summarize how many PET scans have been or still need to be processed
+    print("\n  * PET scan review:")
+    print(
+        "    - {:,}/{:,} PET scans have been fully processed".format(
+            len(raw_pets.loc[raw_pets["pet_processing_complete"] == 1]),
             len(raw_pets),
         )
     )
+    qry = (
+        "(pet_processing_complete == 0) & (flag == 0) & (scheduled_for_processing == 0)"
+    )
+    _n = len(raw_pets.query(qry))
+    if _n:
+        print(
+            f"    - {_n:,} PET scans cannot be processed until their corresponding MRI is processed"
+        )
 
-    # Convert date columns to string
-    fmt = "%Y-%m-%d"
-    raw_mris["mri_date"] = raw_mris["mri_date"].dt.strftime(fmt)
-    for col in ["pet_date", "mri_date"]:
-        raw_pets[col] = raw_pets[col].dt.strftime(fmt)
+    # Save the raw scan dataframes to CSV files
+    if save_csv:
+        save_raw_mri_index(raw_mris)
+        save_raw_pet_index(raw_pets)
 
-    # Save the raw MRI scans dataframe to a CSV file
-    save_mri_scan_index(raw_mris)
+    # Report how many MRI and PET scans are scheduled for processing
+    print("")
+    print("  +.." + ("=" * 44) + "..+")
+    print("  |" + (" " * 47) + " |")
+    print(
+        "  |  {:>5,} MRIs are scheduled for processing       |".format(
+            len(raw_mris.loc[raw_mris["scheduled_for_processing"] == 1])
+        )
+    )
+    print(
+        "  |  {:>5,} PET scans are scheduled for processing  |".format(
+            len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
+        )
+    )
+    print("  |" + (" " * 47) + " |")
+    print("  +.." + ("=" * 44) + "..+")
+    print("")
 
-    # Save the raw PET scans dataframe to a CSV file
-    save_pet_scan_index(raw_pets)
+    return raw_mris, raw_pets
 
 
 def fast_recursive_glob_nii(path):
@@ -576,12 +663,19 @@ def find_closest_mri_to_pet(pet_scans, mri_scans):
     ii = merged.columns.tolist().index("pet_date")
     merged.insert(
         ii + 1,
-        "pet_to_mri_days",
-        (merged["pet_date"] - merged["mri_date"]).abs().dt.days,
+        "days_mri_to_pet",
+        (merged["pet_date"] - merged["mri_date"]).dt.days,
+    )
+    merged.insert(
+        ii + 2,
+        "abs_days_mri_to_pet",
+        merged["days_mri_to_pet"].abs(),
     )
 
     # Sort by |pet_date - mri_date| and drop duplicates
-    merged_min = merged.sort_values("pet_to_mri_days").drop_duplicates("pet_image_id")
+    merged_min = merged.sort_values("abs_days_mri_to_pet").drop_duplicates(
+        ["subj", "tracer", "pet_date"]
+    )
 
     # Resort the dataframe and reset index before returning
     merged_min = merged_min.sort_values(["subj", "tracer", "pet_date"]).reset_index(
@@ -591,11 +685,70 @@ def find_closest_mri_to_pet(pet_scans, mri_scans):
     return merged_min
 
 
-def audit_pet(pet_scans):
-    """Audit each PET scan and flag scans with potential issues"""
+def get_orphan_mris(mri_scans, pet_scans, max_days_from_present=100):
+    """Flag MRIs that are not used for PET processing"""
+    ii = mri_scans.columns.tolist().index("n_mri_scans")
+    mri_scans.insert(
+        ii + 1,
+        "mri_used_for_pet_proc",
+        mri_scans["mri_image_id"].apply(
+            lambda x: 1 if np.isin(x, pet_scans["mri_image_id"]) else 0
+        ),
+    )
+    today = pd.Timestamp("today")
+    mri_scans.insert(
+        ii + 2,
+        "mri_is_orphan",
+        mri_scans.apply(
+            lambda x: (
+                1
+                if (x["mri_used_for_pet_proc"] == 0)
+                and ((today - x["mri_date"]).days > max_days_from_present)
+                else 0
+            ),
+            axis=1,
+        ),
+    )
+    return mri_scans
+
+
+def audit_pet(
+    pet_scans,
+    audit_pet_res=True,
+    audit_pet_to_mri_days=True,
+    audit_repeat_mri=True,
+    presumed_pet_res=6,
+    max_pet_to_mri_days=365,
+):
+    """Audit each PET scan and flag scans with potential issues
+
+    Parameters
+    ----------
+    pet_scans : pd.DataFrame
+        A DataFrame with columns 'subj', 'tracer', 'pet_date', 'pet_res',
+        'mri_image_id', 'flag', and 'flag_notes'
+    audit_pet_res : bool, optional
+        If True, audit the PET resolution
+    audit_pet_to_mri_days : bool, optional
+        If True, audit the days between PET and MRI scans
+    audit_repeat_mri : bool, optional
+        If True, audit for repeated MRIs used for multiple PET scans
+    presumed_pet_res : int, optional
+        The presumed PET resolution in mm
+    max_pet_to_mri_days : int, optional
+        The maximum allowed number of days between PET and MRI scans
+
+    Returns
+    -------
+    pet_scans_cp : pd.DataFrame
+        A copy of the input DataFrame with added 'flag' and 'flag_notes'
+        columns. Scans with flag==1 have potential issues that need to
+        be resolved before processing. These issues are noted in the
+        'flag_notes' column. Otherwise flag==0 and flag_notes==""
+    """
     pet_scans_cp = pet_scans.copy()
     pet_scans_cp["flag"] = 0
-    pet_scans_cp["notes"] = ""
+    pet_scans_cp["flag_notes"] = ""
 
     # Missing tracer
     idx = pet_scans_cp.loc[
@@ -603,8 +756,8 @@ def audit_pet(pet_scans):
     ].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
     pet_scans_cp.loc[
-        idx, "notes"
-    ] += "Unknown tracer, check raw PET filename against scan_types_and_tracers.csv\n"
+        idx, "flag_notes"
+    ] += "Unknown tracer--check raw PET filename against scan_types_and_tracers.csv; "
 
     # Multiple tracers
     idx = pet_scans_cp.loc[
@@ -612,44 +765,58 @@ def audit_pet(pet_scans):
     ].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
     pet_scans_cp.loc[
-        idx, "notes"
+        idx, "flag_notes"
     ] += (
-        "Matched >1 tracer, check raw PET filename against scan_types_and_tracers.csv\n"
+        "Matched >1 tracer--check raw PET filename against scan_types_and_tracers.csv; "
     )
 
     # Missing PET date
     idx = pet_scans_cp.loc[pd.isna(pet_scans_cp["pet_date"])].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "notes"] += "Missing PET date\n"
+    pet_scans_cp.loc[idx, "flag_notes"] += "Missing PET date; "
 
     # PET resolution unclear or not at 6mm
-    idx = pet_scans_cp.loc[pet_scans_cp["pet_res"] != 6].index.tolist()
-    pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "notes"] += "PET resolution is unclear or not at 6mm\n"
+    if audit_pet_res:
+        idx = pet_scans_cp.loc[
+            pet_scans_cp["pet_res"] != presumed_pet_res
+        ].index.tolist()
+        pet_scans_cp.loc[idx, "flag"] = 1
+        pet_scans_cp.loc[
+            idx, "flag_notes"
+        ] += f"PET resolution could not be parsed or is not at {presumed_pet_res}mm; "
 
     # Missing MRI
     idx = pet_scans_cp.loc[pd.isna(pet_scans_cp).any(axis=1)].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "notes"] += f"No available MRI in {PATHS['raw']}\n"
+    pet_scans_cp.loc[idx, "flag_notes"] += f"No available MRI in {PATHS['raw']}; "
 
-    # PET and MRI scan dates > 365 days apart
-    idx = pet_scans_cp.query("(pet_to_mri_days>365)").index.tolist()
-    pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "notes"] += "Closest MRI is more than 1 year from PET date\n"
+    # PET and MRI scan dates too far apart
+    if audit_pet_to_mri_days:
+        idx = pet_scans_cp.query(
+            f"abs_days_mri_to_pet > {max_pet_to_mri_days}"
+        ).index.tolist()
+        pet_scans_cp.loc[idx, "flag"] = 1
+        pet_scans_cp.loc[
+            idx, "flag_notes"
+        ] += f"Closest MRI is more than {max_pet_to_mri_days} days from PET date; "
 
     # Same MRI used to process multiple PET scans for the same tracer
-    idx = pet_scans_cp.loc[
-        pet_scans_cp.groupby(["subj", "tracer"])["mri_image_id"].transform(
-            lambda x: (
-                True if (np.max(np.unique(x, return_counts=True)[1]) > 1) else False
+    if audit_repeat_mri:
+        idx = pet_scans_cp.loc[
+            pet_scans_cp.groupby(["subj", "tracer"])["mri_image_id"].transform(
+                lambda x: (
+                    True if (np.max(np.unique(x, return_counts=True)[1]) > 1) else False
+                )
             )
-        )
-    ].index.tolist()
-    pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[
-        idx, "notes"
-    ] += "Same MRI would be used to process multiple timepoints for the same PET tracer\n"
+        ].index.tolist()
+        pet_scans_cp.loc[idx, "flag"] = 1
+        pet_scans_cp.loc[
+            idx, "flag_notes"
+        ] += "Same MRI would be used to process multiple timepoints for the same PET tracer; "
 
+    pet_scans_cp["flag_notes"] = pet_scans_cp["flag_notes"].apply(
+        lambda x: x[:-2] if (len(x) >= 2) else x
+    )
     return pet_scans_cp
 
 
@@ -715,44 +882,88 @@ def check_if_pet_processed(pet_proc_dir):
         return 0
 
 
-def get_mri_to_process(used_for_pet, processed, overwrite, process_unused_mris):
+def get_mri_to_process(
+    mri_scan_number,
+    mri_is_orphan,
+    already_processed,
+    baseline_processed,
+    overwrite,
+    process_all_mris,
+):
     """Return 1 if the MRI scan should be processed, otherwise 0"""
-    if process_unused_mris or used_for_pet:
-        if overwrite or not processed:
+    # Don't process MRIs that have already been processed unless
+    # overwrite is True
+    if already_processed and not overwrite:
+        return 0
+
+    # Always process baseline MRIs as later MRIs are coreg'd to them
+    if mri_scan_number == 1:
+        return 1
+
+    # Only process follow-up MRIs if the baseline MRI has been processed
+    if baseline_processed:
+        # Don't process orphan MRIs unless process_all_mris is True
+        if process_all_mris or not mri_is_orphan:
             return 1
-    return 0
+        else:
+            return 0
+    else:
+        return 0
 
 
-def get_pet_to_process(flagged, processed, overwrite):
+def get_pet_to_process(pet_processed, mri_processed, pet_flagged, overwrite):
     """Return 1 if the PET scan should be processed, otherwise 0"""
-    if not flagged:
-        if overwrite or not processed:
-            return 1
-    return 0
+    # Don't process PET scans that have already been processed unless
+    # overwrite is True
+    if pet_processed and not overwrite:
+        return 0
+
+    # Don't process PET scans that have been flagged with issues
+    if pet_flagged:
+        return 0
+
+    # Only process PET scans for which the corresponding MRI has already
+    # been processed
+    if mri_processed:
+        return 1
+    else:
+        return 0
 
 
-def save_mri_scan_index(mri_scans):
+def save_raw_mri_index(mri_scans):
     """Save the MRI scan index to a CSV file"""
     # Move any existing files to archive
     archive_dir = op.join(PATHS["scans_to_process"], "archive")
-    files = glob(op.join(PATHS["scans_to_process"], "Raw_MRI_Scan_Index_*.csv"))
+    files = glob(op.join(PATHS["scans_to_process"], "raw_MRI_index_*.csv"))
     if files:
         if not op.isdir(archive_dir):
             os.makedirs(archive_dir)
         for f in files:
             os.rename(f, op.join(archive_dir, op.basename(f)))
 
+    # Resort the dataframe so we process scans that have already been
+    # run through FreeSurfer first
+    mri_scans = mri_scans.sort_values(
+        [
+            "freesurfer_complete",
+            "subj",
+            "mri_date",
+        ],
+        ascending=[False, True, True],
+    ).reset_index(drop=True)
+
     # Save the mri_scans dataframe
-    outf = op.join(PATHS["scans_to_process"], f"Raw_MRI_Scan_Index_{TIMESTAMP}.csv")
+    outf = op.join(PATHS["scans_to_process"], f"raw_MRI_index_{TIMESTAMP}.csv")
+
     mri_scans.to_csv(outf, index=False)
     print(f"  * Saved raw MRI scan index to {outf}")
 
 
-def save_pet_scan_index(pet_scans):
+def save_raw_pet_index(pet_scans):
     """Save the PET scan index to a CSV file"""
     # Move any existing files to archive
     archive_dir = op.join(PATHS["scans_to_process"], "archive")
-    files = glob(op.join(PATHS["scans_to_process"], "Raw_PET_Scan_Index_*.csv"))
+    files = glob(op.join(PATHS["scans_to_process"], "raw_PET_index_*.csv"))
     if files:
         if not op.isdir(archive_dir):
             os.makedirs(archive_dir)
@@ -760,7 +971,7 @@ def save_pet_scan_index(pet_scans):
             os.rename(f, op.join(archive_dir, op.basename(f)))
 
     # Save the pet_scans dataframe
-    outf = op.join(PATHS["scans_to_process"], f"Raw_PET_Scan_Index_{TIMESTAMP}.csv")
+    outf = op.join(PATHS["scans_to_process"], f"raw_PET_index_{TIMESTAMP}.csv")
     pet_scans.to_csv(outf, index=False)
     print(f"  * Saved raw PET scan index to {outf}")
 
@@ -776,6 +987,15 @@ def _parse_args():
         exit_on_error=False,
     )
     parser.add_argument(
+        "-a",
+        "--all",
+        action="store_true",
+        help=(
+            "Process all MRIs scans in the raw directory, even if they are not the\n"
+            + "closest MRI to any PET scan currently in the raw directory"
+        ),
+    )
+    parser.add_argument(
         "-o",
         "--overwrite",
         action="store_true",
@@ -785,12 +1005,14 @@ def _parse_args():
         ),
     )
     parser.add_argument(
-        "-p",
-        "--process_unused_mris",
-        action="store_true",
+        "-m",
+        "--max_days",
+        type=int,
+        default=100,
         help=(
-            "Process all MRIs scans in the raw directory, even if they are not the\n"
-            + "closest MRI to any PET scan currently in the raw directory"
+            "The maximum number of days from present that an MRI scan can have been acquired\n"
+            + "without being linked to a PET scan before it is considered an orphan and is not\n"
+            + "scheduled for processing when --all is not used"
         ),
     )
 
@@ -803,7 +1025,11 @@ if __name__ == "__main__":
     args = _parse_args()
 
     # Call the main function
-    main(overwrite=args.overwrite, process_unused_mris=args.process_unused_mris)
+    main(
+        process_all_mris=args.all,
+        overwrite=args.overwrite,
+        max_days_from_present=args.max_days,
+    )
 
     # Exit successfully
     sys.exit(0)
