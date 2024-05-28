@@ -1,15 +1,17 @@
-function outfile = coreg_reslice_pet_to_mri(infile, overwrite, nuf, prefix)
+function outfile = coreg_reslice_pet_to_mri(infile, nuf, fid, overwrite, prefix)
     % Coregister and reslice PET scans to the MRI in the same directory.
     %
     % Parameters
     % ----------
     % infile : char|string
     %     Path to the PET image to coregister and reslice to MRI.
-    % overwrite : logical
-    %     If true, overwrite existing files. Default is false
     % nuf : char|string
     %     Path to the MRI to coregister to. If empty, the MRI is looked
     %     for in <pet_dir>/mri
+    % fid : int, optional
+    %     File identifier for logging. Default is 1 for stdout
+    % overwrite : logical
+    %     If true, overwrite existing files. Default is false
     % prefix : char|string, optional
     %     Prefix to append to the output filenames. Default is 'r'
     %
@@ -18,11 +20,11 @@ function outfile = coreg_reslice_pet_to_mri(infile, overwrite, nuf, prefix)
     % outfile : char|string
     %   Path to the coregistered and resliced PET image.
     % ------------------------------------------------------------------
-
     arguments
         infile {mustBeFile}
-        overwrite logical = false
         nuf {mustBeText} = ''
+        fid {mustBeNumeric} = 1
+        overwrite logical = false
         prefix = 'r'
     end
 
@@ -41,14 +43,19 @@ function outfile = coreg_reslice_pet_to_mri(infile, overwrite, nuf, prefix)
     % Check existence of output files
     outfile = add_presuf(infile, prefix);
     if isfile(outfile) && ~overwrite
-        fprintf('- Coregistered PET image exists, will not overwrite\n');
+        log_append(fid, '- Coregistered PET image exists, will not overwrite');
         return
     else
-        fprintf('- Coregistering and reslicing PET to native MRI space:\n')
+        log_append(fid, '- Coregistering and reslicing PET to native MRI space:');
         if ~isempty(prefix)
-            fprintf('  * %s -> %s\n', basename(infile), basename(outfile));
+            msg = sprintf( ...
+                '  * %s ->\n              %s', ...
+                basename(infile), ...
+                basename(outfile) ...
+            );
+            log_append(fid, msg);
         else
-            fprintf('  * %s\n', basename(infile));
+            log_append(fid, sprintf('  * %s', basename(infile)));
         end
     end
 

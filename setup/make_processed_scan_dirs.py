@@ -16,8 +16,6 @@ import pandas as pd
 
 
 def make_processed_scan_dirs(
-    raw_mris=None,
-    raw_pets=None,
     scans_to_process_dir="/mnt/coredata/processing/leads/metadata/scans_to_process",
     overwrite=False,
 ):
@@ -35,28 +33,13 @@ def make_processed_scan_dirs(
     2. Symlinks from processed to raw MRI directory
     3. Creates new processed PET directory
     4. Symlinks from processed to raw PET directory
-    5. Copies raw PET image to processed PET directory and renames it
-    6. Symlinks from processed PET to associated MRI directory
+    5. Symlinks from processed PET to associated MRI directory
 
     Parameters
     ----------
-    raw_mris : DataFrame or str, optional
-        A pandas DataFrame or path to a CSV file with columns
-        'subj', 'mri_date', 'mri_raw_niif', 'mri_proc_dir',
-        'mri_image_id', and 'scheduled_for_processing'. If
-        scheduled_for_processing==0 for a given MRI, it will be skipped.
-        If this argument is None, the most recently saved
-        raw_MRI_index_*.csv file in scans_to_process_dir will be used
-    raw_pets : DataFrame or str, optional
-        A pandas DataFrame or path to a CSV file with columns
-        'subj', 'tracer', 'pet_date', 'pet_raw_niif', 'pet_proc_dir',
-        'mri_image_id', and 'scheduled_for_processing'. If
-        scheduled_for_processing==0 for a given PET scan, it will be
-        skipped. If this argument is None, the most recently saved
-        raw_PET_index_*.csv file in scans_to_process_dir will be used
     scans_to_process_dir : str, optional
-        Path to the directory containing the log files that list the
-        raw MRI and PET scans to be processed
+        Path to the directory containing CSV files that list the MRI and
+        PET scans in 'raw' that are scheduled to be processed
     overwrite : bool, optional
         If True, remove and recreate any existing processed MRI and PET
         directories that are scheduled to be processed. Note that this
@@ -69,7 +52,6 @@ def make_processed_scan_dirs(
     None
     """
 
-    # Load the most recently saved raw_mris spreadsheet if not provided
     def print_tag(scan_tag, already_printed=False):
         """Print the scan tag if it hasn't already been printed"""
         if already_printed:
@@ -79,13 +61,27 @@ def make_processed_scan_dirs(
             already_printed = True
             return already_printed
 
-    if raw_mris is None:
+    # Load the most recently modified raw_MRI_index* CSV file in
+    # scans_to_process_dir
+    try:
         raw_mrisf = glob_sort_mtime(
-            op.join(scans_to_process_dir, "raw_MRI_index_*.csv")
+            op.join(scans_to_process_dir, "raw_MRI_index*.csv")
         )[0]
-    elif isinstance(raw_mris, str):
-        raw_mrisf = raw_mris
+    except IndexError:
+        print(f"ERROR: No raw_MRI_index*.csv file found in {scans_to_process_dir}")
+        sys.exit(1)
     raw_mris = pd.read_csv(raw_mrisf)
+
+    # Load the most recently saved raw_PET_index* CSV file in
+    # scans_to_process_dir
+    try:
+        raw_petsf = glob_sort_mtime(
+            op.join(scans_to_process_dir, "raw_PET_index*.csv")
+        )[0]
+    except IndexError:
+        print(f"ERROR: No raw_PET_index_*.csv file found in {scans_to_process_dir}")
+        sys.exit(1)
+    raw_pets = pd.read_csv(raw_petsf)
 
     # Loop over each MRI to be processed and setup the processed
     # directory structure
@@ -133,15 +129,6 @@ def make_processed_scan_dirs(
                     f"!!  - {link_dst} ALREADY EXISTS BUT POINTS TO {op.realpath(link_dst)}; EXPECTED LOCATION IS {link_src}"
                 )
                 count_problems_mri += 1
-
-    # Load the most recently saved raw_pets spreadsheet if not provided
-    if raw_pets is None:
-        raw_petsf = glob_sort_mtime(
-            op.join(scans_to_process_dir, "raw_PET_index_*.csv")
-        )[0]
-    elif isinstance(raw_pets, str):
-        raw_petsf = raw_pets
-    raw_pets = pd.read_csv(raw_petsf)
 
     # Loop over each PET scan to be processed and setup the processed
     # directory structure
@@ -208,13 +195,13 @@ def make_processed_scan_dirs(
                 )
                 count_problems_pet += 1
 
-        # Copy the raw PET file to the processed PET directory
-        infile = scan["pet_raw_niif"]
-        outfile = op.join(scan["pet_proc_dir"], f"{pet_tag}.nii")
-        if not op.isfile(outfile):
-            already_printed = print_tag(pet_tag, already_printed)
-            shutil.copy(infile, outfile)
-            print(f"    $ cp {infile} {outfile}")
+        # # Copy the raw PET file to the processed PET directory
+        # infile = scan["pet_raw_niif"]
+        # outfile = op.join(scan["pet_proc_dir"], f"{pet_tag}.nii")
+        # if not op.isfile(outfile):
+        #     already_printed = print_tag(pet_tag, already_printed)
+        #     shutil.copy(infile, outfile)
+        #     print(f"    $ cp {infile} {outfile}")
 
         # Create a symlink to the processed MRI directory
         link_src = mri_proc_dir
@@ -275,22 +262,6 @@ def _parse_args():
         exit_on_error=False,
     )
     parser.add_argument(
-        "--raw_mris",
-        type=str,
-        help=(
-            "Path to the raw MRI scan CSV file that lists which MRIs will be processed\n"
-            + "If None, the most recently saved raw_MRI_index_*.csv in scans_to_process_dir will be used"
-        ),
-    )
-    parser.add_argument(
-        "--raw_pets",
-        type=str,
-        help=(
-            "Path to the raw PET scan CSV file that lists which PET scans will be processed\n"
-            + "If None, the most recently saved raw_PET_index_*.csv file in scans_to_process_dir will be used"
-        ),
-    )
-    parser.add_argument(
         "--scans_to_process_dir",
         type=str,
         default="/mnt/coredata/processing/leads/metadata/scans_to_process",
@@ -313,8 +284,6 @@ if __name__ == "__main__":
 
     # Call the main function
     make_processed_scan_dirs(
-        raw_mris=args.raw_mris,
-        raw_pets=args.raw_pets,
         scans_to_process_dir=args.scans_to_process_dir,
         overwrite=args.overwrite,
     )

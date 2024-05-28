@@ -13,7 +13,7 @@ import sys
 from glob import glob
 
 
-def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, cleanup=True):
+def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, wipe_newdata=True):
     """Move scans from newdata to raw, keeping file hierarchies intact
 
     Parameters
@@ -29,7 +29,7 @@ def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, cleanup=True):
         If True, overwrite existing scan directories in raw_dir with
         directories from newdata_dir. If False, skip existing
         directories.
-    cleanup : bool
+    wipe_newdata : bool
         If True, remove all files and folders from newdata_dir after
         moving everything eligible to be moved to raw_dir.
 
@@ -52,9 +52,6 @@ def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, cleanup=True):
     newdata_dir = op.abspath(newdata_dir)
     raw_dir = op.abspath(raw_dir)
 
-    # Print the welcome message
-    print(f"- Moving scans from {newdata_dir} to {raw_dir}")
-
     # Find all niftis in newdata
     check_exts = (".nii", ".nii.gz")
     glob_files = []
@@ -64,7 +61,7 @@ def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, cleanup=True):
     # If no niftis are found, print a message and return
     if len(glob_files) == 0:
         print(f"  * No niftis found in {newdata_dir}")
-        if cleanup:
+        if wipe_newdata:
             do_cleanup()
         print("")
         return
@@ -104,7 +101,7 @@ def move_newdata_to_raw(newdata_dir, raw_dir, overwrite=False, cleanup=True):
     print(f"  * Done; {count} scan directories moved to raw")
 
     # Clean up empty directories in newdata
-    if cleanup:
+    if wipe_newdata:
         do_cleanup()
 
 
@@ -141,7 +138,10 @@ def _parse_args():
         "-o", "--overwrite", action="store_true", help="Overwrite existing files in raw"
     )
     parser.add_argument(
-        "--no-clean", action="store_true", help="Don't remove files from newdata"
+        "--no-wipe-newdata",
+        action="store_false",
+        dest="wipe_newdata",
+        help="Don't wipe 'newdata' after moving scans to 'raw'",
     )
 
     # Parse the command line arguments
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         newdata_dir=args.newdata,
         raw_dir=args.raw,
         overwrite=args.overwrite,
-        cleanup=not args.no_clean,
+        wipe_newdata=args.wipe_newdata,
     )
 
     # Exit successfully

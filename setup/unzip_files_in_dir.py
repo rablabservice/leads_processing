@@ -32,12 +32,12 @@ def fast_unzip_dir(source_dir):
 
     # Unzip the files, parallelizing if there are multiple .zip files
     if len(zip_files) == 0:
-        print(f"- No files to unzip in {source_dir}")
+        print(f"  * No files to unzip in {source_dir}")
     elif len(zip_files) == 1:
-        print(f"- Scanning {source_dir}, found 1 file to unzip...")
+        print(f"  * Found 1 file to unzip in {source_dir}")
         unzip_file(zip_files[0], source_dir)
     else:
-        print(f"- Scanning {source_dir}, found {len(zip_files)} files to unzip...")
+        print(f"  * Found {len(zip_files)} files to unzip in {source_dir}")
         max_workers = min(16, len(zip_files))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_zip = {
@@ -67,7 +67,7 @@ def unzip_file(zipf, target_dir=None):
     with zipfile.ZipFile(zipf) as zf:
         try:
             zf.extractall(target_dir)
-            msg = f"  * Unzipped {zipf}"
+            msg = f"    - Unzipped {zipf}"
             if target_dir is not None:
                 msg += f" to {target_dir}"
             print(msg)

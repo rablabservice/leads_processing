@@ -47,10 +47,16 @@ function outfiles = copy_convert_freesurfer(mri_dir, fid, overwrite)
         if isfile(mgzf)
             if overwrite || ~isfile(niif)
                 cmd = sprintf('%s %s %s', mri_convert, mgzf, niif);
-                log_append(fid, sprintf('  * %s -> %s', basename(mgzf), basename(niif)));
-                run_system(cmd, fid);
+                msg = sprintf( ...
+                    '  * %s ->\n              %s', ...
+                    basename(mgzf), ...
+                    basename(niif) ...
+                );
+                log_append(fid, msg);
+                run_system(cmd, 1, false, true);
             else
-                log_append(fid, sprintf('  * %s exists, will not overwrite', basename(niif)));
+                msg = sprintf('  * %s exists, will not overwrite', basename(niif));
+                log_append(fid, msg);
             end
         end
         % Keep only outfiles that exist

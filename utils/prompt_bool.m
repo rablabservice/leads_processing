@@ -38,7 +38,7 @@ function response = prompt_bool( ...
     % Enter the prompt loop
     if require_response
         % Format the question
-        yes_no_question_full = append(yes_no_question, ' (y/n)\n\n>> ');
+        yes_no_question_full = append(yes_no_question, ' (y/n)\n>> ');
 
         % Prompt the user
         user_response = input(yes_no_question_full, 's');
@@ -54,7 +54,7 @@ function response = prompt_bool( ...
         user_response = lower(user_response(1));
 
         % Parse the response
-        if user_response == 'y'
+        if strcmp(user_response, 'y')
             if ask_twice
                 ask_twice = false;
                 confirmed = prompt_bool(dbl_check, xx, require_response, ask_twice);
@@ -69,7 +69,7 @@ function response = prompt_bool( ...
             else
                 response = true;
             end
-        elseif user_response == 'n'
+        elseif strcmp(user_response, 'n')
             if ask_twice
                 ask_twice = false;
                 confirmed = prompt_bool(dbl_check, xx, require_response, ask_twice);
@@ -98,7 +98,7 @@ function response = prompt_bool( ...
         else
             yes_no_question_full = append(yes_no_question, ' (default=n)');
         end
-        yes_no_question_full = append(yes_no_question_full, ' (y/n)\n\n>> ');
+        yes_no_question_full = append(yes_no_question_full, ' (y/n)\n>> ');
 
         % Prompt the user
         user_response = input(yes_no_question_full, 's');
@@ -113,9 +113,9 @@ function response = prompt_bool( ...
 
         % Parse the response
         if default_response
-            if user_response == 'y'
+            if strcmp(user_response, 'y')
                 return
-            elseif user_response == 'n'
+            elseif strcmp(user_response, 'n')
                 if ask_twice
                     require_response = true;
                     ask_twice = false;
@@ -130,9 +130,9 @@ function response = prompt_bool( ...
                 );
             end
         else
-            if user_response == 'n'
+            if strcmp(user_response, 'n')
                 return
-            elseif user_response == 'y'
+            elseif strcmp(user_response, 'y')
                 if ask_twice
                     require_response = true;
                     ask_twice = false;

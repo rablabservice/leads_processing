@@ -47,8 +47,8 @@ function [atlasf, out_dir] = format_mask_inputs(atlasf, in_dir, out_dir)
         else
             in_dir = abspath(in_dir);
         end
-        mrifs = get_freesurfer_files(in_dir);
-        atlasf = mrifs.aparc;
+        mri_files = get_freesurfer_files(in_dir);
+        atlasf = mri_files.aparc;
     else
         atlasf = abspath(atlasf);
     end

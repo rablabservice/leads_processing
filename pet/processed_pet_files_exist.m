@@ -1,9 +1,9 @@
-function all_exist = processed_mri_files_exist(mri_dir)
+function all_exist = processed_pet_files_exist(pet_dir)
     % Return true if all freesurfer directory is complete
     %
     % Parameters
     % ----------
-    % mri_dir : char or str
+    % pet_dir : char or str
     %     The directory that contains the processed MRI data
     %
     % Returns
@@ -12,9 +12,9 @@ function all_exist = processed_mri_files_exist(mri_dir)
     %    true if all processed MRI files are present, else false
     % ------------------------------------------------------------------
     arguments
-        mri_dir {mustBeText} = ''
+        pet_dir {mustBeText} = ''
     end
 
-    mri_files = get_processed_mri_files(mri_dir);
+    pet_files = get_processed_pet_files(pet_dir);
 
-    all_exist = all(isfile(cellvec(mri_files)));
+    all_exist = all(isfile(cellvec(pet_files)));

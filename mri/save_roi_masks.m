@@ -41,9 +41,9 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
 
     % Format parameters
     if ~isempty(mri_dir)
-        mrifs = get_freesurfer_files(mri_dir);
-        aparcf = mrifs.aparc;
-        bstemf = mrifs.bstem;
+        mri_files = get_freesurfer_files(mri_dir);
+        aparcf = mri_files.aparc;
+        bstemf = mri_files.bstem;
     else
         aparcf = abspath(aparcf);
         bstemf = abspath(bstemf);

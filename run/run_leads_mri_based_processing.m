@@ -55,27 +55,35 @@ restoredefaultpath;
 addpath("/home/mac/dschonhaut/code/matlab/spm12");
 addpath("/home/mac/dschonhaut/code/matlab/spm12/toolbox");
 addpath("/home/mac/dschonhaut/code/matlab/spm12/toolbox/suit");
-addpath(genpath("/mnt/coredata/processing/leads/code"));
+addpath(genpath(fileparts(fileparts(mfilename('fullpath')))));
 
 % Define defaults
 proj_dir = "/mnt/coredata/processing/leads";
 scans_to_process_dir = fullfile(proj_dir, 'metadata', 'scans_to_process');
+skip_newdata = false;
+wipe_newdata = true;
+setup_processed = true;
+dry_run = false;
+schedule_all_mris = false;
+overwrite_raw = false;
+schedule_overwrite = false;
+overwrite_processed = false;
 overwrite = false;
-cleanup_newdata = true;
-process_all_mris = false;
+mri_dirs = {};
 segment_brainstem = true;
 process_freesurfer = true;
 process_post_freesurfer = true;
+pet_dirs = {};
 
 % Figure out what the user wants to do
 prompt_user = sprintf([
     '\n~ Welcome to the LEADS processing pipeline ~\n\n', ...
-    'What do you want to do?\n', ...
+    'What would you like to do?\n', ...
     '  [1] Setup scans for processing\n', ...
-    '  [2] View scans that are scheduled for processing (but don''t do anything)\n', ...
-    '  [3] Process MRIs\n', ...
-    '  [4] Process PET scans\n', ...
-    '  [5] Nothing, I was just curious what happens when I run this script\n\n', ...
+    '  [2] View scans that are scheduled for processing\n', ...
+    '  [3] Process scheduled MRIs\n', ...
+    '  [4] Process scheduled PET scans\n', ...
+    '  [5] Nothing, I would like to exit this program now...\n\n', ...
     '>> '
 ]);
 action = input(prompt_user);
@@ -86,55 +94,196 @@ overwrite_msg = 'Overwrite existing files?';
 switch action
     case 1
         fprintf('\nDefault parameters\n------------------\n');
-        fprintf('Project directory                           = %s\n', proj_dir);
-        fprintf('Overwrite existing files                    = %d\n', overwrite);
-        fprintf('Cleanup newdata after moving scans          = %d\n', cleanup_newdata);
-        fprintf('Process all MRIs in raw (including orphans) = %d\n', process_all_mris);
+        fprintf('Project directory                                                  = %s\n', proj_dir);
+        fprintf('Skip the ''newdata'' -> ''raw'' submodule?                             = %d\n', skip_newdata);
+        fprintf('Wipe ''newdata'' after moving scans to ''raw''                         = %d\n', wipe_newdata);
+        fprintf('Do a dry run (summarize but do not schedule scans yet)             = %d\n', dry_run);
+        fprintf('Schedule all unprocessed MRIs in ''raw'' (including orphans)         = %d\n', schedule_all_mris);
+        fprintf('Setup ''processed'' directories for scheduled scans                  = %d\n', setup_processed);
+        fprintf('Overwrite existing directories when moving ''newdata'' -> ''raw''      = %d\n', overwrite_raw);
+        fprintf('Schedule already processed scans to be reprocessed                 = %d\n', schedule_overwrite);
+        fprintf('Remove processed directories for scans scheduled to be reprocessed = %d\n', overwrite_processed);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
-            proj_dir = prompt_text('Enter path to project directory', proj_dir, true);
-            overwrite = prompt_bool(overwrite_msg, false, false, true);
-            cleanup_newdata = prompt_bool('Wipe ''newdata'' after moving scans to ''raw''?', true);
-            process_all_mris = prompt_bool('Process all MRIs in ''raw'' (even orphans)?', false);
+            require_response = false;
+            confirm_response = true;
+            proj_dir = prompt_text('Enter path to project directory', proj_dir, confirm_response);
+            skip_newdata = prompt_bool('Skip ''newdata'' -> ''raw''?', false);
+            if ~skip_newdata
+                wipe_newdata = prompt_bool('Wipe ''newdata'' after moving scans?', true);
+            end
+            dry_run = prompt_bool('Do a dry run?', dry_run);
+            schedule_all_mris = prompt_bool('Schedule all unprocessed MRIs?', schedule_all_mris);
+            if ~dry_run
+                setup_processed = prompt_bool('Setup scheduled scans in ''processed''?', true);
+                if ~skip_newdata
+                    overwrite_raw = prompt_bool('Overwrite scans in ''raw''?', overwrite_raw, require_response, confirm_response);
+                end
+                schedule_overwrite = prompt_bool('Schedule scans to be reprocessed?', schedule_overwrite, require_response, confirm_response);
+                if setup_processed
+                    overwrite_processed = prompt_bool('Overwrite scans in ''processed''?', overwrite_processed, require_response, confirm_response);
+                end
+            end
         end
         proj_dir = abspath(proj_dir);
         mustBeFolder(proj_dir);
-        setup_leads_processing(proj_dir, overwrite, cleanup_newdata, process_all_mris);
-    case 2
-        fprintf('\nDefaults parameters\n-------------------\n');
-        fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
-        change_defaults = prompt_bool(change_defaults_msg, false);
-        if change_defaults
-            scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+        if schedule_overwrite && setup_processed && overwrite_processed
+            proceed_knowingly = prompt_bool('!! PLEASE BE CAREFUL. You are about to remove and reset already processed scans in ''processed''. Are you sure you want to do this?', false, true, true);
+            if ~proceed_knowingly
+                fprintf('OK--let''s get out of this scary situation...\n');
+                return;
+            end
         end
+        fprintf('\nCalling setup_leads_processing.m...\n');
+        setup_leads_processing( ...
+            proj_dir, ...
+            skip_newdata, ...
+            wipe_newdata, ...
+            setup_processed, ...
+            dry_run, ...
+            schedule_all_mris, ...
+            overwrite_raw, ...
+            schedule_overwrite, ...
+            overwrite_processed ...
+        );
+    case 2
+        fprintf('\nCalling queue_mris_to_process.m...\n');
         queue_mris_to_process(scans_to_process_dir);
+        fprintf('\nCalling queue_pets_to_process.m...\n');
         queue_pets_to_process(scans_to_process_dir);
     case 3
         fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('MRIs to process                                   = By default, this program will attempt to process all    \n');
+        fprintf('                                                    scheduled MRIs, but it is possible to override this     \n');
+        fprintf('                                                    behavior and provide an exact list of scans you want to \n');
+        fprintf('                                                    process. Note that if you intend to overwrite already   \n');
+        fprintf('                                                    processed files, you still need to specify overwrite = 1\n');
+        fprintf('                                                    or nothing will happen                                  \n');
         fprintf('Overwrite existing files                          = %d\n', overwrite);
         fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
-        fprintf('Segment brainstem                                 = %d\n', segment_brainstem);
         fprintf('Run FreeSurfer processing                         = %d\n', process_freesurfer);
-        fprintf('Run post-FreeSurfer processing                    = %d\n', process_post_freesurfer);
+        fprintf('Segment brainstem                                 = %d\n', segment_brainstem);
+        fprintf('Run post-FreeSurfer, SPM-based processing         = %d\n', process_post_freesurfer);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
+            set_mri_dirs = prompt_bool('Specify a list of MRIs to process?', false);
+            if set_mri_dirs
+                response = prompt_text( ...
+                    'Enter path to the first MRI you want to process', ...
+                    '', ...
+                    false ...
+                );
+                if ~isfolder(response)
+                    fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                else
+                    mri_dirs = [mri_dirs, response]
+                end
+
+                while 1
+                    msg = sprintf('Enter path to the next MRI you want to process, or type ''q'' to move on\n');
+                    response = prompt_text(msg, '', false);
+                    if strcmp(lower(response(1)), 'q')
+                        break;
+                    elseif ~isfolder(response)
+                        fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                    else
+                        mri_dirs = [mri_dirs, response]
+                    end
+                end
+                mri_dirs = unique(abspath(cellvec(mri_dirs)));
+
+                % Confirm the submitted directories
+                n_scans = length(pet_dirs);
+                fprintf('\nYou have submitted the following %d MRI scan directories to process:\n', n_scans);
+                for i = 1:n_scans
+                    fprintf('  %s\n', mri_dirs{i});
+                end
+                confirm_response = prompt_bool('Is this correct?', false, true);
+                if ~confirm_response
+                    fprintf('OK--let''s exit the program and try again...\n');
+                    return;
+                end
+            end
             overwrite = prompt_bool(overwrite_msg, false, false, true);
-            scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
-            segment_brainstem = prompt_bool('Segment brainstem?', true);
+            if isempty(mri_dirs)
+                scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+            end
             process_freesurfer = prompt_bool('Process MRIs through FreeSurfer?', true);
+            if process_freesurfer
+                segment_brainstem = prompt_bool('Segment brainstem?', true);
+            end
             process_post_freesurfer = prompt_bool('Run post-FreeSurfer MRI processing?', true);
         end
-        process_mris(overwrite, scans_to_process_dir, segment_brainstem, process_freesurfer, process_post_freesurfer);
+        fprintf('\nCalling process_mris.m...\n');
+        process_mris( ...
+            mri_dirs, ...
+            scans_to_process_dir, ...
+            overwrite, ...
+            segment_brainstem, ...
+            process_freesurfer, ...
+            process_post_freesurfer ...
+        );
     case 4
         fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('PET scans to process                              = By default, this program will attempt to process all     \n');
+        fprintf('                                                    scheduled PETs scans, but it is possible to override this\n');
+        fprintf('                                                    behavior and provide an exact list of scans you want to  \n');
+        fprintf('                                                    process. Note that if you intend to overwrite already    \n');
+        fprintf('                                                    processed files, you still need to specify overwrite = 1 \n');
+        fprintf('                                                    or nothing will happen                                   \n');
         fprintf('Overwrite existing files                          = %d\n', overwrite);
         fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
+            set_pet_dirs = prompt_bool('Specify a list of PET scans to process?', false);
+            if set_pet_dirs
+                response = prompt_text( ...
+                    'Enter path to the first PET scan you want to process', ...
+                    '', ...
+                    false ...
+                );
+                if ~isfolder(response)
+                    fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                else
+                    pet_dirs = [pet_dirs, response]
+                end
+
+                while 1
+                    msg = sprintf('Enter path to the next PET scan you want to process, or type ''q'' to move on\n');
+                    response = prompt_text(msg, '', false);
+                    if strcmp(lower(response(1)), 'q')
+                        break;
+                    elseif ~isfolder(response)
+                        fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                    else
+                        pet_dirs = [pet_dirs, response]
+                    end
+                end
+                pet_dirs = unique(abspath(cellvec(pet_dirs)));
+
+                % Confirm the submitted directories
+                n_scans = length(pet_dirs);
+                fprintf('\nYou have submitted the following %d PET scan directories to process:\n', n_scans);
+                for i = 1:n_scans
+                    fprintf('  %s\n', pet_dirs{i});
+                end
+                confirm_response = prompt_bool('Is this correct?', false, true);
+                if ~confirm_response
+                    fprintf('OK--let''s exit the program and try again...\n');
+                    return;
+                end
+            end
             overwrite = prompt_bool(overwrite_msg, false, false, true);
-            scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+            if isempty(pet_dirs)
+                scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+            end
         end
-        process_pets(overwrite, scans_to_process_dir);
+        fprintf('\nCalling process_pets.m...\n');
+        process_pets( ...
+            pet_dirs, ...
+            scans_to_process_dir, ...
+            overwrite ...
+        );
     case 5
         fprintf('Ok\n');
     otherwise

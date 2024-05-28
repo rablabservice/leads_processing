@@ -1,5 +1,5 @@
 function output = roi_desc(scanfs, maskfs, subrois, aggf)
-    % Calculate descriptive statistics for within masked voxels
+    % Calculate descriptive statistics for within masked voxel_count
     %
     % Parameters
     % ----------
@@ -45,10 +45,10 @@ function output = roi_desc(scanfs, maskfs, subrois, aggf)
     aggf_names = fieldnames(aggfs);
     n_aggfs = numel(aggf_names);
     if n_subrois > 0
-        cols = cat(1, {'scan'; 'aparc'; 'roi'}, aggf_names, {'voxels'});
+        cols = cat(1, {'image_file'; 'aparc_file'; 'roi'}, aggf_names, {'voxel_count'});
         n_rows = n_scanfs * n_subrois * n_aggfs;
     else
-        cols = cat(1, {'scan'; 'mask'; 'roi'}, aggf_names, {'voxels'});
+        cols = cat(1, {'image_file'; 'mask_file'}, aggf_names, {'voxel_count'});
         n_rows = n_scanfs * n_maskfs * n_aggfs;
     end
     n_cols = numel(cols);
@@ -77,10 +77,10 @@ function output = roi_desc(scanfs, maskfs, subrois, aggf)
                 % Check that dat and mask have equal shape
                 assert(isequal(dat_shp, mask_shp), 'Data and mask shape must be equal');
 
-                % Select voxels that are finite and within the mask
+                % Select voxel_count that are finite and within the mask
                 mask_is_gt0 = mask > 0;
 
-                % Calculate the number of voxels in the mask
+                % Calculate the number of voxel_count in the mask
                 mask_vol = sum(mask_is_gt0);
 
                 % Select values to aggregate over
@@ -94,7 +94,7 @@ function output = roi_desc(scanfs, maskfs, subrois, aggf)
                     aggf_val = aggf(dat_mask);
 
                     % Append value to the output array
-                    outrow = {scanf, maskf, aggf_name, aggf_val, mask_vol};
+                    outrow = {scanf, maskf, aggf_val, mask_vol};
                     output(iRow, :) = outrow;
                     iRow = iRow + 1;
                 end

@@ -1,8 +1,13 @@
 function setup_leads_processing( ...
     proj_dir, ...
-    overwrite, ...
-    cleanup_newdata, ...
-    process_all_mris ...
+    skip_newdata, ...
+    wipe_newdata, ...
+    setup_processed, ...
+    dry_run, ...
+    schedule_all_mris, ...
+    overwrite_raw, ...
+    schedule_overwrite, ...
+    overwrite_processed ...
 )
     % Setup the LEADS processing pipeline.
     %
@@ -32,16 +37,17 @@ function setup_leads_processing( ...
     %          'raw' that points back to the relevant raw data directory
     %     II.  Each PET scan is also linked to its closest MRI scan,
     %          to which it will later be coregistered
-    %     III. PET niftis are copied from raw to processed, where they
-    %          are renamed with standard naming conventions
-    %     IV.  MRI files are not copied from raw to processed, because
-    %          FreeSurfer will do this as part of recon-all
     % ------------------------------------------------------------------
     arguments
         proj_dir {mustBeFolder} = '/mnt/coredata/processing/leads'
-        overwrite logical = false
-        cleanup_newdata logical = true
-        process_all_mris logical = false
+        skip_newdata logical = false
+        wipe_newdata logical = true
+        setup_processed logical = true
+        dry_run logical = false
+        schedule_all_mris logical = false
+        overwrite_raw logical = false
+        schedule_overwrite logical = false
+        overwrite_processed logical = false
     end
 
     % Print the module header
@@ -52,47 +58,49 @@ function setup_leads_processing( ...
 
     % Format paths to project directories
     proj_dir = abspath(proj_dir);
-    data_dir = fullfile(proj_dir, 'data');
-    newdata_dir = fullfile(data_dir, 'newdata');
-    raw_dir = fullfile(data_dir, 'raw');
+    newdata_dir = fullfile(proj_dir, 'data', 'newdata');
+    raw_dir = fullfile(proj_dir, 'data', 'raw');
     scans_to_process_dir = fullfile(proj_dir, 'metadata', 'scans_to_process');
+    code_dir = fullfile(proj_dir, 'code');
 
     % Get path to the Python interpreter
     python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python ';
 
-    % Note that Python scripts that we need to run must be in the same
-    % directory as this calling script
-    code_dir = fileparts(mfilename('fullpath'));
-
     % Part I: newdata -> raw
     % Unzip any zip files in newdata, convert dicoms to nifti, and move
     % scan directories from newdata to raw
-    newdatafs = dir(newdata_dir);
-    newdatafs = newdatafs(~startsWith({newdatafs.name}, '.'));
-    if isempty(newdatafs)
-        fprintf('- %s is empty, skipping ahead\n', newdata_dir);
-    else
-        % Unzip newdata files
-        cmd = append(python, fullfile(code_dir, 'unzip_files_in_dir.py'));
-        cmd = append(cmd, ' -d ', newdata_dir);
-        system(cmd);
+    if ~skip_newdata
+        newdatafs = dir(newdata_dir);
+        newdatafs = newdatafs(~startsWith({newdatafs.name}, '.'));
+        if isempty(newdatafs)
+            fprintf('- %s is empty, skipping ahead\n', newdata_dir);
+        else
+            % Unzip newdata files
+            cmd = append(python, fullfile(code_dir, 'setup', 'unzip_files_in_dir.py'));
+            cmd = append(cmd, ' -d ', newdata_dir);
+            fprintf('- Unzipping zip files\n');
+            fprintf('  (unzip_files_in_dir.py)\n');
+            system(cmd);
 
-        % Convert dicoms to nifti
-        fprintf('- Converting newdata dicoms to nifti\n');
-        convert_dicoms(newdata_dir);
+            % Convert dicoms to nifti
+            fprintf('- Converting newdata dicoms to nifti\n');
+            fprintf('  (convert_dicoms.m)\n');
+            convert_dicoms(newdata_dir);
 
-        % Move scans from newdata to raw
-        cmd = append(python, fullfile(code_dir, 'move_newdata_to_raw.py'));
-        cmd = append(cmd, ' --newdata ', newdata_dir);
-        cmd = append(cmd, ' --raw ', raw_dir);
-        if overwrite
-            cmd = append(cmd, ' -o');
+            % Move scans from newdata to raw
+            cmd = append(python, fullfile(code_dir, 'setup', 'move_newdata_to_raw.py'));
+            cmd = append(cmd, ' --newdata ', newdata_dir);
+            cmd = append(cmd, ' --raw ', raw_dir);
+            if overwrite_raw
+                cmd = append(cmd, ' -o');
+            end
+            if ~wipe_newdata
+                cmd = append(cmd, ' --no-clean');
+            end
+            fprintf('- Moving scans from ''newdata'' to ''raw''\n');
+            fprintf('  (move_newdata_to_raw.py)\n');
+            system(cmd);
         end
-        if ~cleanup_newdata
-            cmd = append(cmd, ' --no-clean');
-        end
-        fprintf('  $ %s', cmd);
-        system(cmd);
     end
 
     % Part II: raw -> processed
@@ -101,29 +109,40 @@ function setup_leads_processing( ...
 
     % Save CSVs files of MRI and PET scans in the raw directory, and
     % indicate which scans are scheduled for processing
-    cmd = append(python, fullfile(code_dir, 'select_scans_to_process.py'));
-    if process_all_mris
+    cmd = append(python, fullfile(code_dir, 'setup', 'select_scans_to_process.py'));
+    cmd = append(cmd, ' -p ', proj_dir);
+    if schedule_all_mris
         cmd = append(cmd, ' -a');
     end
-    if overwrite
+    if schedule_overwrite
         cmd = append(cmd, ' -o');
     end
-    fprintf('- Selecting scans to process\n');
+    if dry_run
+        cmd = append(cmd, ' --no-save-csv');
+    end
+    if dry_run
+        fprintf('- Scheduling scans to process (dry run, no CSVs will be saved)\n');
+    else
+        fprintf('- Scheduling scans to process\n');
+    end
+    fprintf('  (select_scans_to_process.py)\n');
     system(cmd);
 
     % Create processed scan directories for MRI and PET scans that need
     % to be processed, link each PET scan to its closest MRI, and copy
     % PET niftis from their raw to processed directories
-    cmd = append(python, fullfile(code_dir, 'make_processed_scan_dirs.py'));
-    cmd = append(cmd, ' --scans_to_process_dir ', scans_to_process_dir);
-    if overwrite
-        cmd = append(cmd, ' -o');
+    if setup_processed && ~dry_run
+        cmd = append(python, fullfile(code_dir, 'setup', 'make_processed_scan_dirs.py'));
+        cmd = append(cmd, ' --scans_to_process_dir ', scans_to_process_dir);
+        if overwrite_processed
+            cmd = append(cmd, ' -o');
+        end
+        fprintf('- Setting up scan directories ahead of processing\n');
+        fprintf('  (make_processed_scan_dirs.py)\n');
+        system(cmd);
     end
-    fprintf('- Setting up scan directories ahead of processing\n');
-    system(cmd);
 
     % Print the module footer
     fprintf('\n----------------\n');
     fprintf('END SETUP MODULE\n\n');
-
 end

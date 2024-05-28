@@ -44,7 +44,7 @@ function outfiles = process_mri_freesurfer( ...
     % the struct of FreeSurfer *.mgz files that we care about and return
     if freesurfer_files_exist(mri_dir)
         if overwrite
-            log_append(sprintf('- Removing existing FreeSurfer directory: %s', fs_dir));
+            log_append(fid, sprintf('- Removing existing FreeSurfer directory: %s', fs_dir));
             rmdir(fs_dir, 's');
         else
             log_append(fid, '- FreeSurfer processing already complete, will not rerun');

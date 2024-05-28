@@ -1,5 +1,6 @@
-function mrifs = get_processed_mri_files(mri_dir)
-    % Check which processed MRI files exist for a given MRI directory
+function mri_files = get_processed_mri_files(mri_dir)
+    % Return a struct of all processed MRI files for a selected scan
+    % that should exist after processing is complete
     %
     % Parameters
     % ----------
@@ -8,12 +9,8 @@ function mrifs = get_processed_mri_files(mri_dir)
     %
     % Returns
     % -------
-    % mrifs_exist : struct
-    %     A struct containing the paths to the processed MRI files that
-    %     exist
-    % mrifs_missing : struct
-    %     A struct containing the paths to the processed MRI files that
-    %     do not exist
+    % mri_files : struct
+    %     A struct containing the paths to the processed MRI files
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeText} = ''
@@ -24,7 +21,7 @@ function mrifs = get_processed_mri_files(mri_dir)
     scan_tag = get_scan_tag(mri_dir);
 
     % Define the processed MRI files
-    mrifs = struct( ...
+    mri_files = struct( ...
         'nu', fullfile( ...
             mri_dir, append(scan_tag, '_nu.nii') ...
         ), ...

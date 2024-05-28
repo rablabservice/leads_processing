@@ -46,4 +46,36 @@ function mri_dirs = queue_mris_to_process(scans_to_process_dir)
         fprintf('    ...including %d already processed MRIs from %d subjects that will be reprocessed\n', n_scans_to_reprocess, n_subjs_to_reprocess);
     end
     fprintf('\n');
+
+    % Print the full list of scans to process, separating each scan by a
+    % space and adding a newline when adding the next scan causes
+    % the current line length to exceed max_line
+    max_line = 115;
+    current_line = '';
+    scan_tags = cellfun(@get_scan_tag, mri_dirs, 'UniformOutput', false);
+    fprintf('All MRIs scheduled to be processed:\n');
+    for i = 1:length(scan_tags)
+        new_entry = scan_tags{i};
+        if isempty(current_line)
+            new_line = new_entry;
+        else
+            new_line = append(current_line, '  ', new_entry);
+        end
+
+        % Check if the new line length exceeds max_line
+        if length(new_line) > max_line
+            % Print the current line and start a new one
+            fprintf('%s\n', current_line);
+            current_line = new_entry;
+        else
+            % Update the current line
+            current_line = new_line;
+        end
+    end
+
+    % Print any remaining text in the current line
+    if ~isempty(current_line)
+        fprintf('%s\n', current_line);
+    end
+    fprintf('\n');
 end

@@ -67,4 +67,36 @@ function pet_dirs = queue_pets_to_process(scans_to_process_dir)
         end
         fprintf('\n');
     end
+
+    % Print the full list of scans to process, separating each scan by a
+    % space and adding a newline when adding the next scan causes
+    % the current line length to exceed max_line
+    max_line = 115;
+    current_line = '';
+    scan_tags = cellfun(@get_scan_tag, pet_dirs, 'UniformOutput', false);
+    fprintf('All PET scans scheduled to be processed:\n');
+    for i = 1:length(scan_tags)
+        new_entry = scan_tags{i};
+        if isempty(current_line)
+            new_line = new_entry;
+        else
+            new_line = append(current_line, '  ', new_entry);
+        end
+
+        % Check if the new line length exceeds max_line
+        if length(new_line) > max_line
+            % Print the current line and start a new one
+            fprintf('%s\n', current_line);
+            current_line = new_entry;
+        else
+            % Update the current line
+            current_line = new_line;
+        end
+    end
+
+    % Print any remaining text in the current line
+    if ~isempty(current_line)
+        fprintf('%s\n', current_line);
+    end
+    fprintf('\n');
 end

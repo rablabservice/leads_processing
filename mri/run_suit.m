@@ -49,7 +49,12 @@ function outfiles = run_suit(mri_dir, fid, overwrite)
     outfile = suitfs.t1;
     if overwrite || ~isfile(outfile)
         cmd = sprintf('%s %s %s', mri_convert, infile, outfile);
-        log_append(fid, sprintf('    - %s -> %s', basename(infile), basename(outfile)));
+        msg = sprintf( ...
+            '    - %s ->\n                %s', ...
+            basename(infile), ...
+            basename(outfile) ...
+        );
+        log_append(fid, msg);
         run_system(cmd, 1, false, true);
     end
 
@@ -96,7 +101,12 @@ function outfiles = run_suit(mri_dir, fid, overwrite)
         infile = add_presuf(suitfs.iwAtlas, 'p');
         outfile = outfiles.suit_atlas;
         cmd = sprintf('%s %s %s', mri_convert, infile, outfile);
-        log_append(fid, sprintf('    - %s -> %s', basename(infile), basename(outfile)));
+        msg = sprintf( ...
+            '    - %s ->\n                %s', ...
+            basename(infile), ...
+            basename(outfile) ...
+        );
+        log_append(fid, msg);
         run_system(cmd, 1, false, true);
 
         % Reslice to match the original T1

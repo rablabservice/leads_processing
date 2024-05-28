@@ -67,7 +67,12 @@ function outfiles = apply_warp_to_mni(infiles, yf, fid, overwrite, interp, vox, 
         log_append(fid, '- Warping images to MNI space:');
         for ii = 1:length(infiles)
             if ~isempty(prefix)
-                log_append(fid, sprintf('  * %s -> %s', basename(infiles{ii}), basename(outfiles{ii})));
+                msg = sprintf( ...
+                    '  * %s ->\n              %s', ...
+                    basename(infiles{ii}), ...
+                    basename(outfiles{ii}) ...
+                );
+                log_append(fid, msg);
             else
                 log_append(fid, sprintf('  * %s', basename(infiles{ii})));
             end

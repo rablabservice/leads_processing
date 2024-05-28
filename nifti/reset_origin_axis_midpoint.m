@@ -31,16 +31,21 @@ function outfiles = reset_origin_axis_midpoint(infiles, fid, overwrite, prefix)
     % If outfiles already exist and overwrite is false, return
     outfiles = add_presuf(infiles, prefix);
     if all(isfile(outfiles)) && ~overwrite
-        fprintf(fid, '- Will not reset origin to axis midpoint, as output files exist\n')
+        log_append(fid, '- Will not reset origin to axis midpoint, as output files exist');
         outfiles = format_outfiles(infiles_cp, prefix);
         return
     else
-        fprintf(fid, '- Resetting origin to axis midpoint\n')
+        log_append(fid, '- Resetting origin to axis midpoint');
         for ii = 1:numel(infiles)
             if isempty(prefix)
-                fprintf(fid, '  * %s\n', basename(infiles{ii}));
+                log_append(fid, sprintf('  * %s', basename(infiles{ii})));
             else
-                fprintf(fid, '  * %s -> %s\n', basename(infiles{ii}), basename(outfiles{ii}));
+                msg = sprintf( ...
+                    '  * %s ->\n              %s', ...
+                    basename(infiles{ii}), ...
+                    basename(outfiles{ii}) ...
+                );
+                log_append(fid, msg);
             end
         end
     end

@@ -17,94 +17,18 @@ import numpy as np
 import pandas as pd
 
 
-# Define global variables
-PATHS = {}
-SCAN_TYPES = None
-TIMESTAMP = None
-
-
-def set_globals():
-    """Set module-level global variables"""
-    global PATHS, SCAN_TYPES, TIMESTAMP
-
-    root_dir = "/mnt/coredata"
-    if not __file__.startswith(root_dir):
-        raise ValueError(
-            f"Could not parse the project path because {__file__} is not in {root_dir}"
-        )
-
-    # The project directory is assumed to be the 4th directory up from /
-    # (e.g., /mnt/coredata/processing/leads)
-    PATHS["proj"] = "/".join(__file__.split("/")[:5])
-
-    # Set global paths and check that they exist
-    PATHS["code"] = op.join(PATHS["proj"], "code")
-    PATHS["config"] = op.join(PATHS["code"], "config")
-    PATHS["metadata"] = op.join(PATHS["proj"], "metadata")
-    PATHS["scans_to_process"] = op.join(PATHS["metadata"], "scans_to_process")
-    PATHS["ssheets"] = op.join(PATHS["metadata"], "ssheets")
-    PATHS["data"] = op.join(PATHS["proj"], "data")
-    PATHS["newdata"] = op.join(PATHS["data"], "newdata")
-    PATHS["raw"] = op.join(PATHS["data"], "raw")
-    PATHS["processed"] = op.join(PATHS["data"], "processed")
-    for k in PATHS:
-        if not op.isdir(PATHS[k]):
-            raise ValueError(f"Expected {PATHS[k]}, but this directory does not exist")
-
-    # Define the SCAN_TYPES dict
-    SCAN_TYPES = load_scan_typesf()
-
-    # Set the timestamp
-    TIMESTAMP = now()
-
-
-def load_scan_typesf(scan_typesf=None):
-    """Load scan types CSV and return a {name_in: name_out} dict."""
-    if scan_typesf is None:
-        scan_typesf = op.join(PATHS["config"], "scan_types_and_tracers.csv")
-    scan_types = pd.read_csv(scan_typesf)
-    scan_types["name_in"] = scan_types["name_in"].str.lower()
-    scan_types = scan_types.drop_duplicates("name_in").dropna()
-    scan_types = scan_types.set_index("name_in")["name_out"].to_dict()
-    return scan_types
-
-
-def now():
-    """Return the current date and time down to seconds."""
-
-    def is_dst():
-        today = datetime.datetime.now()
-        year = today.year
-        dst_start = datetime.datetime(year, 3, 8, 2, 0)  # Second Sunday in March
-        dst_end = datetime.datetime(year, 11, 1, 2, 0)  # First Sunday in November
-        dst_start += datetime.timedelta(
-            days=(6 - dst_start.weekday())
-        )  # Find the second Sunday
-        dst_end += datetime.timedelta(
-            days=(6 - dst_end.weekday())
-        )  # Find the first Sunday
-        return dst_start <= today < dst_end
-
-    # Get the current UTC time
-    utc_time = datetime.datetime.now(datetime.timezone.utc)
-
-    # Define the offset for Los Angeles time
-    la_offset = -8 if not is_dst() else -7
-
-    # Create a timezone-aware datetime object for Los Angeles
-    la_time = utc_time + datetime.timedelta(hours=la_offset)
-
-    # Format the time as specified
-    formatted_time = la_time.strftime("%Y-%m-%d-%H-%M-%S")
-
-    return formatted_time
-
-
-set_globals()
-
-
 def main(
-    process_all_mris=False, overwrite=False, max_days_from_present=100, save_csv=True
+    proj_dir,
+    orphan_mri_tolerance=100,
+    schedule_all_mris=False,
+    overwrite=False,
+    audit_pet_res=True,
+    expected_pet_res=6,
+    audit_pet_to_mri_days=True,
+    max_pet_to_mri=365,
+    audit_repeat_mri=True,
+    check_brainstem=True,
+    save_csv=True,
 ):
     """Save CSV files for MRI and PET scans in the raw directory.
 
@@ -114,16 +38,38 @@ def main(
     -------
     None
     """
+    # Define paths to the needed directories
+    raw_dir = op.abspath(op.join(proj_dir, "data", "raw"))
+    raw_base = op.basename(raw_dir)
+    proc_dir = op.abspath(op.join(proj_dir, "data", "processed"))
+    config_dir = op.abspath(op.join(proj_dir, "code", "config"))
+    scans_to_process_dir = op.abspath(op.join(proj_dir, "metadata", "scans_to_process"))
+    for d in [raw_dir, proc_dir, config_dir, scans_to_process_dir]:
+        if not op.isdir(d):
+            raise ValueError(f"{d} does not exist")
+
+    # Load the scan types CSV files
+    scan_typesf = op.join(config_dir, "scan_types_and_tracers.csv")
+    scan_types = load_scan_typesf(scan_typesf)
+
     # Get a list of all directories containing .nii files
-    print(f"  * Searching {PATHS['raw']} for all *.nii files")
-    raw_niis = fast_recursive_glob_nii(PATHS["raw"])
+    print(f"  * Searching {raw_dir} for all *.nii files")
+    raw_niis = fast_recursive_glob_nii(raw_dir)
 
     # Find the subject ID, scan type, acquisition date, and LONI image ID
     # for each nifti file in raw
     raw_niis = pd.DataFrame(raw_niis, columns=["raw_niif"])
-    raw_niis.insert(0, "subj", raw_niis["raw_niif"].apply(get_subj))
-    raw_niis.insert(1, "scan_type", raw_niis["raw_niif"].apply(get_scan_type))
-    raw_niis.insert(2, "scan_date", raw_niis["raw_niif"].apply(get_scan_date))
+    raw_niis.insert(
+        0, "subj", raw_niis["raw_niif"].apply(lambda x: get_subj(x, raw_dir))
+    )
+    raw_niis.insert(
+        1,
+        "scan_type",
+        raw_niis["raw_niif"].apply(lambda x: get_scan_type(x, scan_types, raw_base)),
+    )
+    raw_niis.insert(
+        2, "scan_date", raw_niis["raw_niif"].apply(lambda x: get_scan_date(x, raw_base))
+    )
     raw_niis.insert(3, "image_id", raw_niis["raw_niif"].apply(get_image_id))
 
     # Convert the date column to datetime
@@ -196,23 +142,30 @@ def main(
     raw_pets = find_closest_mri_to_pet(raw_pets, raw_mris)
 
     # Figure out which MRIs are actually used for PET processing
-    raw_mris = get_orphan_mris(raw_mris, raw_pets, max_days_from_present)
+    raw_mris = get_orphan_mris(raw_mris, raw_pets, orphan_mri_tolerance)
     print(
-        f"  * Auditing MRIs in {PATHS['raw']}",
+        f"  * Auditing MRIs in {raw_dir}",
         "    - {:,} MRIs are orphans (>{} days old and not linked to any PET scan).".format(
-            raw_mris["mri_is_orphan"].sum(), max_days_from_present
+            raw_mris["mri_is_orphan"].sum(), orphan_mri_tolerance
         ),
         sep="\n",
     )
-    if process_all_mris:
+    if schedule_all_mris:
         msg = "      These scans will still be scheduled for processing at the user's request"
     else:
         msg = "      These scans will not be scheduled for processing (process anyway with flag --all)"
     print(msg)
 
     # Flag PET scans with issues that preclude processing
-    raw_pets = audit_pet(raw_pets)
-    print(f"  * Auditing PET scans in {PATHS['raw']}")
+    raw_pets = audit_pet(
+        raw_pets,
+        audit_pet_res=audit_pet_res,
+        expected_pet_res=expected_pet_res,
+        audit_pet_to_mri_days=audit_pet_to_mri_days,
+        max_pet_to_mri=max_pet_to_mri,
+        audit_repeat_mri=audit_repeat_mri,
+    )
+    print(f"  * Auditing PET scans in {raw_dir}")
     print(
         "    - Flagged {:,} scans with issues to be resolved before processing (see 'flag_notes')".format(
             len(raw_pets.loc[raw_pets["flag"] == 1])
@@ -222,7 +175,7 @@ def main(
     # Add path to the processed MRI directory
     ii = raw_mris.columns.tolist().index("mri_raw_niif")
     raw_mris["mri_proc_dir"] = raw_mris.apply(
-        lambda x: get_mri_proc_dir(x["subj"], x["mri_date"]), axis=1
+        lambda x: get_mri_proc_dir(x["subj"], x["mri_date"], proc_dir), axis=1
     )
 
     # Add path to the processed PET directory
@@ -231,13 +184,14 @@ def main(
         ii + 1,
         "pet_proc_dir",
         raw_pets.apply(
-            lambda x: get_pet_proc_dir(x["subj"], x["tracer"], x["pet_date"]), axis=1
+            lambda x: get_pet_proc_dir(x["subj"], x["tracer"], x["pet_date"], proc_dir),
+            axis=1,
         ),
     )
 
     # Determine which MRIs have been processed
     raw_mris["freesurfer_complete"] = raw_mris["mri_proc_dir"].apply(
-        check_if_freesurfer_run
+        lambda x: check_if_freesurfer_run(x, check_brainstem)
     )
     raw_mris["mri_processing_complete"] = raw_mris["mri_proc_dir"].apply(
         check_if_mri_processed
@@ -256,7 +210,7 @@ def main(
             x["mri_processing_complete"],
             baseline_mri_processed[x["subj"]],
             overwrite,
-            process_all_mris,
+            schedule_all_mris,
         ),
         axis=1,
     )
@@ -264,7 +218,7 @@ def main(
     # Summarize how many MRIs have been or still need to be processed
     raw_mris_req = raw_mris.query("(mri_scan_number==1) or (mri_is_orphan==0)")
     raw_mris_opt = raw_mris.query("(mri_scan_number>1) and (mri_is_orphan==1)")
-    print("\n  * MRI scan review:")
+    print("\n  MRI scan review\n  ---------------")
     print(
         "    - {:,}/{:,} required MRIs have been processed through Freesurfer".format(
             len(raw_mris_req.loc[raw_mris_req["freesurfer_complete"] == 1]),
@@ -327,7 +281,7 @@ def main(
     )
 
     # Summarize how many PET scans have been or still need to be processed
-    print("\n  * PET scan review:")
+    print("\n  PET scan review\n  ---------------")
     print(
         "    - {:,}/{:,} PET scans have been fully processed".format(
             len(raw_pets.loc[raw_pets["pet_processing_complete"] == 1]),
@@ -345,28 +299,47 @@ def main(
 
     # Save the raw scan dataframes to CSV files
     if save_csv:
-        save_raw_mri_index(raw_mris)
-        save_raw_pet_index(raw_pets)
+        timestamp = now()
+        save_raw_mri_index(raw_mris, scans_to_process_dir, timestamp)
+        save_raw_pet_index(raw_pets, scans_to_process_dir, timestamp)
 
     # Report how many MRI and PET scans are scheduled for processing
+    pad = 44
+    if not save_csv:
+        pad += 30
     print("")
-    print("+.." + ("=" * 44) + "..+")
-    print("|" + (" " * 47) + " |")
-    print(
-        "|  {:>5,} MRIs are scheduled for processing       |".format(
+    print("+.." + ("=" * pad) + "..+")
+    print("|" + (" " * (pad + 3)) + " |")
+    msg = {
+        "mri": "|  {:>5,} MRI scans are scheduled for processing  |".format(
             len(raw_mris.loc[raw_mris["scheduled_for_processing"] == 1])
-        )
-    )
-    print(
-        "|  {:>5,} PET scans are scheduled for processing  |".format(
+        ),
+        "pet": "|  {:>5,} PET scans are scheduled for processing  |".format(
             len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
-        )
-    )
-    print("|" + (" " * 47) + " |")
-    print("+.." + ("=" * 44) + "..+")
+        ),
+    }
+    if not save_csv:
+        for scan_type in msg:
+            msg[scan_type] = msg[scan_type].replace(
+                "are scheduled for processing",
+                "can be scheduled for processing (rerun with save_csv=True)",
+            )
+    print(msg["mri"])
+    print(msg["pet"])
+    print("|" + (" " * (pad + 3)) + " |")
+    print("+.." + ("=" * pad) + "..+")
     print("")
 
     return raw_mris, raw_pets
+
+
+def load_scan_typesf(scan_typesf):
+    """Load scan types CSV and return a {name_in: name_out} dict."""
+    scan_types = pd.read_csv(scan_typesf)
+    scan_types["name_in"] = scan_types["name_in"].str.lower()
+    scan_types = scan_types.drop_duplicates("name_in").dropna()
+    scan_types = scan_types.set_index("name_in")["name_out"].to_dict()
+    return scan_types
 
 
 def fast_recursive_glob_nii(path):
@@ -399,7 +372,7 @@ def glob_sort_mtime(pattern):
     return files
 
 
-def get_subj(filepath, raw_dir=None):
+def get_subj(filepath, raw_dir):
     """Return the subject ID from filepath to the recon'd nifti.
 
     Parameters
@@ -412,8 +385,6 @@ def get_subj(filepath, raw_dir=None):
     subj : str
         The subject ID parsed from the input file basename.
     """
-    if raw_dir is None:
-        raw_dir = PATHS["raw"]
     try:
         subj = filepath.replace(raw_dir + "/", "").split("/")[0]
         if len(subj) > 0:
@@ -424,7 +395,7 @@ def get_subj(filepath, raw_dir=None):
         return np.nan
 
 
-def get_scan_type(filepath):
+def get_scan_type(filepath, scan_types, raw_base="raw"):
     """Search filepath and return the scan type"""
 
     def find_matches(text, scan_types, scan_type_keys):
@@ -434,14 +405,14 @@ def get_scan_type(filepath):
         return unique_values
 
     # Load the SCAN_TYPES dict and get lowercase keys
-    scan_type_keys = list(SCAN_TYPES)
+    scan_type_keys = list(scan_types)
 
     # Convert filepath to lowercase and get the basename
     filepath = filepath.lower()
     basename = op.basename(filepath)
 
     # First attempt to match in the basename
-    match_values = find_matches(basename, SCAN_TYPES, scan_type_keys)
+    match_values = find_matches(basename, scan_types, scan_type_keys)
     if len(match_values) == 1:
         return match_values[0]
     elif len(match_values) > 1:
@@ -453,14 +424,14 @@ def get_scan_type(filepath):
 
     # Attempt to match in the directory path after "raw"
     dirname = op.dirname(filepath)
-    raw_base = "/{}/".format(op.basename(PATHS["raw"]))
+    raw_base = f"/{raw_base}/"
     raw_idx = dirname.find(raw_base)
     if raw_idx == -1:
         return "FAILED TO IDENTIFY PET TRACER OR MRI MODALITY FROM FILENAME"
 
     # Only consider part of the path after "raw"
     search_path = dirname[raw_idx + len(raw_base) :]
-    match_values = find_matches(search_path, SCAN_TYPES, scan_type_keys)
+    match_values = find_matches(search_path, scan_types, scan_type_keys)
     if len(match_values) == 1:
         return match_values[0]
     elif len(match_values) > 1:
@@ -472,7 +443,7 @@ def get_scan_type(filepath):
             return "FAILED TO IDENTIFY PET TRACER OR MRI MODALITY FROM FILENAME"
 
 
-def get_scan_date(filepath):
+def get_scan_date(filepath, raw_base="raw"):
     """Search filepath and return the scan date"""
 
     def test_datestr(str_to_search, date_start="2000-01-01", date_stop=None):
@@ -518,7 +489,7 @@ def get_scan_date(filepath):
     # If no date was found in the basename, try the dirname but limit
     # search to everything forward from the raw/ directory
     dirname = op.dirname(filepath)
-    raw_base = "/{}/".format(op.basename(PATHS["raw"]))
+    raw_base = "/{raw_base}/"
     raw_idx = dirname.find(raw_base)
     if raw_idx == -1:
         return np.nan
@@ -685,7 +656,7 @@ def find_closest_mri_to_pet(pet_scans, mri_scans):
     return merged_min
 
 
-def get_orphan_mris(mri_scans, pet_scans, max_days_from_present=100):
+def get_orphan_mris(mri_scans, pet_scans, orphan_mri_tolerance=100):
     """Flag MRIs that are not used for PET processing"""
     ii = mri_scans.columns.tolist().index("n_mri_scans")
     mri_scans.insert(
@@ -703,7 +674,7 @@ def get_orphan_mris(mri_scans, pet_scans, max_days_from_present=100):
             lambda x: (
                 1
                 if (x["mri_used_for_pet_proc"] == 0)
-                and ((today - x["mri_date"]).days > max_days_from_present)
+                and ((today - x["mri_date"]).days > orphan_mri_tolerance)
                 else 0
             ),
             axis=1,
@@ -715,10 +686,10 @@ def get_orphan_mris(mri_scans, pet_scans, max_days_from_present=100):
 def audit_pet(
     pet_scans,
     audit_pet_res=True,
+    expected_pet_res=6,
     audit_pet_to_mri_days=True,
+    max_pet_to_mri=365,
     audit_repeat_mri=True,
-    presumed_pet_res=6,
-    max_pet_to_mri_days=365,
 ):
     """Audit each PET scan and flag scans with potential issues
 
@@ -729,14 +700,14 @@ def audit_pet(
         'mri_image_id', 'flag', and 'flag_notes'
     audit_pet_res : bool, optional
         If True, audit the PET resolution
+    expected_pet_res : int, optional
+        The expected PET resolution in mm
     audit_pet_to_mri_days : bool, optional
         If True, audit the days between PET and MRI scans
+    max_pet_to_mri : int, optional
+        The maximum allowed number of days between PET and MRI scans
     audit_repeat_mri : bool, optional
         If True, audit for repeated MRIs used for multiple PET scans
-    presumed_pet_res : int, optional
-        The presumed PET resolution in mm
-    max_pet_to_mri_days : int, optional
-        The maximum allowed number of days between PET and MRI scans
 
     Returns
     -------
@@ -778,27 +749,27 @@ def audit_pet(
     # PET resolution unclear or not at 6mm
     if audit_pet_res:
         idx = pet_scans_cp.loc[
-            pet_scans_cp["pet_res"] != presumed_pet_res
+            pet_scans_cp["pet_res"] != expected_pet_res
         ].index.tolist()
         pet_scans_cp.loc[idx, "flag"] = 1
         pet_scans_cp.loc[
             idx, "flag_notes"
-        ] += f"PET resolution could not be parsed or is not at {presumed_pet_res}mm; "
+        ] += f"PET resolution could not be parsed or is not at {expected_pet_res}mm; "
 
     # Missing MRI
     idx = pet_scans_cp.loc[pd.isna(pet_scans_cp).any(axis=1)].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "flag_notes"] += f"No available MRI in {PATHS['raw']}; "
+    pet_scans_cp.loc[idx, "flag_notes"] += f"Missing MRI; "
 
     # PET and MRI scan dates too far apart
     if audit_pet_to_mri_days:
         idx = pet_scans_cp.query(
-            f"abs_days_mri_to_pet > {max_pet_to_mri_days}"
+            f"abs_days_mri_to_pet > {max_pet_to_mri}"
         ).index.tolist()
         pet_scans_cp.loc[idx, "flag"] = 1
         pet_scans_cp.loc[
             idx, "flag_notes"
-        ] += f"Closest MRI is more than {max_pet_to_mri_days} days from PET date; "
+        ] += f"Closest MRI is more than {max_pet_to_mri} days from PET date; "
 
     # Same MRI used to process multiple PET scans for the same tracer
     if audit_repeat_mri:
@@ -820,23 +791,21 @@ def audit_pet(
     return pet_scans_cp
 
 
-def get_mri_proc_dir(subj, mri_date):
+def get_mri_proc_dir(subj, mri_date, proc_dir):
     """Return the processed MRI directory for each MRI scan"""
-    return op.join(
-        PATHS["processed"], subj, "MRI-T1_{}".format(datetime_to_datestr(mri_date))
-    )
+    return op.join(proc_dir, subj, "MRI-T1_{}".format(datetime_to_datestr(mri_date)))
 
 
-def get_pet_proc_dir(subj, tracer, pet_date):
+def get_pet_proc_dir(subj, tracer, pet_date, proc_dir):
     """Return the processed PET directory for each PET scan"""
     return op.join(
-        PATHS["processed"],
+        proc_dir,
         subj,
         "{}_{}".format(tracer, datetime_to_datestr(pet_date)),
     )
 
 
-def check_if_freesurfer_run(mri_proc_dir):
+def check_if_freesurfer_run(mri_proc_dir, check_brainstem=True):
     """Return True if the MRI scan has been processed by Freesurfer"""
     freesurfer_dir = op.join(mri_proc_dir, "freesurfer")
     if not op.isdir(freesurfer_dir):
@@ -844,8 +813,13 @@ def check_if_freesurfer_run(mri_proc_dir):
     # Search for the Freesurfer output directory
     nuf = op.join(freesurfer_dir, "mri", "nu.mgz")
     aparcf = op.join(freesurfer_dir, "mri", "aparc+aseg.mgz")
-    bstemf = op.join(freesurfer_dir, "mri", "brainstemSsLabels.v12.FSvoxelSpace.mgz")
-    if op.isfile(nuf) and op.isfile(aparcf) and op.isfile(bstemf):
+    check_files = [nuf, aparcf]
+    if check_brainstem:
+        bstemf = op.join(
+            freesurfer_dir, "mri", "brainstemSsLabels.v12.FSvoxelSpace.mgz"
+        )
+        check_files.append(bstemf)
+    if all([op.isfile(f) for f in check_files]):
         return 1
     else:
         return 0
@@ -888,7 +862,7 @@ def get_mri_to_process(
     already_processed,
     baseline_processed,
     overwrite,
-    process_all_mris,
+    schedule_all_mris,
 ):
     """Return 1 if the MRI scan should be processed, otherwise 0"""
     # Don't process MRIs that have already been processed unless
@@ -902,8 +876,8 @@ def get_mri_to_process(
 
     # Only process follow-up MRIs if the baseline MRI has been processed
     if baseline_processed:
-        # Don't process orphan MRIs unless process_all_mris is True
-        if process_all_mris or not mri_is_orphan:
+        # Don't process orphan MRIs unless schedule_all_mris is True
+        if schedule_all_mris or not mri_is_orphan:
             return 1
         else:
             return 0
@@ -930,11 +904,42 @@ def get_pet_to_process(pet_processed, mri_processed, pet_flagged, overwrite):
         return 0
 
 
-def save_raw_mri_index(mri_scans):
+def now():
+    """Return the current date and time down to seconds."""
+
+    def is_dst():
+        today = datetime.datetime.now()
+        year = today.year
+        dst_start = datetime.datetime(year, 3, 8, 2, 0)  # Second Sunday in March
+        dst_end = datetime.datetime(year, 11, 1, 2, 0)  # First Sunday in November
+        dst_start += datetime.timedelta(
+            days=(6 - dst_start.weekday())
+        )  # Find the second Sunday
+        dst_end += datetime.timedelta(
+            days=(6 - dst_end.weekday())
+        )  # Find the first Sunday
+        return dst_start <= today < dst_end
+
+    # Get the current UTC time
+    utc_time = datetime.datetime.now(datetime.timezone.utc)
+
+    # Define the offset for Los Angeles time
+    la_offset = -8 if not is_dst() else -7
+
+    # Create a timezone-aware datetime object for Los Angeles
+    la_time = utc_time + datetime.timedelta(hours=la_offset)
+
+    # Format the time as specified
+    formatted_time = la_time.strftime("%Y-%m-%d-%H-%M-%S")
+
+    return formatted_time
+
+
+def save_raw_mri_index(mri_scans, scans_to_process_dir, timestamp):
     """Save the MRI scan index to a CSV file"""
     # Move any existing files to archive
-    archive_dir = op.join(PATHS["scans_to_process"], "archive")
-    files = glob(op.join(PATHS["scans_to_process"], "raw_MRI_index_*.csv"))
+    archive_dir = op.join(scans_to_process_dir, "archive")
+    files = glob(op.join(scans_to_process_dir, "raw_MRI_index*.csv"))
     if files:
         if not op.isdir(archive_dir):
             os.makedirs(archive_dir)
@@ -953,17 +958,17 @@ def save_raw_mri_index(mri_scans):
     ).reset_index(drop=True)
 
     # Save the mri_scans dataframe
-    outf = op.join(PATHS["scans_to_process"], f"raw_MRI_index_{TIMESTAMP}.csv")
+    outf = op.join(scans_to_process_dir, f"raw_MRI_index_{timestamp}.csv")
 
     mri_scans.to_csv(outf, index=False)
     print(f"  * Saved raw MRI scan index to {outf}")
 
 
-def save_raw_pet_index(pet_scans):
+def save_raw_pet_index(pet_scans, scans_to_process_dir, timestamp):
     """Save the PET scan index to a CSV file"""
     # Move any existing files to archive
-    archive_dir = op.join(PATHS["scans_to_process"], "archive")
-    files = glob(op.join(PATHS["scans_to_process"], "raw_PET_index_*.csv"))
+    archive_dir = op.join(scans_to_process_dir, "archive")
+    files = glob(op.join(scans_to_process_dir, "raw_PET_index*.csv"))
     if files:
         if not op.isdir(archive_dir):
             os.makedirs(archive_dir)
@@ -971,7 +976,7 @@ def save_raw_pet_index(pet_scans):
             os.rename(f, op.join(archive_dir, op.basename(f)))
 
     # Save the pet_scans dataframe
-    outf = op.join(PATHS["scans_to_process"], f"raw_PET_index_{TIMESTAMP}.csv")
+    outf = op.join(scans_to_process_dir, f"raw_PET_index_{timestamp}.csv")
     pet_scans.to_csv(outf, index=False)
     print(f"  * Saved raw PET scan index to {outf}")
 
@@ -980,39 +985,177 @@ def _parse_args():
     """Parse and return command line arguments."""
     parser = argparse.ArgumentParser(
         description=(
-            "Find MRI and PET scans that need to be processed by comparing data\n"
-            + "in raw vs. processed directories"
+            "High-level program to schedule MRI and PET scans for later processing\n\n"
+            + "Overview\n--------\n"
+            + "This program is designed for an MRI-based PET processing pipeline in which\n"
+            + "scans are downloaded from LONI (with each PET scan being a preprocessed\n"
+            + "'Step 4' image in common resolution).\n\n"
+            + "Before running this program, a zip file containing 1+ scans must be added by\n"
+            + "the user to the 'newdata' directory, unzipped, converted from DICOM to NIfTI\n"
+            + "format, and moved to the 'raw' directory (see 'setup_leads_processing.m' to\n"
+            + "see how these last three steps are automated).\n\n"
+            + "Presumably, the user is normally engaging with this program through the\n"
+            + "run_leads_mri_based_pipeline.m script that calls it. That said, it is\n"
+            + "possible to run this program as a standalone from the Linux command line to\n"
+            + "have a more granular level of control.\n\n"
+            + "The following steps are completed:\n"
+            + "  1.  All scan directories in 'raw' are identified by a recursive search for\n"
+            + "      *.nii files\n"
+            + "  2.  Filenames are parsed to resolve:\n"
+            + "      -  Subject ID\n"
+            + "      -  Scan type (MRI or PET; and for PET, which tracer)\n"
+            + "      -  Scan acquisition date\n"
+            + "      -  LONI Image ID\n"
+            + "      -  For PET scans, the spatial resolution\n"
+            + "  3.  Each PET scan is matched to the closest MRI scan\n"
+            + "  4.  Orphan MRIs (those not recently acquired and not closest to any PET\n"
+            + "      scan) are identified, and under default settings will not be scheduled\n"
+            + "      for processing\n"
+            + "  5.  PET scans are audited for potential issues that would prevent processing.\n"
+            + "      These include:\n"
+            + "      - Inability to parse any of the scan information above\n"
+            + "      - PET not at the expected resolution (6mm by default)\n"
+            + "      - PET and MRI scans too far apart (>365 days, by default)\n"
+            + "      - Same MRI would be used for multiple PET scans of the same tracer (e.g.\n"
+            + "        two FTP timepoints)\n"
+            + "  6.  A search is conducted to identify which MRIs in 'raw' have been\n"
+            + "      processed by FreeSurfer, and which have completed post-FreeSurfer,\n"
+            + "      SPM-based processing, respectively\n"
+            + "  7.  A search is conducted to identify which PET scans in 'raw' have been\n"
+            + "      fully processed\n"
+            + "  8.  MRIs are scheduled for processing if they have not been fully processed,\n"
+            + "      are not orphans, and (for follow-up MRIs) their corresponding baseline\n"
+            + "      MRI has been processed\n"
+            + "  9.  PET scans are scheduled for processing if they have not been fully\n"
+            + "      processed, are not flagged with an issue, and their corresponding MRI\n"
+            + "      has been fully processed\n"
+            + "  10. The user is informed of how many MRI and PET scans are in 'raw', and how\n"
+            + "      many of these scans have completed processing, have been flagged with an\n"
+            + "      issue, and have been scheduled for processing\n"
+            + "  11. Two CSV files containing scan-level information are saved to\n"
+            + "      'scans_to_process': one for MRIs and one for PET scans. These files are\n"
+            + "      read by downstream scripts in the processing pipeline. Manually editing\n"
+            + "      these files will affect which scans the scripts attempt to process,\n"
+            + "      though could also introduce errors, so edit the CSVs with caution and at\n"
+            + "      your own risk.\n\n"
+            + "The remainder of this documentation lists the command line arguments that can\n"
+            + "be passed to this program to change some of its default behavior."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
         exit_on_error=False,
     )
     parser.add_argument(
+        "-p",
+        "--proj-dir",
+        required=True,
+        help=(
+            "Full path to the top-level project directory. Must contain\n"
+            + "'data/raw' and 'data/processed' subdirectories, along with\n"
+            + "'metadata/scans_to_process' where output CSVs will be saved"
+        ),
+    )
+    parser.add_argument(
+        "--orphan-tol",
+        type=int,
+        default=100,
+        dest="orphan_mri_tolerance",
+        help=(
+            "Defines the maximum number of days from present that an MRI\n"
+            + "can have been acquired without being linked to a PET scan\n"
+            + "before it is considered an orphan and is not scheduled for\n"
+            + "processing when --all is not specified"
+        ),
+    )
+    parser.add_argument(
         "-a",
         "--all",
+        dest="schedule_all_mris",
         action="store_true",
-        help=(
-            "Process all MRIs scans in the raw directory, even if they are not the\n"
-            + "closest MRI to any PET scan currently in the raw directory"
-        ),
+        help="Schedule all MRIs in 'raw' for processing, even orphans",
     )
     parser.add_argument(
         "-o",
         "--overwrite",
         action="store_true",
         help=(
-            "Process all PET scans and their closest MRIs in the raw directory,\n"
-            + "whether or not they have already been processed"
+            "Schedule all eligible PET and MRI scans in 'raw' to be\n"
+            + "processed, regardless of whether they have already been\n"
+            + "processed. Orphan MRIs are still not scheduled unless --all\n"
+            + "is specified, and PET scans that are flagged with an issue\n"
+            + "are not scheduled"
         ),
     )
     parser.add_argument(
-        "-m",
-        "--max_days",
-        type=int,
-        default=100,
+        "--no-audit-pet-res",
+        action="store_false",
+        dest="audit_pet_res",
         help=(
-            "The maximum number of days from present that an MRI scan can have been acquired\n"
-            + "without being linked to a PET scan before it is considered an orphan and is not\n"
-            + "scheduled for processing when --all is not used"
+            "Don't audit the PET resolution. By default, PET scans are\n"
+            + "flagged if their resolution is not 6mm. This flag disables\n"
+            + "that check"
+        ),
+    )
+    parser.add_argument(
+        "--expected-pet-res",
+        type=int,
+        default=6,
+        dest="expected_pet_res",
+        help=(
+            "The expected PET resolution in mm. By default, PET scans are\n"
+            + "flagged if their resolution is not 6mm"
+        ),
+    )
+    parser.add_argument(
+        "--no-audit-pet-to-mri-days",
+        action="store_false",
+        dest="audit_pet_to_mri_days",
+        help=(
+            "Don't audit the days between PET and MRI scans. By default,\n"
+            + "PET scans are flagged if the closest MRI is more than 365\n"
+            + "days away. This flag disables that check"
+        ),
+    )
+    parser.add_argument(
+        "--max-pet-to-mri",
+        type=int,
+        default=365,
+        help=(
+            "The maximum allowed number of days between a PET scan and\n"
+            + "the closest MRI scan. By default, PET scans are flagged if\n"
+            + "the closest MRI is more than 365 days away"
+        ),
+    )
+    parser.add_argument(
+        "--no-audit-repeat-mri",
+        action="store_false",
+        dest="audit_repeat_mri",
+        help=(
+            "Don't audit for repeated MRIs used for multiple PET scans.\n"
+            + "By default, PET scans are flagged if the same MRI would be\n"
+            + "used to process multiple timepoints for the same PET\n"
+            + "tracer. This flag disables that check"
+        ),
+    )
+    parser.add_argument(
+        "--no-check-brainstem",
+        action="store_false",
+        dest="check_brainstem",
+        help=(
+            "Don't check for the presence of the brainstemSsLabels.v12\n"
+            + "file in the Freesurfer output directory. By default, this\n"
+            + "file is checked and if missing, the MRI is not scheduled\n"
+            + "for processing"
+        ),
+    )
+    parser.add_argument(
+        "--no-save-csv",
+        action="store_false",
+        dest="save_csv",
+        help=(
+            "Parse 'raw' and view the summary information for this\n"
+            + "program, but don't save new CSV files (i.e., don't schedule\n"
+            + "new scans for processing yet, but see how many scans would\n"
+            + "be scheduled if the program is rerun without --view-only"
         ),
     )
 
@@ -1026,9 +1169,17 @@ if __name__ == "__main__":
 
     # Call the main function
     main(
-        process_all_mris=args.all,
+        proj_dir=args.proj_dir,
+        orphan_mri_tolerance=args.orphan_mri_tolerance,
+        schedule_all_mris=args.schedule_all_mris,
         overwrite=args.overwrite,
-        max_days_from_present=args.max_days,
+        audit_pet_res=args.audit_pet_res,
+        expected_pet_res=args.expected_pet_res,
+        audit_pet_to_mri_days=args.audit_pet_to_mri_days,
+        max_pet_to_mri=args.max_pet_to_mri,
+        audit_repeat_mri=args.audit_repeat_mri,
+        check_brainstem=args.check_brainstem,
+        save_csv=args.save_csv,
     )
 
     # Exit successfully

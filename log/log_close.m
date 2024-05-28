@@ -22,8 +22,12 @@ function log_close(fid)
         log_append(fid, sprintf('Elapsed time: %.3fs', elapsed), add_timestamp, indent);
     end
     log_append(fid, repmat('-', 1, 88), add_timestamp, indent);
-    log_append(fid, '', false, 0);
+    log_append(fid, '', 0, 0);
 
     % Close the log file
+    logf = fopen(fid);
     fclose(fid);
+    fprintf('\n%s:\n', basename(logf));
+    cmd = sprintf('cat "%s"', logf);
+    system(cmd);
 end
