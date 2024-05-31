@@ -2,12 +2,22 @@
 Data processing pipeline for the Longitudinal Early-onset Alzheimer's Disease Study (LEADS).
 
 ## Primer
-This repository contains the updated (version 2) codebase to process LEADS MRI and PET
-scans under the MRI-based processing pipeline. The new LEADS codebase, introduced in Spring 2024, is a full rewrite
-of the original MRI-based PET processing pipeline that was developed in 2018. Both codebases mimic ADNI processing, and aside from the corrections and changes noted in this document, the new codebase follows the methods used by the original pipeline. The new codebase is designed to be faster,
-more readable, more modular, and more flexible than the original codebase. With minor changes it should be fully extensible to other projects that want to adopt an MRI-based PET processing pipeline using a similar directory structure and file naming conventions.
+This repository contains the new codebase to process LEADS MRI and PET scans using an
+MRI-based processing pipeline that mimics the ADNI processing pipeline. The new codebase
+was written by D. Schonhaut in Spring 2024 as a full rewrite of the original LEADS processing
+code by L. Iaccarino in 2018.
 
-## Corrections
+The new codebase is designed to be faster, more readable, and more modular than the
+original codebase. With minimal changes, the new code should also be fully extesible to other
+projects that collect PET and MRI data and want to adopt an MRI-based PET processing pipeline
+with a similar directory structure and file naming conventions.
+
+## Corrections to the original LEADS processing pipeline
+The points below encompass, to the best of our knowledge, all *substantive* differences
+between the new LEADS pipeline and the older processing code it replaces. Non-substantive
+differences refer to any changes that do not affect the underlying values of processed data
+(for example, changes to file naming convenctions and directory organization, or changes to
+the code itself that don't affect the end result for files saved).
 1. The original codebase used SPM ImCalc to perform arithmetic operations on PET images
    (e.g. create an SUVR by dividing PET voxels by a scalar value). However, the ImCalc code
    was programmed to cast output values to an inappropriate data type (int16 for continuous
@@ -29,151 +39,188 @@ more readable, more modular, and more flexible than the original codebase. With 
    sensical values at the borders between different cerebellar subregions (e.g. a left
    subregion label appearing in R hemisphere). The new code fixes this problem by using
    nearest-neighbor interpolation to reslice the SUIT atlas to native MRI space.
+1. Also regarding to the inferior cerebrellar reference region, we now use the
+   [SUIT toolbox](https://www.diedrichsenlab.org/imaging/suit.htm) in MATLAB to estimate
+   a nonlinear transformation between each subject's cerebellum in native space and the
+   'SUIT space' template cerebellum. Previously we had used the iy_ file defined during
+   SPM segmentation to reverse normalize an MNI space version of the SUIT template.
+1. The regularization parameters used for SPM segmentation in the original LEADS codebase
+   differed slightly from the default regularization parameters used by SPM12.
+   (original LEADS: matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.025 0.1];)
+   (default params: matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.05 0.2];).
+   We could not find a rationale for this change and did not observe a noticeable
+   difference in segmentation results when testing segmentation with the altered versus
+   default parameters. For simplicity, the new codebase reverts back to the SPM12 default.
+1. The original LEADS codebase saved PET images that were affine transformed to MNI space
+   at 1mm^3 resolution, while PET images that were nonlinearly warped to MNI space were
+   saved at 1.5mm^3. In the new LEADS codebase, affine and warped MNI space images are both
+   saved at 1.5mm^3.
 
 ## Structure and implementation of the new codebase
-- The new codebase is implemented in Matlab and Python, with Matlab as the primary
-  interface. Aside from launching Matlab (the code was written in Matlab version 2023b), the
-  user should not need to set paths to any other programs, as this is all done internally to
-  ensure that all users are using the same versions of required software.
-- On the PETcore VM, the codebase lives in **`/mnt/coredata/processing/leads/code`** and is
-  connected to its remote repository on GitHub.
-- The new codebase offers 10-20x performance improvements over the original codebase when
-  run on the PETcore VM. This is mostly due to the use of multithreading throughout the
-  processing pipeline, as opposed to only during FreeSurfer processing.
+The new codebase is implemented in Matlab (version 2023b) and Python (version 3.11), with
+Matlab serving as the primary interface for end users. The user should not need to specify
+paths to any programs aside from Matlab, as all paths are specified by the code to ensure
+that the same versions of required software are used consistently.
+
+A few additional notes about the new codebase:
+- On the PETcore VM, the codebase lives in `/mnt/coredata/processing/leads/code` and is
+  connected to its [remote repository](https://github.com/dschonhaut/leads_processing) on GitHub.
+- The new code is 10-20x faster than the original codebase, mostly due to the use of multithreading
+  throughout the processing pipeline. FreeSurfer still takes ~10 hr to run per scan, although up to
+  16 MRIs can be processed in parallel on the PETcore VM.
 - A single Matlab script, [`run_leads_mri_based_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/run/run_leads_mri_based_processing.m), allows
   the user to run all parts of the processing pipeline while interacting with the program
   through simple, question and answer based prompts.
 - The processing pipeline is divided into three modules, one of which must be specified by
-  the user with each call to [`run_leads_mri_based_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/run/run_leads_mri_based_processing.m). The modules are:
-    1. ### Setup
-       * Main script: [`setup_leads_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/setup/setup_leads_processing.m)
-       * Overview: Prepare newly downloaded data to be processed. There are three substages
-         to this module:
-         1. Newly downloaded files that the user copies to **`.../leads/data/newdata`** are unzipped,
-            converted from DICOMs to NIfTI, and moved to **`.../leads/data/raw`**.
-         1. All scans in **`.../leads/data/raw`** are parsed and compared against scans in
-            **`.../leads/data/processed`** to determine which scans need to be processed. The results
-            of this evaluation step are stored in two CSV files, *raw_MRI_index\*.csv* and
-            *raw_PET_index\*.csv* in **`.../leads/metadata/scans_to_process`**. These files contain an
-            entry for every MRI and PET scan in **`.../leads/data/raw`**, respectively, and the column
-            "scheduled_for_processing" controls which scans the processing pipeline will attempt
-            to process under the default settings.
-         1. For scans that are scheduled to be processed, the code will create new directories in
-            **`.../leads/data/processed`** to store the processed data. Symbolic links are made in
-            these new, processed scan directories that point back to their corresponding directories
-            in **`.../leads/data/raw`**. A symbolic link in each PET scan directory is also created that
-            points to the directory of the closest MRI (the MRI scan that PET will be coregistered to).
-    1. ### MRI processing
-       * Main script: [`process_mris.m`](https://github.com/dschonhaut/leads_processing/blob/main/mri/process_mris.m)
-       * Overview: MRI processing is divided into two submodules:
-         1. T1 MRIs are processed through FreeSurfer [`recon-all`](https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all) and optionally [`segmentBS.sh`](https://surfer.nmr.mgh.harvard.edu/fswiki/BrainstemSubstructures), which
-            segments the brainstem into subregions. This is the most time consuming part of the processing
-            pipeline, taking ~10 hours to run on a single MRI, and currently the PETcore VM is equipped
-            to process only up to 16 scans in parallel. In contrast, the second most time consuming part
-            of processing is SPM segmentation, which takes about 12 minutes per scan.
-         1. Post-FreeSurfer processing is carried out in [`SPM12`](https://www.fil.ion.ucl.ac.uk/spm/software/spm12/). The steps in order are:
-            1. Convert FreeSurfer files from .mgz to .nii, and copy them from the FreeSurfer directory
-               to the processed MRI directory for a given scan.
-            1. Reset origins of the nu.nii, aparc+aseg.nii, and brainstem_sublabels.nii images to the
-               center-of-mass of the nu.nii. Then coregister the nu.nii to the OldNorm T1.nii template
-               in MNI space, and apply the estimated transform to all three images.
-            1. Coregister the nu.nii to the baseline nu.nii (earliest processed MRI for a given subject),
-               and apply the estimated transform to the nu.nii, aparc+aseg.nii, and brainstem_sublabels.nii
-               images. This step is skipped for baseline MRIs.
-            1. Run the [Matlab SUIT toolbox](https://www.diedrichsenlab.org/imaging/suit.htm), which estimates
-               a nonlinear fit between the cerebellar SUIT template and a native space MRI.
-            1. Save reference region and target ROI masks in native MRI space.
-            1. Segment the nu.nii and save deformation fields that map the nonlinear transform from native
-               MRI to MNI space, and vice versa (y_* and iy_* files).
-            1. Warp the nu.nii to MNI space using the y_* deformation field
-            1. Calculate the full (12-degree) affine transform between the native space nu.nii and the OldNorm
-               T1.nii template in MNI space, and save the affine transformation matrix.
-            1. Apply the affine transformation to the native space nu.nii
-    1. ### PET processing
-       * Main script: [`process_pets.m`](https://github.com/dschonhaut/leads_processing/blob/main/pet/process_pets.m)
-       * Overview: PET processing must be performed after the MRI that PET will be coregistered to has
-         been processed, and the [Setup module](#setup) will not schedule PET scans to be processed until this
-         is the case. PET processing includes the following steps, in order:
-         1. Copy the PET scan from **`.../leads/data/raw`** to **`.../leads/data/processed`**
-         1. Coregister and reslice PET to the nu.nii
-         1. Calculate reference region means, and save voxelwise PET SUVR images. The reference regions
-            used to make SUVR imagess are defined in [`ref_regions.csv`](https://github.com/dschonhaut/leads_processing/blob/main/config/ref_regions.csv).
-            Following ADNI processing, default reference regions are:
-            - Amyloid-PET
-              * Whole cerebellum (cross-sectional reference region)
-              * Composite white matter, consisting of the unweighted average PET signal within the brainstem,
-                eroded subcortical white matter, and whole cerebellum (longitudinal reference region)
-            - Tau-PET
-              * Inferior cerebellar gray matter (cross-sectional reference region)
-              * Eroded subcortical white matter (longitudinal reference region)
-            - FDG-PET
-              * Pons
-         1. Extract mean PET SUVRs and ROI volumes within FreeSurfer regios in native MRI space.
-            `fsroi_list_<TRACER>.csv` files in the [**`config`**](https://github.com/dschonhaut/leads_processing/tree/main/config) directory define which regions are saved for each PET tracer.
-         1. For amyloid-PET only, calculate the mean SUVR within the cortical summary region
-            and convert this value to Centiloids.
-         1. Warp PET SUVRs to MNI space using the y_* deformation field from SPM12 segmentation
-            of the nu.nii.
-         1. Linearly transform PET SUVRs to MNI space using the affine transform estimated to
-            scale the nu.nii to MNI space.
+  the user with each call to [`run_leads_mri_based_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/run/run_leads_mri_based_processing.m).
 
-## Processing notes
-- All PET data are now processed at 6mm resolution. The code checks for the resolution of
-  PET scans in the downloaded filenames and alerts the user if the resolution is not 6mm
-  or cannot be determined from the filename. Such scans are not, by default, processed
-  without explicit direction from the user.
-- Zip files downloaded from LONI are now automatically unzipped by the using a faster algorithm
-  than the default `unzip` program in Linux.
-- Dicoms are now automatically converted to nifti using [`dcm2niix`](https://github.com/rordenlab/dcm2niix) version v1.0.20240202.
--
+## Running the processing pipeline
+From an end user's perspective, new MRI and PET data will be downloaded from LONI and manually
+uploaded as one or more zip files to `/mnt/coredata/processing/leads/data/newdata`. The
+`run_leads_mri_based_processing.m` program then needs to be run four times in the following
+order:
+1. Run the **Setup Module** (Option 1, "Setup scans for processing") to move scans from
+   `.../leads/data/newdata` to `.../leads/data/raw` and schedule new MRIs for processing
+   (**_note_**: scans are selected but not yet processed). This module takes 2-3 min to
+   run, and at the end the user is informed of how many scans have been scheduled for
+   processing.
+   1. Optionally, the user can now run `run_leads_mri_based_processing.m` and choose Option 2
+      ("View scans that are scheduled for processing") to see a full list of scheduled scans.
+1. Run the **MRI Module** (Option 3, "Process scheduled MRIs") to process new MRIs through
+   FreeSurfer and SPM-based pipelines.
+1. Rerun the **Setup Module** to schedule new PET scans for processing. This step is necessary
+   because PET scans will not be scheduled until the MRI that they will be coregistered to has
+   been processed.
+   1. As before, running `run_leads_mri_based_processing.m` and choosing Option 2 ("View scans
+      that are scheduled for processing") will print a full list of scheduled PET scans.
+1. Run the **PET Module** (Option 4, "Process scheduled PET scans") to process new PET scans.
 
-### Data organization and file naming
-1. The LEADS project now located at `/mnt/coredata/processing/leads`
-1. A new Linux group, 'leads', has been created to manage write access to this project.
-   All PETcore VM users retain the ability to read and copy out files within 'leads', but
-   only group members will have write access to the data directories, and only I have
-   write access to the codebase. This should offer greater security against files being
-   accidentally modified or deleted by users who mean to copy it elsewhere.
-1. The LEADS directory structure and file naming conventions have been reconsidered:
-    - Raw data is stored in `/mnt/coredata/processing/leads/data/raw`
-    - Processed data is stored in `/mnt/coredata/processing/leads/data/processed`
-    - `MRI_T1` filenames and directories are being changed to `MRI-T1`
-    - MRI-based mask files are being moved from PET directories to the
-    processed `MRI-T1` directory, and PET directories will then symlink
-    to the mask files that are used e.g. in making SUVR images
-    - "w_affine" files are now simply prefixed with "a" to distinguish
-    the linear affine transform from the nonlinear warping prefix "w",
-    e.g. `a<subj>_MRI-T1_<YYYY-MM-DD>_nu.nii`
-- Introduced a Python script (`LEADS_find_new_scans.py`) that identifies
-scans that need to be processed by comparing unprocessed data that has
-been uploaded to `/mnt/coredata/processing/leads/data/raw` against
-processed data in `/mnt/coredata/processing/leads/data/processed`
-    - This includes code that automatically parses the subject ID, scan
-    date, and MRI sequence or tracer type from the file and directory
-    names assigned by LONI and present at the time that the data are
-    downloaded. This code makes use of a new spreadsheet,
-    `/mnt/coredata/processing/leads/metadata/ssheets/scan_types_and_tracers.csv`,
-    that maps LONI-assigned PET tracer names to whatever we want to
-    call them in `/mnt/coredata/processing/leads/data/processed`
-- LEADS code no longer requires subject IDs to begin with LDS*, but
-instead identifies subjects by the directory name in which their data
-is stored in `/mnt/coredata/processing/leads/data/raw`
-- There are no more "Timepoint" directories in the processed file
-hierarchy. Instead, each processed MRI and PET scan has its own
-directory like `/mnt/coredata/processing/leads/data/processed/<subj>/<scan>`,
-and PET scans use symbolic links to point to the MRIs they are
-coregistered to.
-- Hard-coded paths to template files at `/mnt/neuroimaging` have been
-remapped to function outside of the old Singularity image
-- Code to generate QC images has been moved out of the main processing
-pipeline and will be implemented as a separate script
-- Raw data is no longer removed at the end of processing
-- Rewrote the LEADS extraction script and made several changes to the
-output spreadsheets:
-- The entire codebase has been refactored to trim length, provide
-clarifying comments where needed, replace opaque variable names, reduce
-hard-coding (especially in referencing dataframe columns by number or
-substrings by position), create a more modular structure by making
-better use of functions, and improve overall readability
+## Data processing modules
+Here is a somewhat more detailed account of what happens during each processing module.
 
+### Setup
+* Main script: [`setup_leads_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/setup/setup_leads_processing.m)
+* Overview: Newly uploaded data are prepared for subsequent processing
+    1. Zip files in `.../leads/data/newdata` are unzipped
+    1. All DICOMs in `.../leads/data/newdata` are converted to NIfTI using
+    [`dcm2niix`](https://github.com/rordenlab/dcm2niix) (version v1.0.20240202).
+    1. MRI and PET scan directories are moved from `.../leads/data/newdata` to `.../leads/data/raw`
+    if they don't already exist in `.../leads/data/raw`
+    1. All scan directories in `.../leads/data/raw` are identified by a recursive search for
+    *.nii files
+    1. Filenames are parsed to resolve:
+    -  Subject ID
+    -  Scan type (MRI or PET; and for PET, which tracer)
+    -  Scan acquisition date
+    -  LONI Image ID
+    -  For PET scans, the spatial resolution
+    1. Each PET scan is matched to the closest MRI scan
+    1. Orphan MRIs (those not recently acquired and not closest to any PET
+    scan) are identified, and under default settings will not be scheduled
+    for processing
+    1. PET scans are audited for potential issues that would prevent processing.
+    These include:
+    - Inability to parse any of the scan information above
+    - PET not at the expected resolution (6mm by default)
+    - PET and MRI scans too far apart (>365 days, by default)
+    - Same MRI would be used for multiple PET scans of the same tracer (e.g.
+        two FTP timepoints)
+    1. A search is conducted to identify which MRIs in `.../leads/data/raw` have been
+    processed by FreeSurfer, and which have completed post-FreeSurfer,
+    SPM-based processing, respectively
+    1. A search is conducted to identify which PET scans in `.../leads/data/raw` have been
+    fully processed
+    1. MRIs are scheduled for processing if they have not been fully processed,
+    are not orphans, and (for follow-up MRIs) their corresponding baseline
+    MRI has been processed
+    1. PET scans are scheduled for processing if they have not been fully
+    processed, are not flagged with an issue, and their corresponding MRI
+    has been fully processed
+    1. The user is informed of how many MRI and PET scans are in `.../leads/data/raw`,
+    and how many of these scans have completed processing, been flagged with one or
+    more issues, and been scheduled for processing, respectively
+    1. Two CSV files containing scan-level information are saved to
+    'scans_to_process': one for MRIs and one for PET scans. These files are
+    read by downstream scripts in the processing pipeline. Manually editing
+    these files will affect which scans the scripts attempt to process,
+    though could also introduce errors, so edit the CSVs with caution and at
+    your own risk.
+    1. For scans that are scheduled to be processed, new directories are created in
+    `.../leads/data/processed` to store the processed data. Symbolic links are made in
+    these new scan directories that point back to their corresponding directories
+    in `.../leads/data/raw`. A symbolic link in each PET scan directory is also created that
+    points to the directory of the MRI it will be coregistered to.
 
+### MRI
+* Main script: [`process_mris.m`](https://github.com/dschonhaut/leads_processing/blob/main/mri/process_mris.m)
+* Overview: MRI processing is divided into two submodules:
+    1. T1 MRIs are processed through FreeSurfer [`recon-all`](https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all)
+       and [`segmentBS.sh`](https://surfer.nmr.mgh.harvard.edu/fswiki/BrainstemSubstructures), which
+       segments the brainstem into subregions. This is the most time consuming part of the processing
+       pipeline, taking ~10 hours to run on a single MRI, and currently the PETcore VM is equipped
+       to process only up to 16 scans in parallel. In contrast, the second most time consuming part
+       of processing is SPM segmentation, which takes about 12 minutes per scan.
+    1. Post-FreeSurfer processing is carried out in [`SPM12`](https://www.fil.ion.ucl.ac.uk/spm/software/spm12/).
+       The steps in order are:
+       1. FreeSurfer files are converted from .mgz to .nii and copied from the FreeSurfer directory
+          into the processed MRI directory
+       1. Image origins of the nu.nii, aparc+aseg.nii, and brainstem_sublabels.nii files are reset to the
+          center-of-mass of the nu.nii. Rigid body coregistration parameters are then estimated to bring
+          the nu.nii as close as possible to the SPM12 OldNorm T1.nii template in MNI space, and these
+          parameters are applied to the nu.nii, aparc+aseg.nii, and brainstem_sublabels.nii images.
+       1. The nu.nii is coregistered to the baseline nu.nii (earliest processed MRI for a given subject),
+          and the same transform is applied to the aparc+aseg.nii and brainstem_sublabels.nii images.
+          This step is skipped for baseline MRIs.
+       1. The [Matlab SUIT toolbox](https://www.diedrichsenlab.org/imaging/suit.htm) is run to estimate
+          a nonlinear fit between the native space nu.nii and the cerebellar SUIT template.
+       1. Reference region and target ROI masks are saved in native MRI space.
+       1. The nu.nii is segmented into tissue probability maps, and deformation fields that map
+          the nonlinear transforms between native MRI and MNI space are saved (y_* and iy_* files).
+       1. The nu.nii is warped to MNI space using the y_* deformation field
+       1. The full (12-degree) affine transform between the native space nu.nii and the OldNorm
+          T1.nii template in MNI space is estimated and saved.
+       1. The affine transform from the previous step is applied to the native space nu.nii
+
+### PET
+* Main script: [`process_pets.m`](https://github.com/dschonhaut/leads_processing/blob/main/pet/process_pets.m)
+* Overview: PET processing must be performed after the MRI that PET will be coregistered to has
+    been processed, and the [Setup module](#setup) will not schedule PET scans to be processed until this
+    has happened. PET processing includes the following steps, in order:
+    1. The "raw" PET scan is copied from `.../leads/data/raw` to `.../leads/data/processed`
+       - **_Note:_** In LEADS we download already preprocessed PET data, for which reconstructed PET frames have
+         already been realigned and averaged into a single frame spanning a tracer-specific time window of
+         interest. Preprocessed scans have also been resliced to the same voxel size, intensity normalized against
+         mean signal in the whole cerebellum (not FreeSurfer-based), and smoothed to approximately the same resolution.
+         This code will therefore need to be modified before it can be used to process raw PET data (reconstructed frames)
+         rather than preprocessed PET data.
+    1. The PET scan is coregistered and resliced to the nu.nii (at 1mm^3 voxel sizes)
+    1. Reference region means are calculated, and voxelwise PET SUVR images are saved.
+       - Reference regions in the new pipeline are not hard-coded, but rather depend on a
+         [`ref_regions.csv`](https://github.com/dschonhaut/leads_processing/blob/main/config/ref_regions.csv)
+         file that in the `.../leads/code/config` directory. To process a new PET tracer or reference region,
+         the user should need only to add a line to this file and -- if the reference region is not already
+         saved in the processed MRI directory -- add a new script to save the desired reference region
+         and call it from [`save_roi_masks.m`](https://github.com/dschonhaut/leads_processing/blob/main/mri/save_roi_masks.m).
+         If the PET tracer is not recognized, it may need to be added to a different config file,
+         [`scan_types_and_tracers.csv`](https://github.com/dschonhaut/leads_processing/blob/main/config/scan_types_and_tracers.csv).
+       - Following ADNI processing, the default reference regions saved in LEADS are:
+         * Amyloid-PET
+           - Whole cerebellum (cross-sectional reference region)
+           - Composite white matter, consisting of the unweighted average PET signal within the brainstem,
+             eroded subcortical white matter, and whole cerebellum (longitudinal reference region)
+         * Tau-PET
+           - Inferior cerebellar gray matter (cross-sectional reference region)
+           - Eroded subcortical white matter (longitudinal reference region)
+         * FDG-PET
+           - Pons
+    1. Mean PET SUVRs and ROI volumes are extracted from FreeSurfer regions in native MRI space.
+      - The `fsroi_list_<TRACER>.csv` files in
+        [`../leads/code/config`](https://github.com/dschonhaut/leads_processing/tree/main/config)
+        define which ROIs are saved for each PET tracer
+    1. For amyloid-PET only, the mean SUVR within the ADNI cortical summary region is calculated
+       and converted to Centiloids using the appropriate equation from
+       [Royse et al., 2021](https://pubmed.ncbi.nlm.nih.gov/33971965)
+    1. PET SUVRs are warped from native MRI space to MNI space using the y_* deformation field
+       obtained during segmentation of the nu.nii.
+    1. PET SUVRs are linearly transformed from native MRI space to MNI space using the affine transform
+       estimated on the nu.nii.
