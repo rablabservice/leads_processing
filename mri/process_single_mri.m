@@ -79,6 +79,7 @@ function outfiles = process_single_mri( ...
             error('Multiple raw MRI files found in %s', fullfile(mri_dir, 'raw'));
         end
         raw_mrif = abspath(fullfile({files.folder}, {files.name}));
+        raw_mrif = raw_mrif{1};
     end
 
     % Start the log file

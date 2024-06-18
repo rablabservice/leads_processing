@@ -1,4 +1,4 @@
-function outfiles = extract_rois(suvr_files, maskfs, aparcf, roif, fid, overwrite)
+function outfiles = run_pet_roi_extractions(suvr_files, maskfs, aparcf, roif, fid, overwrite)
     % Extract ROI means from one or more PET SUVR images
     % ------------------------------------------------------------------
     arguments
@@ -11,7 +11,8 @@ function outfiles = extract_rois(suvr_files, maskfs, aparcf, roif, fid, overwrit
     end
 
     % Define path to the extract_rois.py program
-    extract_rois_py = '/home/mac/dschonhaut/bin/extract_rois';
+    code_dir = fileparts(fileparts(mfilename('fullpath')));
+    extract_rois_py = fullfile(code_dir, 'nifti', 'extract_rois.py');
 
     % Get the output file paths
     suvr_fields = fieldnames(suvr_files);
@@ -48,7 +49,6 @@ function outfiles = extract_rois(suvr_files, maskfs, aparcf, roif, fid, overwrit
         aparcf = abspath(aparcf);
         % Get the aparc ROI labels file if it wasn't provided
         if isempty(roif)
-            code_dir = fileparts(fileparts(mfilename('fullpath')));
             roif = fullfile(code_dir, 'config', sprintf('fsroi_list_%s.csv', tracer));
         end
     end

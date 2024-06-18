@@ -302,21 +302,23 @@ def main(
         timestamp = now()
         save_raw_mri_index(raw_mris, scans_to_process_dir, timestamp)
         save_raw_pet_index(raw_pets, scans_to_process_dir, timestamp)
+        print("")
 
     # Report how many MRI and PET scans are scheduled for processing
-    pad = 44
+    n_mri_scheduled = len(raw_mris.loc[raw_mris["scheduled_for_processing"] == 1])
+    n_pet_scheduled = len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
+
+    sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled)))
+    sp += int(sp / 3)  # Space to add a comma every 3 digits
+    pad = 43 + sp
     if not save_csv:
-        pad += 30
+        pad += 26 + sp
     print("")
     print("+.." + ("=" * pad) + "..+")
     print("|" + (" " * (pad + 3)) + " |")
     msg = {
-        "mri": "|  {:>5,} MRI scans are scheduled for processing  |".format(
-            len(raw_mris.loc[raw_mris["scheduled_for_processing"] == 1])
-        ),
-        "pet": "|  {:>5,} PET scans are scheduled for processing  |".format(
-            len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
-        ),
+        "mri": f"|  {n_mri_scheduled:>{sp},} MRI scans are scheduled for processing  |",
+        "pet": f"|  {n_pet_scheduled:>{sp},} PET scans are scheduled for processing  |",
     }
     if not save_csv:
         for scan_type in msg:
@@ -329,6 +331,31 @@ def main(
     print("|" + (" " * (pad + 3)) + " |")
     print("+.." + ("=" * pad) + "..+")
     print("")
+
+    # Report the individual scans to be processed
+    if n_mri_scheduled > 0:
+        mris_to_process = (
+            raw_mris.loc[raw_mris["scheduled_for_processing"] == 1]
+            .apply(
+                lambda x: f"{x['subj']}_MRI-T1_{datetime_to_datestr(x['mri_date'])}",
+                axis=1,
+            )
+            .tolist()
+        )
+        print("  All MRIs scheduled to be processed:")
+        print_list(mris_to_process)
+
+    if n_pet_scheduled > 0:
+        pets_to_process = (
+            raw_pets.loc[raw_pets["scheduled_for_processing"] == 1]
+            .apply(
+                lambda x: f"{x['subj']}_{x['tracer']}_{datetime_to_datestr(x['pet_date'])}",
+                axis=1,
+            )
+            .tolist()
+        )
+        print("  All PET scans scheduled to be processed:")
+        print_list(pets_to_process)
 
     return raw_mris, raw_pets
 
@@ -489,7 +516,7 @@ def get_scan_date(filepath, raw_base="raw"):
     # If no date was found in the basename, try the dirname but limit
     # search to everything forward from the raw/ directory
     dirname = op.dirname(filepath)
-    raw_base = "/{raw_base}/"
+    raw_base = f"/{raw_base}/"
     raw_idx = dirname.find(raw_base)
     if raw_idx == -1:
         return np.nan
@@ -759,7 +786,7 @@ def audit_pet(
     # Missing MRI
     idx = pet_scans_cp.loc[pd.isna(pet_scans_cp).any(axis=1)].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "flag_notes"] += f"Missing MRI; "
+    pet_scans_cp.loc[idx, "flag_notes"] += "Missing MRI; "
 
     # PET and MRI scan dates too far apart
     if audit_pet_to_mri_days:
@@ -979,6 +1006,22 @@ def save_raw_pet_index(pet_scans, scans_to_process_dir, timestamp):
     outf = op.join(scans_to_process_dir, f"raw_PET_index_{timestamp}.csv")
     pet_scans.to_csv(outf, index=False)
     print(f"  * Saved raw PET scan index to {outf}")
+
+
+def print_list(lst, max_line=115, sep="  "):
+    """Print a list of strings to the console"""
+    current_line = ""
+    for entry in lst:
+        new_entry = entry
+        new_line = f"{current_line}{sep}{new_entry}"
+        if len(new_line) > max_line:
+            print(current_line)
+            current_line = f"{sep}{new_entry}"
+        else:
+            current_line = new_line
+    if len(current_line) > 0:
+        print(current_line)
+    print()
 
 
 def _parse_args():

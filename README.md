@@ -10,12 +10,12 @@ code by L. Iaccarino in 2018.
 The new codebase is designed to be faster, more readable, and more modular than the
 original codebase. With minimal changes, the new code should also be fully extesible to other
 projects that collect PET and MRI data and want to adopt an MRI-based PET processing pipeline
-with a similar directory structure and file naming conventions.
+with similar directory structure and file naming conventions.
 
 ## Corrections to the original LEADS processing pipeline
-The points below encompass, to the best of our knowledge, all *substantive* differences
+The points below encompass, to the best of my knowledge, all substantive changes
 between the new LEADS pipeline and the older processing code it replaces. Non-substantive
-differences refer to any changes that do not affect the underlying values of processed data
+changes refer to things that do not affect the underlying values of processed data
 (for example, changes to file naming convenctions and directory organization, or changes to
 the code itself that don't affect the end result for files saved).
 1. The original codebase used SPM ImCalc to perform arithmetic operations on PET images
@@ -82,17 +82,13 @@ order:
 1. Run the **Setup Module** (Option 1, "Setup scans for processing") to move scans from
    `.../leads/data/newdata` to `.../leads/data/raw` and schedule new MRIs for processing
    (**_note_**: scans are selected but not yet processed). This module takes 2-3 min to
-   run, and at the end the user is informed of how many scans have been scheduled for
-   processing.
-   1. Optionally, the user can now run `run_leads_mri_based_processing.m` and choose Option 2
-      ("View scans that are scheduled for processing") to see a full list of scheduled scans.
+   run, and at the end the user is informed of how many and which scans have been scheduled
+   for processing.
 1. Run the **MRI Module** (Option 3, "Process scheduled MRIs") to process new MRIs through
    FreeSurfer and SPM-based pipelines.
 1. Rerun the **Setup Module** to schedule new PET scans for processing. This step is necessary
    because PET scans will not be scheduled until the MRI that they will be coregistered to has
    been processed.
-   1. As before, running `run_leads_mri_based_processing.m` and choosing Option 2 ("View scans
-      that are scheduled for processing") will print a full list of scheduled PET scans.
 1. Run the **PET Module** (Option 4, "Process scheduled PET scans") to process new PET scans.
 
 ## Data processing modules

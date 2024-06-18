@@ -26,6 +26,7 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
     % - <mri_dir>/<scan_tag>_mask-cblgm.nii
     % - <mri_dir>/<scan_tag>_mask-eroded-subcortwm.nii
     % - <mri_dir>/<scan_tag>_mask-infcblgm.nii
+    % - <mri_dir>/<scan_tag>_mask-metatemporal.nii
     % - <mri_dir>/<scan_tag>_mask-pons.nii
     % - <mri_dir>/<scan_tag>_mask-wcbl.nii
     % - <mri_dir>/<scan_tag>_mask-subcortwm.nii
@@ -69,6 +70,7 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
         outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, fid, overwrite));
         outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, fid, overwrite));
         outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, fid, overwrite));
+        outfiles = catstruct(outfiles, save_mask_metatemporal(aparcf, fid, overwrite));
         if isfile(suitf)
             outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, fid, overwrite));
         end

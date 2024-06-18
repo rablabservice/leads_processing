@@ -1,5 +1,5 @@
 function output = roi_desc(scanfs, maskfs, subrois, aggf)
-    % Calculate descriptive statistics for within masked voxel_count
+    % Calculate descriptive statistics for scan within one or more ROIs
     %
     % Parameters
     % ----------

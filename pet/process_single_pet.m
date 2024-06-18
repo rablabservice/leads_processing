@@ -34,9 +34,11 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
         raw_petf {mustBeText} = ''
     end
 
+    % ------------------------------------------------------------------
     % Hard-code a list amyloid PET tracers
     amyloid_tracers = {'FBB', 'FBP', 'FLUTE', 'NAV', 'PIB'};
 
+    % ------------------------------------------------------------------
     % Get scan info
     pet_dir = abspath(pet_dir);
     pet_tag = get_scan_tag(pet_dir);
@@ -46,6 +48,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
     mri_dir = fullfile(pet_dir, 'mri');
     mri_tag = get_scan_tag(mri_dir);
 
+    % ------------------------------------------------------------------
     % If processing is already complete and overwrite is false, get
     % the struct of processed MRI files and return
     if processed_pet_files_exist(pet_dir) && ~overwrite
@@ -54,10 +57,12 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
         return
     end
 
+    % ------------------------------------------------------------------
     % Start the log file
     fid = log_start(pet_dir);
 
     try
+        % --------------------------------------------------------------
         % Print the module header
         log_append(fid, '', 0, 0);
         log_append(fid, 'START PET PROCESSING MODULE', 0, 0);
@@ -79,6 +84,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
         end
         log_append(fid, '', 0, 0);
 
+        % --------------------------------------------------------------
         % Find the raw PET scan and copy it in to the processed directory
         if isempty(raw_petf)
             raw_petf = dir(fullfile(pet_dir, 'raw', '*.nii'));
@@ -96,24 +102,30 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
             error('Expected 1 raw PET scan, found %d', length(raw_petf));
         end
 
+        % --------------------------------------------------------------
         % Initialize SPM jobman and PET parameter defaults
         spm_jobman('initcfg');
         spm('defaults','PET');
 
+        % --------------------------------------------------------------
         % Reset origin to axis midpoint
         outfiles.pet = reset_origin_axis_midpoint(outfiles.pet, fid);
 
+        % --------------------------------------------------------------
         % Coregister and reslice PET to the nu.nii
         mri_files = get_freesurfer_files(mri_dir);
         outfiles.rpet = coreg_reslice_pet_to_mri(outfiles.pet, mri_files.nu, fid, overwrite);
 
+        % --------------------------------------------------------------
         % Save SUVRs in native MRI space
         outfiles = catstruct( ...
             outfiles, save_pet_suvrs(outfiles.rpet, mri_dir, fid, overwrite) ...
         );
         [ref_regions, suvr_files] = get_suvr_files(pet_dir);
 
+        % --------------------------------------------------------------
         % Extract ROI means from native MRI space PET SUVRs
+
         % Get paths to any mask files that we want to extract
         maskfs = [];
         for ii = 1:length(ref_regions.masks)
@@ -133,10 +145,11 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
         fsroif = fullfile(code_dir, 'config', append('fsroi_list_', tracer, '.csv'));
 
         % Run the ROI extractions
-        extract_rois( ...
+        run_pet_roi_extractions( ...
             suvr_files, maskfs, mri_files.aparc, fsroif, fid, overwrite ...
         );
 
+        % --------------------------------------------------------------
         % For amyloid PET, calculate the cortical summary SUVR and
         % its corresponding CL value for each reference region
         if tracer_is_amyloid
@@ -146,9 +159,16 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
             cortical_summary_maskf = fullfile( ...
                 mri_dir, append(mri_tag, '_mask-amyloid-cortical-summary.nii') ...
             );
-            calculate_centiloids(suvr_files, cortical_summary_maskf, outfiles.cortical_summary, fid, overwrite);
+            calculate_centiloids( ...
+                suvr_files, ...
+                cortical_summary_maskf, ...
+                outfiles.cortical_summary, ...
+                fid, ...
+                overwrite ...
+            );
         end
 
+        % --------------------------------------------------------------
         % Warp the nu.nii to MNI space using the forward deformation field
         % estimated during segmentation
         mri_files.y = fullfile(mri_dir, append('y_', mri_tag, '_nu.nii'));
@@ -156,12 +176,14 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
             outfiles, apply_warp_to_mni(suvr_files, mri_files.y, fid, overwrite) ...
         );
 
+        % --------------------------------------------------------------
         % Affine transform the nu.nii to MNI space
         mri_files.atf = fullfile(mri_dir, append('atf_', mri_tag, '_nu.mat'));
         outfiles = catstruct( ...
             outfiles, apply_affine_to_mni(suvr_files, mri_files.atf, fid, overwrite) ...
         );
 
+        % --------------------------------------------------------------
         % Identify and log any missing processed files
         log_append(fid, '- Checking for expected output files');
         if processed_pet_files_exist(pet_dir)
@@ -181,12 +203,14 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
             cellfun(@(x) log_append(fid, sprintf('    - %s', x)), outfiles_missing);
         end
 
+        % --------------------------------------------------------------
         % Print the module footer
         log_append(fid, '', 0, 0);
         log_append(fid, '-------------------------', 0, 0);
         log_append(fid, 'END PET PROCESSING MODULE', 0, 0);
         log_append(fid, '', 0, 0);
 
+        % --------------------------------------------------------------
         % Close the log file
         log_close(fid);
     catch ME

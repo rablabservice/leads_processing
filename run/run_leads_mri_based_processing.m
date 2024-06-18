@@ -193,7 +193,7 @@ switch action
                 mri_dirs = unique(abspath(cellvec(mri_dirs)));
 
                 % Confirm the submitted directories
-                n_scans = length(pet_dirs);
+                n_scans = length(mri_dirs);
                 fprintf('\nYou have submitted the following %d MRI scan directories to process:\n', n_scans);
                 for i = 1:n_scans
                     fprintf('  %s\n', mri_dirs{i});
