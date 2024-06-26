@@ -1,4 +1,4 @@
-function process_pets(pet_dirs, scans_to_process_dir, overwrite, max_workers)
+function process_pets(pet_dirs, scans_to_process_dir, overwrite)
     % Process all PET scans that are scheduled for processing
     % in the latest raw_PET_index file
     %
@@ -12,14 +12,11 @@ function process_pets(pet_dirs, scans_to_process_dir, overwrite, max_workers)
     %     The directory that stores raw_PET_index files
     % overwrite : logical
     %     If true, overwrite existing processed data
-    % max_workers : int
-    %     Maximum number of parallel workers
     % ------------------------------------------------------------------
     arguments
         pet_dirs = {}
         scans_to_process_dir {mustBeText} = '/mnt/coredata/processing/leads/metadata/scans_to_process'
         overwrite logical = false
-        max_workers {mustBeNumeric} = 16
     end
 
     % Format paths
@@ -58,7 +55,7 @@ function process_pets(pet_dirs, scans_to_process_dir, overwrite, max_workers)
     % Process multiple scans in parallel
     else
         % Start a parallel pool
-        n_workers = min(length(pet_dirs), max_workers);
+        n_workers = min(length(pet_dirs), maxNumCompThreads);
         poolobj = parpool(n_workers);
 
         % Assign a worker to each scan

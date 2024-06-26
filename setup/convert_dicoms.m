@@ -36,10 +36,20 @@ function convert_dicoms(topdir)
             run_system(cmd, 1, false, true);
         end
     else
+        % Start a parallel pool
+        n_workers = min(n_conv, maxNumCompThreads);
+        poolobj = parpool(n_workers);
+
+        % Assign a worker to each scan
         parfor i = 1:n_conv
             scan_dir = abspath(conv_dirs{i});
             cmd = char(append(dcm2niix, ' -o ', scan_dir, ' ', scan_dir));
             run_system(cmd, 1, false, true);
+        end
+
+        % Close the parallel pool
+        if ~isempty(poolobj)
+            delete(poolobj);
         end
     end
 end

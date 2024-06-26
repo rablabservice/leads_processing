@@ -4,8 +4,7 @@ function process_mris( ...
     overwrite, ...
     segment_brainstem, ...
     process_freesurfer, ...
-    process_post_freesurfer, ...
-    max_workers ...
+    process_post_freesurfer ...
 )
     % Process all MRIs that are scheduled for processing
     % in the latest raw_MRI_index file
@@ -26,8 +25,6 @@ function process_mris( ...
     %     If true, run recon-all on the raw MRI
     % process_post_freesurfer : logical
     %     If true, run post-FreeSurfer processing
-    % max_workers : int
-    %     Maximum number of parallel workers
     % ------------------------------------------------------------------
     arguments
         mri_dirs = {}
@@ -36,7 +33,6 @@ function process_mris( ...
         segment_brainstem logical = true
         process_freesurfer logical = true
         process_post_freesurfer logical = true
-        max_workers {mustBeNumeric} = 16
     end
 
     % Format paths
@@ -82,7 +78,7 @@ function process_mris( ...
     % Process multiple scans in parallel
     else
         % Start a parallel pool
-        n_workers = min(length(mri_dirs), max_workers);
+        n_workers = min(length(mri_dirs), maxNumCompThreads);
         poolobj = parpool(n_workers);
 
         % Assign a worker to each scan
