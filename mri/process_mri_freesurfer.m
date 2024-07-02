@@ -51,6 +51,15 @@ function outfiles = process_mri_freesurfer( ...
             outfiles = get_freesurfer_files(mri_dir, 'mgz');
             return
         end
+    % If processing partially completed already and we are choosing to
+    % rerun recon-all with defaults (e.g. if the servers crashed midway
+    % through FreeSurfer processing), delete the existing FreeSurfer
+    % directory so we can start from a clean slate
+    else
+        if isfolder(fs_dir)
+            log_append(fid, sprintf('- Removing existing FreeSurfer directory: %s', fs_dir));
+            rmdir(fs_dir, 's');
+        end
     end
 
     % Run recon-all
