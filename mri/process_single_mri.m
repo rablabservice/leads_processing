@@ -4,7 +4,8 @@ function outfiles = process_single_mri( ...
     raw_mrif, ...
     segment_brainstem, ...
     process_freesurfer, ...
-    process_post_freesurfer ...
+    process_post_freesurfer, ...
+    run_qc ...
 )
     % Run a single MRI scan through all the processing steps.
     %
@@ -48,6 +49,8 @@ function outfiles = process_single_mri( ...
     %     If true, run recon-all on the raw MRI. Default is true
     % process_post_freesurfer : logical, optional
     %     If true, run post-FreeSurfer processing. Default is true
+    % run_qc : logical, optional
+    %     If true, run the QC script. Default is true
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeFolder}
@@ -56,12 +59,15 @@ function outfiles = process_single_mri( ...
         segment_brainstem logical = true
         process_freesurfer logical = true
         process_post_freesurfer logical = true
+        run_qc logical = true
     end
 
+    % ------------------------------------------------------------------
     % Format paths
     mri_dir = abspath(mri_dir);
     scan_tag = get_scan_tag(mri_dir);
 
+    % ------------------------------------------------------------------
     % If processing is already complete and overwrite is false, get
     % the struct of processed MRI files and return
     if processed_mri_files_exist(mri_dir) && ~overwrite
@@ -70,6 +76,7 @@ function outfiles = process_single_mri( ...
         return
     end
 
+    % ------------------------------------------------------------------
     % If raw_mrif is not passed, find in it mri_dir/raw
     if isempty(raw_mrif)
         files = dir(fullfile(mri_dir, 'raw', '*.nii'));
@@ -82,10 +89,12 @@ function outfiles = process_single_mri( ...
         raw_mrif = raw_mrif{1};
     end
 
+    % ------------------------------------------------------------------
     % Start the log file
     fid = log_start(mri_dir);
 
     try
+        % --------------------------------------------------------------
         % Print the module header
         log_append(fid, '', 0, 0);
         log_append(fid, 'START MRI PROCESSING MODULE', 0, 0);
@@ -110,11 +119,13 @@ function outfiles = process_single_mri( ...
         log_append(fid, sprintf('process_post_freesurfer = %d', process_post_freesurfer), 0, 0);
         log_append(fid, '', 0, 0);
 
+        % --------------------------------------------------------------
         % Run FreeSurfer
         if process_freesurfer
             process_mri_freesurfer(raw_mrif, mri_dir, fid, overwrite, segment_brainstem);
         end
 
+        % --------------------------------------------------------------
         % Run post-FreeSurfer processing
         if process_post_freesurfer
             if freesurfer_files_exist(mri_dir)
@@ -124,6 +135,18 @@ function outfiles = process_single_mri( ...
             end
         end
 
+        % --------------------------------------------------------------
+        % Save the QC image
+        if run_qc
+            log_append(fid, '- Generating QC image');
+            python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
+            code_dir = fileparts(fileparts(mfilename('fullpath')));
+            qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
+            cmd = sprintf('%s %s %s', python, qc_script, mri_dir);
+            system(cmd);
+        end
+
+        % --------------------------------------------------------------
         % Identify and log any missing processed files
         log_append(fid, '- Checking for expected output files');
         if processed_mri_files_exist(mri_dir)
@@ -143,12 +166,14 @@ function outfiles = process_single_mri( ...
             cellfun(@(x) log_append(fid, sprintf('    - %s', x)), outfiles_missing);
         end
 
+        % --------------------------------------------------------------
         % Print the module footer
         log_append(fid, '', 0, 0);
         log_append(fid, '-------------------------', 0, 0);
         log_append(fid, 'END MRI PROCESSING MODULE', 0, 0);
         log_append(fid, '', 0, 0);
 
+        % --------------------------------------------------------------
         % Close the log file
         log_close(fid);
     catch ME
