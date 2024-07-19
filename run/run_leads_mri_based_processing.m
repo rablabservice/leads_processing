@@ -13,8 +13,8 @@
 % - MRIs and FreeSurfer-based parcellation files recentered to the
 %   nu.nii center-of-mass then coregistered to SPM12 OldNorm T1 template
 % - Follow-up MRIs coregistered to baseline MRI
-% - ROI masks saved out for reference regions and target ROIs
 % - MRIs segmented and warped to MNI space
+% - ROI masks saved out for reference regions and target ROIs
 % - MRIs affine transformed to transformation to the SPM12 OldNorm T1
 %   template (for visualization purposes only)
 %

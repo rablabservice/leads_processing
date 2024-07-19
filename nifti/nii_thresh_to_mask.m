@@ -8,9 +8,10 @@ function mask = nii_thresh_to_mask(infile, lower, upper, outfile, fid, overwrite
     % ----------
     % infile : char|string
     %     Path to the input nifti file
-    % labels : array
-    %     Array of integers that represent the indices of the elements
-    %     that should be included in the mask
+    % lower : float
+    %     Threshold at or below which voxels are excluded from the mask
+    % upper : float
+    %     Threshold at or above which voxels are excluded from the mask
     % outfile : char
     %     Path to the output nifti file
     % fid : int, optional

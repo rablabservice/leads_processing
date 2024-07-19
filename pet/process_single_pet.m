@@ -1,4 +1,4 @@
-function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
+function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
     % Process a single PET scan through all the processing steps.
     %
     % Overview
@@ -22,6 +22,11 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
     %     The directory containing PET scan data.
     % overwrite : logical
     %     Flag to overwrite existing processed files.
+    % raw_petf : string, optional
+    %     Full path to the raw PET nifti. If not passed, this is assumed
+    %     to be the first .nii file in pet_dir/raw
+    % run_qc : logical, optional
+    %     If true, run the QC script. Default is true
     %
     % Returns
     % -------
@@ -32,6 +37,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
         pet_dir {mustBeFolder}
         overwrite logical = false
         raw_petf {mustBeText} = ''
+        run_qc logical = true
     end
 
     % ------------------------------------------------------------------
@@ -53,7 +59,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
     % the struct of processed MRI files and return
     if processed_pet_files_exist(pet_dir) && ~overwrite
         fprintf('%s processing already complete, returning output files\n', pet_tag);
-        outfiles = get_processed_pet_files(mri_dir);
+        outfiles = get_processed_pet_files(pet_dir);
         return
     end
 
@@ -182,6 +188,17 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf)
         outfiles = catstruct( ...
             outfiles, apply_affine_to_mni(suvr_files, mri_files.atf, fid, overwrite) ...
         );
+
+        % --------------------------------------------------------------
+        % Save the QC image
+        if run_qc
+            log_append(fid, '- Generating QC image');
+            python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
+            code_dir = fileparts(fileparts(mfilename('fullpath')));
+            qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
+            cmd = sprintf('%s %s %s', python, qc_script, pet_dir);
+            system(cmd);
+        end
 
         % --------------------------------------------------------------
         % Identify and log any missing processed files

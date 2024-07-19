@@ -169,9 +169,9 @@ Here is a somewhat more detailed account of what happens during each processing 
           This step is skipped for baseline MRIs.
        1. The [Matlab SUIT toolbox](https://www.diedrichsenlab.org/imaging/suit.htm) is run to estimate
           a nonlinear fit between the native space nu.nii and the cerebellar SUIT template.
-       1. Reference region and target ROI masks are saved in native MRI space.
-       1. The nu.nii is segmented into tissue probability maps, and deformation fields that map
+          1. The nu.nii is segmented into tissue probability maps, and deformation fields that map
           the nonlinear transforms between native MRI and MNI space are saved (y_* and iy_* files).
+       1. Reference region and target ROI masks are saved in native MRI space.
        1. The nu.nii is warped to MNI space using the y_* deformation field
        1. The full (12-degree) affine transform between the native space nu.nii and the OldNorm
           T1.nii template in MNI space is estimated and saved.
