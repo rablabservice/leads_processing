@@ -21,9 +21,9 @@ function outfiles = process_single_mri( ...
     %     FreeSurfer files are now in native MRI space
     % 6.  Run SUIT and inverse warp cerebellar subregions to native MRI
     %     space
-    % 7.  Save reference region and target ROI masks in native MRI space
-    % 8.  Segment nu.nii and save deformation fields between native MRI
+    % 7.  Segment nu.nii and save deformation fields between native MRI
     %     and MNI space
+    % 8.  Save reference region and target ROI masks in native MRI space
     % 9.  Warp nu.nii to MNI space
     % 10. Use nu.nii to calculate and save the full affine transform
     %     from native MRI to MNI space

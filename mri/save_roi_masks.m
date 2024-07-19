@@ -1,4 +1,4 @@
-function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
+function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf, c3f)
     % Save out mask files used as reference regions or target ROIs.
     %
     % If mri_dir is passed, look up the aparc and brainstem files in
@@ -17,6 +17,8 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
     %   Path to the aparc+aseg .nii file
     % bstemf : char or str array, optional
     %   Path to the brainstem sublabels .nii file
+    % c3f : char or str array, optional
+    %   Path to the CSF tissue probability map from SPM segmentation
     %
     % Files created
     % -------------
@@ -38,6 +40,7 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
         overwrite logical = false
         aparcf = ''
         bstemf = ''
+        c3f = ''
     end
 
     % Format parameters
@@ -45,9 +48,11 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
         mri_files = get_freesurfer_files(mri_dir);
         aparcf = mri_files.aparc;
         bstemf = mri_files.bstem;
+        c3f = fullfile(fileparts(mri_files.nu), sprintf('c3%s', basename(mri_files.nu)));
     else
         aparcf = abspath(aparcf);
         bstemf = abspath(bstemf);
+        c3f = abspath(c3f);
     end
     scan_tag = get_scan_tag(mri_dir);
     suitf = fullfile(mri_dir, append(scan_tag, '_cbl-suit.nii'));
@@ -69,7 +74,7 @@ function outfiles = save_roi_masks(mri_dir, fid, overwrite, aparcf, bstemf)
         outfiles = catstruct(outfiles, save_mask_wcbl(aparcf, fid, overwrite));
         outfiles = catstruct(outfiles, save_mask_brainstem(aparcf, fid, overwrite));
         outfiles = catstruct(outfiles, save_mask_amyloid_cortical_summary(aparcf, fid, overwrite));
-        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, fid, overwrite));
+        outfiles = catstruct(outfiles, save_mask_eroded_subcortwm(aparcf, c3f, fid, overwrite));
         outfiles = catstruct(outfiles, save_mask_metatemporal(aparcf, fid, overwrite));
         if isfile(suitf)
             outfiles = catstruct(outfiles, save_mask_infcblgm(aparcf, suitf, fid, overwrite));

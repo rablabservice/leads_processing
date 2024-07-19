@@ -11,9 +11,9 @@ function outfiles = process_mri_post_freesurfer(mri_dir, fid, overwrite)
     %     FreeSurfer files are now in native MRI space
     % 4.  Run SUIT and inverse warp cerebellar subregions to native MRI
     %     space
-    % 5.  Save reference region and target ROI masks in native MRI space
-    % 6.  Segment nu.nii and save deformation fields between native MRI
+    % 5.  Segment nu.nii and save deformation fields between native MRI
     %     and MNI space
+    % 6.  Save reference region and target ROI masks in native MRI space
     % 7.  Warp nu.nii to MNI space
     % 8.  Use nu.nii to calculate and save the full affine transform
     %     from native MRI to MNI space
@@ -74,12 +74,12 @@ function outfiles = process_mri_post_freesurfer(mri_dir, fid, overwrite)
     % Run SUIT to get the cerebellar atlas in native MRI space
     outfiles = catstruct(outfiles, run_suit(mri_dir, fid, overwrite));
 
-    % Save reference region and target ROI mask files
-    outfiles = catstruct(outfiles, save_roi_masks(mri_dir, fid, overwrite));
-
     % Segment the nu.nii and save forward and inverse deformation fields
     % for later use in warping images between native MRI and MNI space
     outfiles = catstruct(outfiles, segment_mri(outfiles.nu, fid, overwrite));
+
+    % Save reference region and target ROI mask files
+    outfiles = catstruct(outfiles, save_roi_masks(mri_dir, fid, overwrite));
 
     % Warp the nu.nii to MNI space using the forward deformation field
     % estimated during segmentation
