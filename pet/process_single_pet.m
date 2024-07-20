@@ -91,36 +91,50 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
         log_append(fid, '', 0, 0);
 
         % --------------------------------------------------------------
-        % Find the raw PET scan and copy it in to the processed directory
-        if isempty(raw_petf)
-            raw_petf = dir(fullfile(pet_dir, 'raw', '*.nii'));
-            raw_petf = abspath(fullfile({raw_petf.folder}, {raw_petf.name}));
-        end
-        outfiles.pet = fullfile(pet_dir, append(pet_tag, '.nii'));
-        if length(raw_petf) == 1
-            copyfile(raw_petf{1}, outfiles.pet);
-            log_append(fid, sprintf( ...
-                ['- Copying raw PET .nii file to the processed scan directory\n' ...
-                 '            %s ->\n            %s'], ...
-                basename(raw_petf{1}), basename(outfiles.pet) ...
-            ));
-        else
-            error('Expected 1 raw PET scan, found %d', length(raw_petf));
-        end
-
-        % --------------------------------------------------------------
         % Initialize SPM jobman and PET parameter defaults
         spm_jobman('initcfg');
         spm('defaults','PET');
 
         % --------------------------------------------------------------
+        % Find the raw PET scan and copy it in to the processed directory)
+        outfiles.pet = fullfile(pet_dir, append(pet_tag, '.nii'));
+        if isfile(outfiles.pet) && ~overwrite
+            log_append(fid, sprintf([ ...
+                '- Raw PET nifti has already been copied to the processed PET ' ...
+                'directory;\n            will not overwrite or reset origin' ...
+            ]));
+            reset_origin = false;
+        else
+            if isempty(raw_petf)
+                raw_petf = dir(fullfile(pet_dir, 'raw', '*.nii'));
+                raw_petf = abspath(fullfile({raw_petf.folder}, {raw_petf.name}));
+            end
+
+            if length(raw_petf) == 1
+                copyfile(raw_petf{1}, outfiles.pet);
+                log_append(fid, sprintf( ...
+                    ['- Copying raw PET .nii file to the processed scan directory\n' ...
+                    '            %s ->\n            %s'], ...
+                    basename(raw_petf{1}), basename(outfiles.pet) ...
+                ));
+                reset_origin = true;
+            else
+                error('Expected 1 raw PET scan, found %d', length(raw_petf));
+            end
+        end
+
+        % --------------------------------------------------------------
         % Reset origin to axis midpoint
-        outfiles.pet = reset_origin_axis_midpoint(outfiles.pet, fid);
+        if reset_origin
+            outfiles.pet = reset_origin_axis_midpoint(outfiles.pet, fid);
+        end
 
         % --------------------------------------------------------------
         % Coregister and reslice PET to the nu.nii
         mri_files = get_freesurfer_files(mri_dir);
-        outfiles.rpet = coreg_reslice_pet_to_mri(outfiles.pet, mri_files.nu, fid, overwrite);
+        outfiles.rpet = coreg_reslice_pet_to_mri( ...
+            outfiles.pet, mri_files.nu, fid, overwrite ...
+        );
 
         % --------------------------------------------------------------
         % Save SUVRs in native MRI space

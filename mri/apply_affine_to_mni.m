@@ -52,23 +52,31 @@ function outfiles = apply_affine_to_mni(infiles, atf, fid, overwrite, interp, vo
 
     % Check existence of output files
     outfiles = add_presuf(infiles, prefix);
-    if all(isfile(outfiles)) && ~overwrite
-        log_append(fid, '- Affine transformed files exist, will not overwrite');
-        outfiles = format_outfiles(infiles_cp, prefix);
-        return
-    else
-        log_append(fid, '- Affine transforming images to MNI space:');
-        for ii = 1:length(infiles)
-            if ~isempty(prefix)
-                msg = sprintf( ...
-                    '  * %s ->\n              %s', ...
-                    basename(infiles{ii}), ...
-                    basename(outfiles{ii}) ...
-                );
-                log_append(fid, msg);
-            else
-                log_append(fid, sprintf('  * %s', basename(infiles{ii})));
-            end
+    outfile_exists = isfile(outfiles);
+    if any(outfile_exists) && ~overwrite
+        if all(outfile_exists)
+            log_append(fid, '- Affine transformed files exist, will not overwrite');
+            outfiles = format_outfiles(infiles_cp, prefix);
+            return
+        else
+            log_append(fid, '- Some affine transformed files exist, will not overwrite them');
+            infiles = infiles(~outfile_exists);
+            outfiles = outfiles(~outfile_exists);
+        end
+    end
+
+    % Log the files that will be warped
+    log_append(fid, '- Affine transforming images to MNI space:');
+    for ii = 1:length(infiles)
+        if ~isempty(prefix)
+            msg = sprintf( ...
+                '  * %s ->\n              %s', ...
+                basename(infiles{ii}), ...
+                basename(outfiles{ii}) ...
+            );
+            log_append(fid, msg);
+        else
+            log_append(fid, sprintf('  * %s', basename(infiles{ii})));
         end
     end
 

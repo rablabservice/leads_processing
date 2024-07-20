@@ -12,18 +12,31 @@ original codebase. With minimal changes, the new code should also be fully extes
 projects that collect PET and MRI data and want to adopt an MRI-based PET processing pipeline
 with similar directory structure and file naming conventions.
 
-## Corrections to the original LEADS processing pipeline
+## Changes to the LEADS processing pipeline
 The points below encompass, to the best of my knowledge, all substantive changes
 between the new LEADS pipeline and the older processing code it replaces. Non-substantive
 changes refer to things that do not affect the underlying values of processed data
 (for example, changes to file naming convenctions and directory organization, or changes to
 the code itself that don't affect the end result for files saved).
-1. The original codebase used SPM ImCalc to perform arithmetic operations on PET images
-   (e.g. create an SUVR by dividing PET voxels by a scalar value). However, the ImCalc code
-   was programmed to cast output values to an inappropriate data type (int16 for continuous
-   values) and reduced the decimal precision vs. the input values by 4-fold. In the new
-   codebase, SPM ImCalc is no longer used (working with Matlab arrays is faster) but all
-   NIfTI images that hold continuous values are stored at float32 precision.
+1. Our method for creating the eroded subcortical white matter mask has changed. Previously,
+   we smoothed FreeSurfer's Cerebral WM mask (aparc+aseg labels 2 and 41) by 8mm^3 FWHM,
+   then binarized voxels in the smoothed image > 0.7 to obtain the eroded mask. Our new
+   method works as follows:
+   1. Create a subcortical WM mask by combining FreeSurfer's aparc+aseg labels 2 and 41
+      and binarizing the output.
+   1. Zero-out any voxels in the subcortical WM mask with >0.5 probability of being in the
+      CSF, according to the c3 image from SPM12 segmentation. This gives the final subcortical
+      WM mask that is used in later steps. We added this step to the method after noting that
+      aparc+aseg labels 2 and 41 sometimes encompass portions of the lateral ventricles in
+      MRIs with severe ventricular enlargement
+   1. In SPM12, smooth the subcortical WM mask by 8mm^3 FWHM
+   1. Binarize smoothed voxels > 0.7 to obtain the initial eroded subcortical WM mask
+   1. Zero-out any voxels in the eroded subcortical WM mask that are not present in the
+      subcortical WM mask. This gives the final eroded subcortical WM mask. This step was
+      missing from our initial LEADS processing pipeline and is not described in ADNI PET
+      processing documents or prior publications in which the ADNI-style eroded WM mask is
+      used. Upon reviewing ADNI's code directly though, we found that this final remasking
+      step is part of their processing pipeline.
 1. Corrected an error in the algorithm to calculate a global amyloid SUVR and
    corresponding Centiloid value using the ADNI longitudinal reference region. To obtain
    the reference region scaling factor, our original code calculated a weighted mean across
@@ -44,6 +57,12 @@ the code itself that don't affect the end result for files saved).
    a nonlinear transformation between each subject's cerebellum in native space and the
    'SUIT space' template cerebellum. Previously we had used the iy_ file defined during
    SPM segmentation to reverse normalize an MNI space version of the SUIT template.
+1. The original codebase used SPM ImCalc to perform arithmetic operations on PET images
+   (e.g. create an SUVR by dividing PET voxels by a scalar value). However, the ImCalc code
+   was programmed to cast output values to an inappropriate data type (int16 for continuous
+   values) and reduced the decimal precision vs. the input values by 4-fold. In the new
+   codebase, SPM ImCalc is no longer used (working with Matlab arrays is faster) but all
+   NIfTI images that hold continuous values are stored at float32 precision.
 1. The regularization parameters used for SPM segmentation in the original LEADS codebase
    differed slightly from the default regularization parameters used by SPM12.
    (original LEADS: matlabbatch{1}.spm.spatial.preproc.warp.reg = [0 0.001 0.5 0.025 0.1];)

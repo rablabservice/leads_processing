@@ -56,10 +56,17 @@ function outfiles = run_pet_roi_extractions(suvr_files, maskfs, aparcf, roif, fi
     % Extract ROI means from each PET image
     log_append(fid, '- Extracting ROI means from PET SUVRs in native MRI space:');
     for ii = 1:length(suvr_files)
-        % Construct the ROI extraction command
         suvr_file = suvr_files{ii};
         roi_field = roi_fields{ii};
         outfile = outfiles.(roi_field);
+
+        % Check if the output file already exists
+        if isfile(outfile) && ~overwrite
+            log_append(fid, sprintf('  * %s exists, will not overwrite', basename(outfile)));
+            continue
+        end
+
+        % Construct the ROI extraction command
         cmd = sprintf('%s --images %s', extract_rois_py, suvr_file);
         if ~isempty(maskfs)
             cmd = sprintf('%s --masks %s', cmd, strjoin(maskfs));
