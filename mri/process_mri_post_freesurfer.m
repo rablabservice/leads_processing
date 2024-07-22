@@ -56,20 +56,41 @@ function outfiles = process_mri_post_freesurfer(mri_dir, fid, overwrite)
     spm_jobman('initcfg');
     spm('defaults','PET');
 
+    % Check if FreeSurfer files have already been converted to nifti
+    outfiles = get_freesurfer_files(mri_dir);
+    if all(structfun(@isfile, outfiles)) && ~overwrite
+        log_append(fid, sprintf([ ...
+            '- FreeSurfer .mgz files have already been converted to .nii; will skip\n' ...
+            '            conversion, recentering, and coregistering these files to the baseline\n' ...
+            '            MRI as these steps have presumably already been completed. Rerun with\n' ...
+            '            overwrite=true to redo these steps' ...
+        ]));
+        skip_mri_convert_recenter_coreg = true;
+    else
+        skip_mri_convert_recenter_coreg = false;
+    end
+
+
     % Copy FreeSurfer files to the subject's processed MRI directory
     % and convert them from .mgz to .nii
-    outfiles = copy_convert_freesurfer(mri_dir, fid, overwrite);
+    if ~skip_mri_convert_recenter_coreg
+        outfiles = copy_convert_freesurfer(mri_dir, fid, overwrite);
+    end
 
     % Reset origin of the nu.nii to its center-of-mass, then coregister
     % to the OldNorm T1 template. Apply transforms to aparc+aseg and
     % brainstem seg files. This step overwrites affine transforms in the
     % input image headers but does not affect their data arrays
-    reset_origin_mri_com(outfiles, fid);
+    if ~skip_mri_convert_recenter_coreg
+        reset_origin_mri_com(outfiles, fid);
+    end
 
     % Coregister nu.nii to subject's baseline nu.nii. Apply transforms
     % to aparc+aseg and brainstem seg files. Overwrites affines in the
     % input image headers but does not affect their data arrays
-    coreg_mri_to_baseline(outfiles, fid);
+    if ~skip_mri_convert_recenter_coreg
+        coreg_mri_to_baseline(outfiles, fid);
+    end
 
     % Run SUIT to get the cerebellar atlas in native MRI space
     outfiles = catstruct(outfiles, run_suit(mri_dir, fid, overwrite));
