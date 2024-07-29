@@ -14,7 +14,7 @@ function response = prompt_text(question, default_response, confirm_response)
     else
         question_full = sprintf('%s (default = ''%s'')', question, default_response);
     end
-    question_full = append(question_full, '\n>> ');
+    question_full = append(question_full, '\n');
 
     % Prompt the user
     response = input(question_full, 's');

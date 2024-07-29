@@ -38,7 +38,7 @@ function response = prompt_bool( ...
     % Enter the prompt loop
     if require_response
         % Format the question
-        yes_no_question_full = append(yes_no_question, ' (y/n)\n>> ');
+        yes_no_question_full = append(yes_no_question, ' (y/n)\n');
 
         % Prompt the user
         user_response = input(yes_no_question_full, 's');
@@ -98,7 +98,7 @@ function response = prompt_bool( ...
         else
             yes_no_question_full = append(yes_no_question, ' (default=n)');
         end
-        yes_no_question_full = append(yes_no_question_full, ' (y/n)\n>> ');
+        yes_no_question_full = append(yes_no_question_full, ' (y/n)\n');
 
         % Prompt the user
         user_response = input(yes_no_question_full, 's');

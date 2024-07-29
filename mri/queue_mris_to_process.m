@@ -32,8 +32,8 @@ function mri_dirs = queue_mris_to_process(scans_to_process_dir)
     n_subjs_processed = numel(unique(raw_mris.subj(raw_mris.mri_processing_complete == 1)));
     n_scans_to_process = sum(raw_mris.scheduled_for_processing);
     n_subjs_to_process = numel(unique(raw_mris.subj(raw_mris.scheduled_for_processing == 1)));
-    n_baseline_scans_to_process = sum(raw_mris.scheduled_for_processing(raw_mris.mri_scan_number == 0));
-    n_followup_scans_to_process = sum(raw_mris.scheduled_for_processing(raw_mris.mri_scan_number > 0));
+    n_baseline_scans_to_process = sum(raw_mris.scheduled_for_processing(raw_mris.mri_scan_number == 1));
+    n_followup_scans_to_process = sum(raw_mris.scheduled_for_processing(raw_mris.mri_scan_number > 1));
     n_scans_to_reprocess = sum(raw_mris.scheduled_for_processing(raw_mris.mri_processing_complete == 1));
     fprintf('  * %d MRIs from %d subjects in total\n', n_scans, n_subjs);
     fprintf('  * %d MRIs from %d subjects have completed FreeSurfer processing\n', n_scans_freesurfer_complete, n_subjs_freesurfer_complete);

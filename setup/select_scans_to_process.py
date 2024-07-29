@@ -11,15 +11,20 @@ import os
 import os.path as op
 import re
 import sys
+import warnings
 from glob import glob
 
 import numpy as np
 import pandas as pd
 
 
+# Define globals
+AMYLOID_TRACERS = ["FBB", "FBP", "FLUTE", "NAV", "PIB"]
+
+
 def main(
     proj_dir,
-    orphan_mri_tolerance=100,
+    orphan_mri_tolerance=182,
     schedule_all_mris=False,
     overwrite=False,
     audit_pet_res=True,
@@ -143,13 +148,14 @@ def main(
 
     # Figure out which MRIs are actually used for PET processing
     raw_mris = get_orphan_mris(raw_mris, raw_pets, orphan_mri_tolerance)
-    print(
-        f"  * Auditing MRIs in {raw_dir}",
-        "    - {:,} MRIs are orphans (>{} days old and not linked to any PET scan).".format(
-            raw_mris["mri_is_orphan"].sum(), orphan_mri_tolerance
-        ),
-        sep="\n",
-    )
+    n_orphans = raw_mris["mri_is_orphan"].sum()
+    print("  * Auditing MRIs in {raw_dir}")
+    if n_orphans == 0:
+        print("    - All MRIs are linked to a PET scan.")
+    else:
+        print(
+            f"    - {n_orphans:,} MRIs are orphans (>{orphan_mri_tolerance} days old and not linked to any PET scan)."
+        )
     if schedule_all_mris:
         msg = "      These scans will still be scheduled for processing at the user's request"
     else:
@@ -193,14 +199,17 @@ def main(
     raw_mris["freesurfer_complete"] = raw_mris["mri_proc_dir"].apply(
         lambda x: check_if_freesurfer_run(x, check_brainstem)
     )
+    raw_mris["mri_seg_complete"] = raw_mris["mri_proc_dir"].apply(
+        check_if_mri_seg_complete
+    )
     raw_mris["mri_processing_complete"] = raw_mris["mri_proc_dir"].apply(
         check_if_mri_processed
     )
 
     # Schedule MRIs for processing
-    baseline_mri_processed = (
+    baseline_mri_seg_complete = (
         raw_mris.loc[raw_mris["mri_scan_number"] == 1]
-        .set_index("subj")["mri_processing_complete"]
+        .set_index("subj")["mri_seg_complete"]
         .to_dict()
     )
     raw_mris["scheduled_for_processing"] = raw_mris.apply(
@@ -208,7 +217,7 @@ def main(
             x["mri_scan_number"],
             x["mri_is_orphan"],
             x["mri_processing_complete"],
-            baseline_mri_processed[x["subj"]],
+            baseline_mri_seg_complete[x["subj"]],
             overwrite,
             schedule_all_mris,
         ),
@@ -243,14 +252,19 @@ def main(
             len(raw_mris_opt),
         )
     )
-    _n = len(
-        raw_mris_req.query(
-            "(mri_processing_complete == 0) & (scheduled_for_processing == 0)"
-        )
-    )
+    qry = "(mri_processing_complete == 0) & (scheduled_for_processing == 0)"
+    _n = len(raw_mris_req.query(qry))
     if _n:
         print(
-            f"    - {_n:,} required, follow-up MRIs cannot be processed until baseline MRI is processed"
+            f"    - {_n:,} required, follow-up MRIs cannot be processed until baseline MRI is processed:"
+        )
+        print_list(
+            raw_mris_req.query(qry)
+            .apply(
+                lambda x: f"{x['subj']}_MRI-T1_{datetime_to_datestr(x['mri_date'])}",
+                axis=1,
+            )
+            .tolist()
         )
 
     # Determine which PET scans have been processed
@@ -294,8 +308,9 @@ def main(
     _n = len(raw_pets.query(qry))
     if _n:
         print(
-            f"    - {_n:,} PET scans cannot be processed until their corresponding MRI is processed"
+            f"    - {_n:,} PET scans cannot be processed until their corresponding MRI is processed:"
         )
+        print_list(raw_pets.query(qry)["pet_proc_dir"].apply(get_scan_tag).tolist())
 
     # Save the raw scan dataframes to CSV files
     if save_csv:
@@ -306,19 +321,35 @@ def main(
 
     # Report how many MRI and PET scans are scheduled for processing
     n_mri_scheduled = len(raw_mris.loc[raw_mris["scheduled_for_processing"] == 1])
+    n_mri_scheduled_full = len(
+        raw_mris.loc[
+            (raw_mris["scheduled_for_processing"] == 1)
+            & (raw_mris["freesurfer_complete"] == 0)
+        ]
+    )
+    n_mri_scheduled_partial = len(
+        raw_mris.loc[
+            (raw_mris["scheduled_for_processing"] == 1)
+            & (raw_mris["freesurfer_complete"] == 1)
+        ]
+    )
     n_pet_scheduled = len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
 
-    sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled)))
+    sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled))) + 1
     sp += int(sp / 3)  # Space to add a comma every 3 digits
-    pad = 43 + sp
+    pad = 42 + sp
     if not save_csv:
-        pad += 26 + sp
+        pad += 25 + sp
     print("")
     print("+.." + ("=" * pad) + "..+")
     print("|" + (" " * (pad + 3)) + " |")
     msg = {
-        "mri": f"|  {n_mri_scheduled:>{sp},} MRI scans are scheduled for processing  |",
-        "pet": f"|  {n_pet_scheduled:>{sp},} PET scans are scheduled for processing  |",
+        "mri": f"|  {n_mri_scheduled:>{sp},} MRI scans are scheduled for processing"
+        + (" " * sp)
+        + "|",
+        "pet": f"|  {n_pet_scheduled:>{sp},} PET scans are scheduled for processing"
+        + (" " * sp)
+        + "|",
     }
     if not save_csv:
         for scan_type in msg:
@@ -334,28 +365,47 @@ def main(
 
     # Report the individual scans to be processed
     if n_mri_scheduled > 0:
-        mris_to_process = (
-            raw_mris.loc[raw_mris["scheduled_for_processing"] == 1]
-            .apply(
-                lambda x: f"{x['subj']}_MRI-T1_{datetime_to_datestr(x['mri_date'])}",
-                axis=1,
-            )
-            .tolist()
-        )
         print("  All MRIs scheduled to be processed:")
-        print_list(mris_to_process)
+        if n_mri_scheduled_full > 0:
+            mris_to_process_full = (
+                raw_mris.query(
+                    "(scheduled_for_processing==1) & (freesurfer_complete==0)"
+                )["mri_proc_dir"]
+                .apply(get_scan_tag)
+                .tolist()
+            )
+            print("\n  FreeSurfer + SPM processing", "  " + ("-" * 27), sep="\n")
+            print_list(mris_to_process_full)
+        if n_mri_scheduled_partial > 0:
+            mris_to_process_partial = (
+                raw_mris.query(
+                    "(scheduled_for_processing==1) & (freesurfer_complete==1)"
+                )["mri_proc_dir"]
+                .apply(get_scan_tag)
+                .tolist()
+            )
+            print(
+                "\n  Just post-FreeSurfer SPM processing", "  " + ("-" * 35), sep="\n"
+            )
+            print_list(mris_to_process_partial)
 
     if n_pet_scheduled > 0:
-        pets_to_process = (
-            raw_pets.loc[raw_pets["scheduled_for_processing"] == 1]
-            .apply(
-                lambda x: f"{x['subj']}_{x['tracer']}_{datetime_to_datestr(x['pet_date'])}",
-                axis=1,
+        tracers_to_process = raw_pets.loc[
+            raw_pets["scheduled_for_processing"] == 1, "tracer"
+        ].unique()
+        print("\n  All PET scans scheduled to be processed:")
+        for tracer in tracers_to_process:
+            pets_to_process = (
+                raw_pets.loc[
+                    (raw_pets["scheduled_for_processing"] == 1)
+                    & (raw_pets["tracer"] == tracer),
+                    "pet_proc_dir",
+                ]
+                .apply(get_scan_tag)
+                .tolist()
             )
-            .tolist()
-        )
-        print("  All PET scans scheduled to be processed:")
-        print_list(pets_to_process)
+            print(f"\n  {tracer}", "  " + ("-" * len(tracer)), sep="\n")
+            print_list(pets_to_process)
 
     return raw_mris, raw_pets
 
@@ -578,6 +628,23 @@ def get_pet_resolution(filepath):
         return np.nan
 
 
+def get_scan_tag(proc_dir):
+    """Return the scan tag from the processed scan directory."""
+    if op.isfile(proc_dir):
+        proc_dir = op.dirname(proc_dir)
+    subj = op.basename(op.dirname(op.normpath(proc_dir)))
+    scan_type = op.basename(proc_dir).split("_")[0]
+    scan_date = op.basename(proc_dir).split("_")[-1]
+    scan_tag = f"{subj}_{scan_type}_{scan_date}"
+    return scan_tag
+
+
+def parse_scan_tag(scan_tag):
+    """Return subject ID, scan type, and scan date from the scan tag."""
+    subj, scan_type, scan_date = scan_tag.split("_")
+    return subj, scan_type, scan_date
+
+
 def add_mri_date_columns(mri_scans):
     """Add info on time between PET and MRI and adjacent PET scans"""
     # Copy the input dataframe
@@ -683,7 +750,7 @@ def find_closest_mri_to_pet(pet_scans, mri_scans):
     return merged_min
 
 
-def get_orphan_mris(mri_scans, pet_scans, orphan_mri_tolerance=100):
+def get_orphan_mris(mri_scans, pet_scans, orphan_mri_tolerance=182):
     """Flag MRIs that are not used for PET processing"""
     ii = mri_scans.columns.tolist().index("n_mri_scans")
     mri_scans.insert(
@@ -833,7 +900,7 @@ def get_pet_proc_dir(subj, tracer, pet_date, proc_dir):
 
 
 def check_if_freesurfer_run(mri_proc_dir, check_brainstem=True):
-    """Return True if the MRI scan has been processed by Freesurfer"""
+    """Return True if the MRI has been processed by Freesurfer"""
     freesurfer_dir = op.join(mri_proc_dir, "freesurfer")
     if not op.isdir(freesurfer_dir):
         return 0
@@ -852,32 +919,93 @@ def check_if_freesurfer_run(mri_proc_dir, check_brainstem=True):
         return 0
 
 
-def check_if_mri_processed(mri_proc_dir):
-    """Return True if the PET scan has been processed"""
+def check_if_mri_seg_complete(mri_proc_dir):
+    """Return True if the MRI has been segmented"""
     if not op.isdir(mri_proc_dir):
         return 0
-    # Search for the warped and affine transformed nu.nii,
-    # respectively, as these are among the last files created in the MRI
-    # processing pipeline. Also make sure we find at least one mask.
-    mfiles = glob(op.join(mri_proc_dir, "*mask-*.nii"))
-    wfiles = glob(op.join(mri_proc_dir, "w*_nu.nii"))
-    afiles = glob(op.join(mri_proc_dir, "a*_nu.nii"))
-    if mfiles and wfiles and afiles:
+
+    # Search for the processed MRI files
+    proc_files = {
+        "seg_nu": glob(op.join(mri_proc_dir, "c*nu.nii")),
+    }
+
+    # Check if all file types are present
+    if all([len(proc_files[key]) > 0 for key in proc_files]):
+        return 1
+    else:
+        return 0
+
+
+def check_if_mri_processed(mri_proc_dir):
+    """Return True if the MRI has been fully processed"""
+    if not op.isdir(mri_proc_dir):
+        return 0
+
+    # Search for the processed MRI files
+    proc_files = {
+        "affine_nu": glob(op.join(mri_proc_dir, "a*nu.nii")),
+        "mask_brainstem": glob(op.join(mri_proc_dir, "*mask-brainstem.nii")),
+        "mask_eroded_subcortwm": glob(
+            op.join(mri_proc_dir, "*mask-eroded-subcortwm.nii")
+        ),
+        "mask_infcblgm": glob(op.join(mri_proc_dir, "*mask-infcblgm.nii")),
+        "mask_pons": glob(op.join(mri_proc_dir, "*mask-pons.nii")),
+        "mask_wcbl": glob(op.join(mri_proc_dir, "*mask-wcbl.nii")),
+        # "qc_image": glob(op.join(mri_proc_dir, "*qc.png")),
+        "warp_nu": glob(op.join(mri_proc_dir, "w*nu.nii")),
+    }
+
+    # Check if all file types are present
+    if all([len(proc_files[key]) > 0 for key in proc_files]):
         return 1
     else:
         return 0
 
 
 def check_if_pet_processed(pet_proc_dir):
-    """Return True if the PET scan has been processed"""
+    """Return True if the PET scan has been fully processed"""
     if not op.isdir(pet_proc_dir):
         return 0
-    # Search for the warped and affine transformed PET SUVRs,
-    # respectively, as these are among the last files created in the PET
-    # processing pipeline
-    wfiles = glob(op.join(pet_proc_dir, "w*suvr*.nii"))
-    afiles = glob(op.join(pet_proc_dir, "a*suvr*.nii"))
-    if wfiles and afiles:
+
+    # Get the scan info
+    pet_tag = get_scan_tag(pet_proc_dir)
+    _, tracer, _ = parse_scan_tag(pet_tag)
+
+    # Get the list of reference regions used for each tracer
+    code_dir = op.dirname(op.dirname(__file__))
+    ref_regions = pd.read_csv(op.join(code_dir, "config", "ref_regions.csv"))
+    ref_regions_by_tracer = {
+        tracer: ref_regions.loc[ref_regions["tracer"] == tracer, "ref_region"].tolist()
+        for tracer in ref_regions["tracer"].unique()
+    }
+
+    # List the files whose existence we will check for
+    proc_files = {
+        "native_pet_pet": op.join(pet_proc_dir, f"{pet_tag}.nii"),
+        "native_mri_pet": op.join(pet_proc_dir, f"r{pet_tag}.nii"),
+        "ref_region_means": op.join(pet_proc_dir, f"{pet_tag}_ref-region-means.csv"),
+        # "qc_image": op.join(pet_proc_dir, f"{pet_tag}_qc.png"),
+    }
+    if tracer in AMYLOID_TRACERS:
+        proc_files["cortical_summary_values"] = op.join(
+            pet_proc_dir, f"{pet_tag}_amyloid-cortical-summary.csv"
+        )
+    for rr in ref_regions_by_tracer[tracer]:
+        proc_files[f"native_mri_suvr_{rr}"] = op.join(
+            pet_proc_dir, f"r{pet_tag}_suvr-{rr}.nii"
+        )
+        proc_files[f"warped_mni_suvr_{rr}"] = op.join(
+            pet_proc_dir, f"wr{pet_tag}_suvr-{rr}.nii"
+        )
+        proc_files[f"affine_mni_suvr_{rr}"] = op.join(
+            pet_proc_dir, f"ar{pet_tag}_suvr-{rr}.nii"
+        )
+        proc_files[f"native_mri_suvr_extractions_{rr}"] = op.join(
+            pet_proc_dir, f"r{pet_tag}_suvr-{rr}_roi-extractions.csv"
+        )
+
+    # Check if all files are present
+    if all([op.isfile(f) for f in proc_files.values()]):
         return 1
     else:
         return 0
@@ -1100,7 +1228,7 @@ def _parse_args():
     parser.add_argument(
         "--orphan-tol",
         type=int,
-        default=100,
+        default=182,
         dest="orphan_mri_tolerance",
         help=(
             "Defines the maximum number of days from present that an MRI\n"

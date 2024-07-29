@@ -43,13 +43,19 @@ function outfiles = process_mri_post_freesurfer(mri_dir, fid, overwrite)
     mri_dir = abspath(mri_dir);
 
     % If mri_dir is not the baseline MRI and the baseline MRI has not
-    % already been processed, don't process this MRI
+    % been processed past the point of image recentering, then we can't
+    % proceed with post-FreeSurfer processing on the current MRI
     subj_dir = fileparts(mri_dir);
     baseline_mri_dir = fileparts(get_baseline_mri(subj_dir));
-    if ~strcmp(mri_dir, baseline_mri_dir) && ~processed_mri_files_exist(baseline_mri_dir)
-        log_append(fid, append('- Cannot proceed with post-FreeSurfer MRI processing, because the baseline MRI has not been fully processed'));
-        outfiles = struct([]);
-        return
+    if ~strcmp(mri_dir, baseline_mri_dir)
+        baseline_mri_files = get_processed_mri_files(baseline_mri_dir);
+        % Check for the existence of the baseline c1 file, as
+        % segmentation happens after recentering
+        if ~isfile(baseline_mri_files.c1)
+            log_append(fid, append('- Cannot proceed with post-FreeSurfer MRI processing, because the baseline MRI has not been fully processed'));
+            outfiles = struct([]);
+            return
+        end
     end
 
     % Initialize SPM jobman and PET parameter defaults
