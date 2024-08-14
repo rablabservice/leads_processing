@@ -334,8 +334,10 @@ def main(
         ]
     )
     n_pet_scheduled = len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
-
-    sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled))) + 1
+    try:
+        sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled))) + 1
+    except ValueError:
+        sp = 1
     sp += int(sp / 3)  # Space to add a comma every 3 digits
     pad = 42 + sp
     if not save_csv:
@@ -344,12 +346,8 @@ def main(
     print("+.." + ("=" * pad) + "..+")
     print("|" + (" " * (pad + 3)) + " |")
     msg = {
-        "mri": f"|  {n_mri_scheduled:>{sp},} MRI scans are scheduled for processing"
-        + (" " * sp)
-        + "|",
-        "pet": f"|  {n_pet_scheduled:>{sp},} PET scans are scheduled for processing"
-        + (" " * sp)
-        + "|",
+        "mri": f"|  {n_mri_scheduled:>{sp},} MRI scans are scheduled for processing",
+        "pet": f"|  {n_pet_scheduled:>{sp},} PET scans are scheduled for processing",
     }
     if not save_csv:
         for scan_type in msg:

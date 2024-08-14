@@ -215,6 +215,16 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
         end
 
         % --------------------------------------------------------------
+        % Save the multislice PDF
+        if strcmp(tracer, 'FDG')
+            outfiles.multislice = save_fdg_multislice_pdf(pet_dir, overwrite);
+        elseif strcmp(tracer, 'FTP')
+            outfiles.multislice = save_ftp_multislice_pdf(pet_dir, overwrite);
+        else
+            outfiles.multislice = '';
+        end
+
+        % --------------------------------------------------------------
         % Identify and log any missing processed files
         log_append(fid, '- Checking for expected output files');
         if processed_pet_files_exist(pet_dir)
