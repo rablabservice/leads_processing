@@ -26,8 +26,7 @@ reslice_matlab_script = os.path.join(rablab_pkg_path,'reslice', 'reslice.m')
 
 mask_reslice_matlab_script = os.path.join(rablab_pkg_path, 'reslice', 'mask_reslice.m')
 
-#tmp_folder = os.path.join('/shared/petcore/Projects/LEADS/data_f7p1/summary/piyush_qc/tmp/')
-tmp_folder = os.path.join('/tmp/')
+tmp_folder = os.path.join('/mnt/tmp-scratch/')
 #  _____________________________________________________________ CUSTOM COLORMAPS _____________________________________________________________ #
 # Notes: 
 # 1. The custom colormaps are created using the LinearSegmentedColormap class from matplotlib.colors.

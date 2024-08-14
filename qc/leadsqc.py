@@ -44,8 +44,7 @@ reslice_matlab_script = os.path.join(rablab_pkg_path, "reslice", "reslice.m")
 
 mask_reslice_matlab_script = os.path.join(rablab_pkg_path, "reslice", "mask_reslice.m")
 
-# tmp_folder = os.path.join('/shared/petcore/Projects/LEADS/data_f7p1/summary/piyush_qc/tmp/')
-tmp_folder = os.path.join("/tmp/")
+tmp_folder = os.path.join('/mnt/tmp-scratch/')
 
 
 def generate_matlab_script(path, output_script_path):
@@ -88,8 +87,7 @@ def load_nii_resliced(path, orientation="LAS", mask=False):
 
     id = path.split("/")[-1].split(".")[0]
 
-    # tmp_folder = os.path.join('/shared/petcore/Projects/LEADS/data_f7p1/summary/piyush_qc/tmp/')
-    tmp_folder = os.path.join("/tmp/")
+    tmp_folder = os.path.join('/mnt/tmp-scratch/')
 
     resliced_image_path = os.path.join(tmp_folder, id, "qc" + id + ".nii")
 
