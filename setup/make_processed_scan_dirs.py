@@ -14,6 +14,11 @@ from glob import glob
 
 import pandas as pd
 
+utils_dir = op.join(op.dirname(__file__), "..", "utils")
+if utils_dir not in sys.path:
+    sys.path.append(utils_dir)
+import utilities as uts
+
 
 def make_processed_scan_dirs(
     scans_to_process_dir="/mnt/coredata/processing/leads/metadata/scans_to_process",
@@ -61,21 +66,21 @@ def make_processed_scan_dirs(
             already_printed = True
             return already_printed
 
-    # Load the most recently modified raw_MRI_index* CSV file in
+    # Load the most recently modified raw_MRI-T1_index* CSV file in
     # scans_to_process_dir
     try:
-        raw_mrisf = glob_sort_mtime(
-            op.join(scans_to_process_dir, "raw_MRI_index*.csv")
+        raw_mrisf = uts.glob_sort_mtime(
+            op.join(scans_to_process_dir, "raw_MRI-T1_index*.csv")
         )[0]
     except IndexError:
-        print(f"ERROR: No raw_MRI_index*.csv file found in {scans_to_process_dir}")
+        print(f"ERROR: No raw_MRI-T1_index*.csv file found in {scans_to_process_dir}")
         sys.exit(1)
     raw_mris = pd.read_csv(raw_mrisf)
 
     # Load the most recently saved raw_PET_index* CSV file in
     # scans_to_process_dir
     try:
-        raw_petsf = glob_sort_mtime(
+        raw_petsf = uts.glob_sort_mtime(
             op.join(scans_to_process_dir, "raw_PET_index*.csv")
         )[0]
     except IndexError:
@@ -239,19 +244,6 @@ def make_processed_scan_dirs(
         print(
             "  * No conflicts detected between existing data structure and latest PET index"
         )
-
-
-def glob_sort_mtime(pattern):
-    """Return files matching pattern in most recent modified order.
-
-    Returns
-    -------
-    files : list of str
-        List of files matching pattern, sorted by most recent modified
-        (files[0] is the most recently modified).
-    """
-    files = sorted(glob(pattern), key=op.getmtime, reverse=True)
-    return files
 
 
 def _parse_args():

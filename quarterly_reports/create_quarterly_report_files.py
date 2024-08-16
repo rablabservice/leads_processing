@@ -7,13 +7,17 @@ PET tracer: FBB, FTP, and FDG).
 """
 
 import argparse
-import os
 import warnings
 import os.path as op
-from glob import glob
+import sys
 
 import numpy as np
 import pandas as pd
+
+utils_dir = op.join(op.dirname(__file__), "..", "utils")
+if utils_dir not in sys.path:
+    sys.path.append(utils_dir)
+import utilities as uts
 
 
 def main(report_period, proj_dir="/mnt/coredata/processing/leads"):
@@ -73,7 +77,7 @@ def load_pet_scan_idx(scans_to_process_dir):
         "pet_proc_dir",
     ]
     pet_scan_idx = pd.read_csv(
-        glob_sort_mtime(op.join(scans_to_process_dir, "raw_PET_index*.csv"))[0]
+        uts.glob_sort_mtime(op.join(scans_to_process_dir, "raw_PET_index*.csv"))[0]
     )
     pet_scans = (
         pet_scan_idx.loc[pet_scan_idx["pet_processing_complete"] == 1, keep_cols]
@@ -91,19 +95,6 @@ def load_pet_scan_idx(scans_to_process_dir):
     print(f"Found {len(pet_scans):,} processed PET scans from {len(pet_subjs):,} subjects.")
 
     return pet_scans
-
-
-def glob_sort_mtime(pattern):
-    """Return files matching pattern in most recent modified order.
-
-    Returns
-    -------
-    files : list of str
-        List of files matching pattern, sorted by most recent modified
-        (files[0] is the most recently modified).
-    """
-    files = sorted(glob(pattern), key=op.getmtime, reverse=True)
-    return files
 
 
 def filter_pet_by_umich_qc(pet_scans, atri_dir, tracers={"fbb", "ftp", "fdg"}):
@@ -285,8 +276,8 @@ def filter_pet_by_ucsf_qc(pets, metadata_dir):
     tracers = set(pets.keys())
 
     # Load UCSF QC spreadsheets
-    qc_ucsf_file = glob_sort_mtime(
-        op.join(metadata_dir, "qc", "ssheets", "LEADS_QC*.xlsx")
+    qc_ucsf_file = uts.glob_sort_mtime(
+        op.join(metadata_dir, "qc", "LEADS_QC*.xlsx")
     )[0]
 
     # Create a dict to hold UCSF QC dataframes
@@ -320,18 +311,15 @@ def filter_pet_by_ucsf_qc(pets, metadata_dir):
         if scan_type == "mri":
             drop_cols = [
                 "rater",
+                "manual_freesurfer_edits",
                 "spm_seg_ok",
                 "affine_nu_ok",
-                "flag_for_consensus",
-                "qc_done",
             ]
             qc_ucsf[scan_type] = qc_ucsf[scan_type].drop(columns=drop_cols)
         else:
             drop_cols = [
                 "rater",
                 "affine_pet_ok",
-                "flag_for_consensus",
-                "qc_done",
             ]
             qc_ucsf[scan_type] = qc_ucsf[scan_type].drop(columns=drop_cols)
 
@@ -353,7 +341,7 @@ def filter_pet_by_ucsf_qc(pets, metadata_dir):
         "mri_qc_pass",
         qc_ucsf[scan_type].apply(
             lambda x: np.all(
-                (x["native_nu_rating"] > 0, x["aparc+aseg_rating"] > 0)
+                (x["native_nu_rating"] > 0, x["aparc_rating"] > 0)
             ).astype(float),
             axis=1,
         ),
@@ -858,7 +846,7 @@ drop_cols = [
     "native_pet_ok",
     "pet_to_mri_coreg_ok",
     "wcbl_mask_ok",
-    "erodedwm+bstem_masks_ok",
+    "eroded_wm_and_brainstem_masks_ok",
     "warped_pet_ok",
     "pet_qc_notes",
     "mri_qc_notes",
@@ -1246,7 +1234,7 @@ drop_cols = [
     "pet_qc_notes",
     "mri_qc_pass",
     "native_nu_rating",
-    "aparc+aseg_rating",
+    "aparc_rating",
     "warped_nu_ok",
     "mri_qc_notes",
     "qc_pass",
@@ -1616,7 +1604,7 @@ drop_cols = [
     "pet_qc_notes",
     "mri_qc_pass",
     "native_nu_rating",
-    "aparc+aseg_rating",
+    "aparc_rating",
     "warped_nu_ok",
     "mri_qc_notes",
     "qc_pass",

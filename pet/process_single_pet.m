@@ -204,21 +204,30 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
         );
 
         % --------------------------------------------------------------
-        % Save the QC image
+        % Run the QC submodule
         if run_qc
+            % Save the QC image
             log_append(fid, '- Generating QC image');
             python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
             code_dir = fileparts(fileparts(mfilename('fullpath')));
             qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
             cmd = sprintf('%s %s %s', python, qc_script, pet_dir);
             system(cmd);
+
+            % Create the QC eval file
+            log_append(fid, '- Creating QC eval file');
+            qc_eval_script = fullfile(code_dir, 'qc', 'qc_evals.py');
+            cmd = sprintf('%s %s create -s %s', python, qc_eval_script, pet_dir);
+            system(cmd);
         end
 
         % --------------------------------------------------------------
         % Save the multislice PDF
         if strcmp(tracer, 'FDG')
+            log_append(fid, '- Generating multislice PDF');
             outfiles.multislice = save_fdg_multislice_pdf(pet_dir, overwrite);
         elseif strcmp(tracer, 'FTP')
+            log_append(fid, '- Generating multislice PDF');
             outfiles.multislice = save_ftp_multislice_pdf(pet_dir, overwrite);
         else
             outfiles.multislice = '';

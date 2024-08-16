@@ -13,7 +13,7 @@ function mri_dirs = queue_mris_to_process(scans_to_process_dir)
     fprintf('- Loading list of MRIs to process\n');
 
     % Load the most recent raw_MRIs table
-    filePattern = fullfile(scans_to_process_dir, 'raw_MRI_index_*.csv');
+    filePattern = fullfile(scans_to_process_dir, 'raw_MRI-T1_index_*.csv');
     files = glob_sort_mtime(filePattern);
     fprintf('  (%s)\n', files{1});
     raw_mris = readtable(files{1});

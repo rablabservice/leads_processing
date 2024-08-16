@@ -11,12 +11,15 @@ import os
 import os.path as op
 import re
 import sys
-import warnings
 from glob import glob
 
 import numpy as np
 import pandas as pd
 
+utils_dir = op.join(op.dirname(__file__), "..", "utils")
+if utils_dir not in sys.path:
+    sys.path.append(utils_dir)
+import utilities as uts
 
 # Define globals
 AMYLOID_TRACERS = ["FBB", "FBP", "FLUTE", "NAV", "PIB"]
@@ -31,7 +34,7 @@ def main(
     expected_pet_res=6,
     audit_pet_to_mri_days=True,
     max_pet_to_mri=365,
-    audit_repeat_mri=True,
+    audit_repeat_mri=False,
     check_brainstem=True,
     save_csv=True,
 ):
@@ -258,7 +261,7 @@ def main(
         print(
             f"    - {_n:,} required, follow-up MRIs cannot be processed until baseline MRI is processed:"
         )
-        print_list(
+        uts.print_list(
             raw_mris_req.query(qry)
             .apply(
                 lambda x: f"{x['subj']}_MRI-T1_{datetime_to_datestr(x['mri_date'])}",
@@ -310,11 +313,13 @@ def main(
         print(
             f"    - {_n:,} PET scans cannot be processed until their corresponding MRI is processed:"
         )
-        print_list(raw_pets.query(qry)["pet_proc_dir"].apply(get_scan_tag).tolist())
+        uts.print_list(
+            raw_pets.query(qry)["pet_proc_dir"].apply(uts.get_scan_tag).tolist()
+        )
 
     # Save the raw scan dataframes to CSV files
     if save_csv:
-        timestamp = now()
+        timestamp = uts.now()
         save_raw_mri_index(raw_mris, scans_to_process_dir, timestamp)
         save_raw_pet_index(raw_pets, scans_to_process_dir, timestamp)
         print("")
@@ -334,10 +339,10 @@ def main(
         ]
     )
     n_pet_scheduled = len(raw_pets.loc[raw_pets["scheduled_for_processing"] == 1])
-    try:
-        sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled))) + 1
-    except ValueError:
+    if n_mri_scheduled == 0 and n_pet_scheduled == 0:
         sp = 1
+    else:
+        sp = int(np.log10(max(n_mri_scheduled, n_pet_scheduled))) + 1
     sp += int(sp / 3)  # Space to add a comma every 3 digits
     pad = 42 + sp
     if not save_csv:
@@ -369,23 +374,23 @@ def main(
                 raw_mris.query(
                     "(scheduled_for_processing==1) & (freesurfer_complete==0)"
                 )["mri_proc_dir"]
-                .apply(get_scan_tag)
+                .apply(uts.get_scan_tag)
                 .tolist()
             )
             print("\n  FreeSurfer + SPM processing", "  " + ("-" * 27), sep="\n")
-            print_list(mris_to_process_full)
+            uts.print_list(mris_to_process_full)
         if n_mri_scheduled_partial > 0:
             mris_to_process_partial = (
                 raw_mris.query(
                     "(scheduled_for_processing==1) & (freesurfer_complete==1)"
                 )["mri_proc_dir"]
-                .apply(get_scan_tag)
+                .apply(uts.get_scan_tag)
                 .tolist()
             )
             print(
                 "\n  Just post-FreeSurfer SPM processing", "  " + ("-" * 35), sep="\n"
             )
-            print_list(mris_to_process_partial)
+            uts.print_list(mris_to_process_partial)
 
     if n_pet_scheduled > 0:
         tracers_to_process = raw_pets.loc[
@@ -399,11 +404,11 @@ def main(
                     & (raw_pets["tracer"] == tracer),
                     "pet_proc_dir",
                 ]
-                .apply(get_scan_tag)
+                .apply(uts.get_scan_tag)
                 .tolist()
             )
             print(f"\n  {tracer}", "  " + ("-" * len(tracer)), sep="\n")
-            print_list(pets_to_process)
+            uts.print_list(pets_to_process)
 
     return raw_mris, raw_pets
 
@@ -432,19 +437,6 @@ def fast_recursive_glob_nii(path):
     nii_files = []
     _path_recurse(path)
     return nii_files
-
-
-def glob_sort_mtime(pattern):
-    """Return files matching pattern in most recent modified order.
-
-    Returns
-    -------
-    files : list of str
-        List of files matching pattern, sorted by most recent modified
-        (files[0] is the most recently modified).
-    """
-    files = sorted(glob(pattern), key=op.getmtime, reverse=True)
-    return files
 
 
 def get_subj(filepath, raw_dir):
@@ -626,23 +618,6 @@ def get_pet_resolution(filepath):
         return np.nan
 
 
-def get_scan_tag(proc_dir):
-    """Return the scan tag from the processed scan directory."""
-    if op.isfile(proc_dir):
-        proc_dir = op.dirname(proc_dir)
-    subj = op.basename(op.dirname(op.normpath(proc_dir)))
-    scan_type = op.basename(proc_dir).split("_")[0]
-    scan_date = op.basename(proc_dir).split("_")[-1]
-    scan_tag = f"{subj}_{scan_type}_{scan_date}"
-    return scan_tag
-
-
-def parse_scan_tag(scan_tag):
-    """Return subject ID, scan type, and scan date from the scan tag."""
-    subj, scan_type, scan_date = scan_tag.split("_")
-    return subj, scan_type, scan_date
-
-
 def add_mri_date_columns(mri_scans):
     """Add info on time between PET and MRI and adjacent PET scans"""
     # Copy the input dataframe
@@ -781,7 +756,7 @@ def audit_pet(
     expected_pet_res=6,
     audit_pet_to_mri_days=True,
     max_pet_to_mri=365,
-    audit_repeat_mri=True,
+    audit_repeat_mri=False,
 ):
     """Audit each PET scan and flag scans with potential issues
 
@@ -949,7 +924,6 @@ def check_if_mri_processed(mri_proc_dir):
         "mask_infcblgm": glob(op.join(mri_proc_dir, "*mask-infcblgm.nii")),
         "mask_pons": glob(op.join(mri_proc_dir, "*mask-pons.nii")),
         "mask_wcbl": glob(op.join(mri_proc_dir, "*mask-wcbl.nii")),
-        # "qc_image": glob(op.join(mri_proc_dir, "*qc.png")),
         "warp_nu": glob(op.join(mri_proc_dir, "w*nu.nii")),
     }
 
@@ -966,8 +940,8 @@ def check_if_pet_processed(pet_proc_dir):
         return 0
 
     # Get the scan info
-    pet_tag = get_scan_tag(pet_proc_dir)
-    _, tracer, _ = parse_scan_tag(pet_tag)
+    pet_tag = uts.get_scan_tag(pet_proc_dir)
+    _, tracer, _ = uts.parse_scan_tag(pet_tag)
 
     # Get the list of reference regions used for each tracer
     code_dir = op.dirname(op.dirname(__file__))
@@ -982,7 +956,6 @@ def check_if_pet_processed(pet_proc_dir):
         "native_pet_pet": op.join(pet_proc_dir, f"{pet_tag}.nii"),
         "native_mri_pet": op.join(pet_proc_dir, f"r{pet_tag}.nii"),
         "ref_region_means": op.join(pet_proc_dir, f"{pet_tag}_ref-region-means.csv"),
-        # "qc_image": op.join(pet_proc_dir, f"{pet_tag}_qc.png"),
     }
     if tracer in AMYLOID_TRACERS:
         proc_files["cortical_summary_values"] = op.join(
@@ -1057,42 +1030,11 @@ def get_pet_to_process(pet_processed, mri_processed, pet_flagged, overwrite):
         return 0
 
 
-def now():
-    """Return the current date and time down to seconds."""
-
-    def is_dst():
-        today = datetime.datetime.now()
-        year = today.year
-        dst_start = datetime.datetime(year, 3, 8, 2, 0)  # Second Sunday in March
-        dst_end = datetime.datetime(year, 11, 1, 2, 0)  # First Sunday in November
-        dst_start += datetime.timedelta(
-            days=(6 - dst_start.weekday())
-        )  # Find the second Sunday
-        dst_end += datetime.timedelta(
-            days=(6 - dst_end.weekday())
-        )  # Find the first Sunday
-        return dst_start <= today < dst_end
-
-    # Get the current UTC time
-    utc_time = datetime.datetime.now(datetime.timezone.utc)
-
-    # Define the offset for Los Angeles time
-    la_offset = -8 if not is_dst() else -7
-
-    # Create a timezone-aware datetime object for Los Angeles
-    la_time = utc_time + datetime.timedelta(hours=la_offset)
-
-    # Format the time as specified
-    formatted_time = la_time.strftime("%Y-%m-%d-%H-%M-%S")
-
-    return formatted_time
-
-
 def save_raw_mri_index(mri_scans, scans_to_process_dir, timestamp):
     """Save the MRI scan index to a CSV file"""
     # Move any existing files to archive
     archive_dir = op.join(scans_to_process_dir, "archive")
-    files = glob(op.join(scans_to_process_dir, "raw_MRI_index*.csv"))
+    files = glob(op.join(scans_to_process_dir, "raw_MRI-T1_index*.csv"))
     if files:
         if not op.isdir(archive_dir):
             os.makedirs(archive_dir)
@@ -1111,7 +1053,7 @@ def save_raw_mri_index(mri_scans, scans_to_process_dir, timestamp):
     ).reset_index(drop=True)
 
     # Save the mri_scans dataframe
-    outf = op.join(scans_to_process_dir, f"raw_MRI_index_{timestamp}.csv")
+    outf = op.join(scans_to_process_dir, f"raw_MRI-T1_index_{timestamp}.csv")
 
     mri_scans.to_csv(outf, index=False)
     print(f"  * Saved raw MRI scan index to {outf}")
@@ -1132,22 +1074,6 @@ def save_raw_pet_index(pet_scans, scans_to_process_dir, timestamp):
     outf = op.join(scans_to_process_dir, f"raw_PET_index_{timestamp}.csv")
     pet_scans.to_csv(outf, index=False)
     print(f"  * Saved raw PET scan index to {outf}")
-
-
-def print_list(lst, max_line=115, sep="  "):
-    """Print a list of strings to the console"""
-    current_line = ""
-    for entry in lst:
-        new_entry = entry
-        new_line = f"{current_line}{sep}{new_entry}"
-        if len(new_line) > max_line:
-            print(current_line)
-            current_line = f"{sep}{new_entry}"
-        else:
-            current_line = new_line
-    if len(current_line) > 0:
-        print(current_line)
-    print()
 
 
 def _parse_args():
@@ -1295,14 +1221,14 @@ def _parse_args():
         ),
     )
     parser.add_argument(
-        "--no-audit-repeat-mri",
-        action="store_false",
+        "--audit-repeat-mri",
+        action="store_true",
         dest="audit_repeat_mri",
         help=(
-            "Don't audit for repeated MRIs used for multiple PET scans.\n"
-            + "By default, PET scans are flagged if the same MRI would be\n"
-            + "used to process multiple timepoints for the same PET\n"
-            + "tracer. This flag disables that check"
+            "Audit for repeated MRIs used for multiple PET scans.\n"
+            + "When this argument is passed, PET scans are flagged if the same\n"
+            + "MRI would need to be used to process more than one PET scan\n"
+            + "from the same subject and tracer"
         ),
     )
     parser.add_argument(

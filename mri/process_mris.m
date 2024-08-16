@@ -7,16 +7,16 @@ function process_mris( ...
     process_post_freesurfer ...
 )
     % Process all MRIs that are scheduled for processing
-    % in the latest raw_MRI_index file
+    % in the latest raw_MRI-T1_index file
     %
     % Parameters
     % ----------
     % mri_dirs : cell
     %     List of MRI directories to process. This variable overrides
     %     the default behavior of selecting scans to process based on
-    %     the latest raw_MRI_index file in scans_to_process_dir
+    %     the latest raw_MRI-T1_index file in scans_to_process_dir
     % scans_to_process_dir : char or str
-    %     The directory that stores raw_MRI_index files
+    %     The directory that stores raw_MRI-T1_index files
     % overwrite : logical
     %     If true, overwrite existing processed data
     % segment_brainstem : logical

@@ -136,13 +136,20 @@ function outfiles = process_single_mri( ...
         end
 
         % --------------------------------------------------------------
-        % Save the QC image
+        % Run the QC submodule
         if run_qc
+            % Save the QC image
             log_append(fid, '- Generating QC image');
             python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
             code_dir = fileparts(fileparts(mfilename('fullpath')));
             qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
             cmd = sprintf('%s %s %s', python, qc_script, mri_dir);
+            system(cmd);
+
+            % Create the QC eval file
+            log_append(fid, '- Creating QC eval file');
+            qc_eval_script = fullfile(code_dir, 'qc', 'qc_evals.py');
+            cmd = sprintf('%s %s create -s %s', python, qc_eval_script, mri_dir);
             system(cmd);
         end
 
