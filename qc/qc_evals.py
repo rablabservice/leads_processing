@@ -119,7 +119,7 @@ def create_qc_eval_file(scan_dir):
 
 
 def get_qc_eval_file(scan_dir):
-    """Return the most recent QC eval file."""
+    """Return the most recent QC eval file for a single scan."""
     scan_dir = op.abspath(scan_dir)
     qc_eval_files = uts.glob_sort(op.join(scan_dir, "qc", "*_qc-eval_*.csv"))
     if len(qc_eval_files) == 0:
@@ -283,41 +283,74 @@ def find_scans_with_incomplete_qc(
     proj_dir = op.abspath(proj_dir)
     proc_dir = op.abspath(op.join(proj_dir, "data", "processed"))
 
-    incomplete_qc_scans = {}
+    scan_dirs = {}
+    processed_scans = {}
+    unprocessed_scans = {}
+    qc_complete_scans = {}
+    qc_incomplete_scans = {}
+    n_scans = {}
+    n_processed_scans = {}
+    n_unprocessed_scans = {}
+    n_qc_complete_scans = {}
+    n_qc_incomplete_scans = {}
     for scan_type in scan_types:
         # Get all processed scan directories
-        scan_dirs = get_processed_scan_dirs(scan_type, proc_dir)
+        scan_dirs[scan_type] = get_processed_scan_dirs(scan_type, proc_dir)
 
+        # Find processed vs. unprocessed scans
         if scan_type == "MRI-T1":
-            processed_scan_dirs = [
-                d for d in scan_dirs if sstp.check_if_mri_processed(d)
+            processed_scans[scan_type] = [
+                d for d in scan_dirs[scan_type] if sstp.check_if_mri_processed(d)
             ]
         else:
-            processed_scan_dirs = [
-                d for d in scan_dirs if sstp.check_if_pet_processed(d)
+            processed_scans[scan_type] = [
+                d for d in scan_dirs[scan_type] if sstp.check_if_pet_processed(d)
             ]
+        unprocessed_scans[scan_type] = [
+            d for d in scan_dirs[scan_type] if d not in processed_scans[scan_type]
+        ]
 
-        # Find all scans with incomplete QC eval
-        incomplete_qc_scans[scan_type] = [
-            d for d in processed_scan_dirs if not check_if_qc_complete(d)
+        # Find processed scans with complete vs. incomplete QC evals
+        qc_complete_scans[scan_type] = [
+            d for d in processed_scans[scan_type] if check_if_qc_complete(d)
+        ]
+        qc_incomplete_scans[scan_type] = [
+            d
+            for d in processed_scans[scan_type]
+            if d not in qc_complete_scans[scan_type]
         ]
 
         # Sort the incomplete scans by scan date
         idx = np.argsort(
-            [op.basename(d).split("_")[1] for d in incomplete_qc_scans[scan_type]]
+            [op.basename(d).split("_")[1] for d in qc_incomplete_scans[scan_type]]
         )
-        incomplete_qc_scans[scan_type] = np.array(incomplete_qc_scans[scan_type])[
+        qc_incomplete_scans[scan_type] = np.array(qc_incomplete_scans[scan_type])[
             idx
         ].tolist()
 
-        if len(incomplete_qc_scans[scan_type]) > 0:
-            n = len(incomplete_qc_scans[scan_type])
-            print(
-                f"Processing complete and QC needed for the following {n:,} {scan_type} scans:"
-            )
-            uts.print_list(incomplete_qc_scans[scan_type])
+        # Get counts of scans in each category
+        n_scans[scan_type] = len(scan_dirs[scan_type])
+        n_processed_scans[scan_type] = len(processed_scans[scan_type])
+        n_unprocessed_scans[scan_type] = len(unprocessed_scans[scan_type])
+        n_qc_complete_scans[scan_type] = len(qc_complete_scans[scan_type])
+        n_qc_incomplete_scans[scan_type] = len(qc_incomplete_scans[scan_type])
 
-    return incomplete_qc_scans
+        # Print scan counts in each category, ending with a list
+        # of scans with incomplete QC evals
+        print(f"\n{scan_type}", "-" * len(scan_type), sep="\n")
+        print(f"- {n_scans[scan_type]:,} scans in {proc_dir}")
+        print(f"- {n_processed_scans[scan_type]:,} scans have been fully processed")
+        print(f"- {n_qc_complete_scans[scan_type]:,} processed scans have been QC'd")
+
+        if n_qc_incomplete_scans[scan_type] > 0:
+            print(
+                f"- {n_qc_incomplete_scans[scan_type]:,} processed scans with incomplete QC"
+            )
+            uts.print_list(qc_incomplete_scans[scan_type])
+        else:
+            print("")
+
+    return qc_incomplete_scans
 
 
 def _parse_args():
@@ -339,7 +372,7 @@ def _parse_args():
         help=(
             "Which QC evaluation task to perform:\n"
             + "  'create'     : Create a new QC eval file for one or more processed scans\n"
-            + "  'check'      : Check if a QC eval file is complete for one or more processed scans\n"
+            + "  'check'      : Check if QC eval is complete for one or more processed scans\n"
             + "  'merge'      : Merge all completed QC eval files in the database into a\n"
             + "                 single spreadsheet for each scan type\n"
             + "  'incomplete' : Find all scans with incomplete QC eval\n"
@@ -394,6 +427,7 @@ if __name__ == "__main__":
         if not op.isdir(args.proj_dir):
             raise FileNotFoundError(args.proj_dir)
         merge_completed_qc_eval_files(args.proj_dir)
+        find_scans_with_incomplete_qc(args.proj_dir)
     elif args.task == "incomplete":
         if not op.isdir(args.proj_dir):
             raise FileNotFoundError(args.proj_dir)
