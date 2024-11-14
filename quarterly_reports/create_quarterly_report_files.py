@@ -38,23 +38,30 @@ def main(report_period, proj_dir="/mnt/coredata/processing/leads"):
     internal_roi_dir = op.join(extraction_dir, "internal_roi_files")
 
     # Get a dataframe with all PET scans in the project
-    pet_scans = load_pet_scan_idx(scans_to_process_dir)
+    pet_scan_idx = load_pet_scan_idx(scans_to_process_dir)
+
+    # Separate PET scans by tracer
+    pets = {
+        "fbb": pet_scan_idx.query("(tracer=='FBB')").copy(),
+        "ftp": pet_scan_idx.query("(tracer=='FTP')").copy(),
+        "fdg": pet_scan_idx.query("(tracer=='FDG')").copy(),
+    }
 
     # Filter PET scans by UMich QC
-    tracers = {"fbb", "ftp", "fdg"}
-    pets = filter_pet_by_umich_qc(pet_scans, atri_dir, tracers=tracers)
+    pets = filter_pet_by_umich_qc(pets, atri_dir)
 
     # Filter PET scans by UCSF QC
     pets = filter_pet_by_ucsf_qc(pets, metadata_dir)
 
+    # Get processed scan data
+    ref_region_dat = load_ref_region_dat(pets)
+    roi_dat = load_roi_dat(pets)
+    centiloid_dat = load_centiloid_dat(pets)
 
 
-# $$ PROCESSED SCAN LIST
-# @@
-# Load the raw_PET_index dataframe in metadata/scans_to_process, and
-# filter to retain all fully processed scans.
+
 def load_pet_scan_idx(scans_to_process_dir):
-    """Load and return the dataframe with all project PET scans.
+    """Load and return the dataframe with all processed PET scans.
 
     This is the raw_PET_index*.csv file created by
     `select_scans_to_process.py` in the Setup Module of the processing
@@ -79,213 +86,182 @@ def load_pet_scan_idx(scans_to_process_dir):
     pet_scan_idx = pd.read_csv(
         uts.glob_sort_mtime(op.join(scans_to_process_dir, "raw_PET_index*.csv"))[0]
     )
-    pet_scans = (
+    pet_scan_idx = (
         pet_scan_idx.loc[pet_scan_idx["pet_processing_complete"] == 1, keep_cols]
         .reset_index(drop=True)
         .copy()
     )
 
     # Rename columns
-    pet_scans = pet_scans.rename(columns={"subj": "subject_id"})
-
-    # Get a list of subjects with processed PET scans
-    pet_subjs = pet_scans["subject_id"].unique().tolist()
+    pet_scan_idx = pet_scan_idx.rename(columns={"subj": "subject_id"})
 
     # Report the number of processed PET scans and subjects
-    print(f"Found {len(pet_scans):,} processed PET scans from {len(pet_subjs):,} subjects.")
+    n_scans = len(pet_scan_idx)
+    n_subjs = pet_scan_idx["subject_id"].nunique()
+    print(f"Loading latest PET scan index from {scans_to_process_dir}")
+    print(f"- Found {n_scans:,} processed PET scans from {n_subjs:,} subjects")
+    for tracer, grp in pet_scan_idx.groupby("tracer"):
+        n_scans = len(grp)
+        n_subjs = grp["subject_id"].nunique()
+        print(f"  * {n_scans:,} {tracer.upper()} scans from {n_subjs:,} subjects")
 
-    return pet_scans
+    return pet_scan_idx
 
 
-def filter_pet_by_umich_qc(pet_scans, atri_dir, tracers={"fbb", "ftp", "fdg"}):
-    # Create a dict to hold UMich QC dataframes
-    qc_mich = {}
+def filter_pet_by_umich_qc(pets, umich_qc_dir, drop_failed_scans=True):
+    """Filter PET scans and retain rows from scans that passed UMich QC.
 
-    # Create a dict to hold PET scans that passed UMich QC
-    pets = {}
+    Parameters
+    ----------
+    pets : pandas.DataFrame
+        Dictionary with one PET scan dataframe for each tracer
+    umich_qc_dir : str
+        Path to the directory that contains the UMich QC spreadsheets
+        (one for each tracer) that we will use to filter.
+    drop_failed_scans : bool
+        Whether to drop scans that failed UMich QC.
+        - If False, all scans in the input dataframes are retained,
+          and a Boolean "passed_umich_qc" column is added to the output
+          dataframes.
+        - If True, only scans that passed QC are retained, and the
+          "passed_umich_qc" column is dropped from the output
+          dataframes.
 
-    # Filter FBB scans
-    if "fbb" in tracers:
-        tracer = "fbb"
+    Returns
+    -------
+    dict
+        Dictionary with one PET scan dataframe for each tracer
 
-        # Load dataframes
-        pets[tracer] = pet_scans.query(f"(tracer=='{tracer.upper()}')").copy()
-        qc_mich[tracer] = pd.read_csv(op.join(atri_dir, "leads_codebook_study_data_amyqc.csv"))
+    """
+    # Separate PET scans by tracer
+    pets = {
+        "fbb": pet_scan_idx.query("(tracer=='FBB')").copy(),
+        "ftp": pet_scan_idx.query("(tracer=='FTP')").copy(),
+        "fdg": pet_scan_idx.query("(tracer=='FDG')").copy(),
+    }
 
-        # Rename columns
-        qc_mich[tracer] = qc_mich[tracer].rename(
-            columns={
-                "subject_label": "subject_id",
-                "scandate": "pet_date",
-                "scanqltya": "passed_umich_qc",
-            }
-        )
+    # Load the UMich QC spreadsheets
+    qc_mich = {
+        "fbb": pd.read_csv(op.join(umich_qc_dir, "leads_codebook_study_data_amyqc.csv")),
+        "ftp": pd.read_csv(op.join(umich_qc_dir, "leads_codebook_study_data_tauqc.csv")),
+        "fdg": pd.read_csv(op.join(umich_qc_dir, "leads_codebook_study_data_fdgqc.csv")),
+    }
 
-        # Select rows that passed QC
+    # Rename columns
+    qc_mich["fbb"] = qc_mich["fbb"].rename(
+        columns={
+            "subject_label": "subject_id",
+            "scandate": "pet_date",
+            "scanqltya": "passed_umich_qc",
+        }
+    )
+    qc_mich["ftp"] = qc_mich["ftp"].rename(
+        columns={
+            "subject_label": "subject_id",
+            "scandate": "pet_date",
+            "scanqlty": "passed_umich_qc",
+        }
+    )
+    qc_mich["fdg"] = qc_mich["fdg"].rename(
+        columns={
+            "subject_label": "subject_id",
+            "scandate": "pet_date",
+            "scanqltya": "passed_umich_qc",
+        }
+    )
+
+    # Retain only the columns we need
+    keep_cols = ["subject_id", "pet_date", "passed_umich_qc"]
+    for tracer in pets:
+        qc_mich[tracer] = qc_mich[tracer][keep_cols]
+
+    # Select rows that passed QC, making sure each scan has only one row
+    for tracer in pets:
         qc_mich[tracer] = qc_mich[tracer].query("(passed_umich_qc==1)")
-
-        # Make sure every scan has only one row
         assert len(qc_mich[tracer]) == len(
             qc_mich[tracer].drop_duplicates(["subject_id", "pet_date"])
         )
 
-        # Select needed columns
-        keep_cols = ["subject_id", "pet_date", "passed_umich_qc"]
-        qc_mich[tracer] = qc_mich[tracer][keep_cols]
+    # Fix scan date mismatches between our processing and UMich CSVs
+    idx = (
+        qc_mich["ftp"].query("(subject_id=='LDS0360283') & (pet_date=='2020-11-11')").index
+    )
+    qc_mich["ftp"].loc[idx, "pet_date"] = "2020-11-12"
+    idx = (
+        qc_mich["ftp"].query("(subject_id=='LDS0370672') & (pet_date=='2023-09-13')").index
+    )
+    qc_mich["ftp"].loc[idx, "pet_date"] = "2023-09-14"
+    idx = (
+        qc_mich["fdg"].query("(subject_id=='LDS0370012') & (pet_date=='2020-12-17')").index
+    )
+    qc_mich["fdg"].loc[idx, "pet_date"] = "2020-12-15"
 
-        # Merge into the main PET scans dataframe
+    # Merge into the main PET scans dataframe
+    for tracer in pets:
         pets[tracer] = pets[tracer].merge(
             qc_mich[tracer],
             on=["subject_id", "pet_date"],
             how="left",
         )
 
-        # Select scans that passed QC
+    # Select scans that passed QC
+    print("Filtering PET scans by UMich QC")
+    drop_msg = "Removing" if drop_failed_scans else "These are the"
+    for tracer in pets:
         n_scans = len(pets[tracer])
         n_passed = int(pets[tracer]["passed_umich_qc"].sum())
-        n_failed = n_scans - n_passed
-        print(f"Keeping {n_passed:,}/{n_scans:,} {tracer.upper()} scans that passed UMich QC")
-        if n_failed > 0:
-            print("Failed scans:")
-            print(pets[tracer].query("(passed_umich_qc!=1)")[["subject_id", "pet_date"]])
-        pets[tracer] = pets[tracer].query("(passed_umich_qc==1)").reset_index(drop=True)
-        pets[tracer] = pets[tracer].drop(columns=["passed_umich_qc"])
-
-        # Print final dataframe shape
-        print(f"{tracer.upper()}: {pets[tracer].shape}")
-
-    # Filter FTP scans
-    if "ftp" in tracers:
-        tracer = "ftp"
-
-        # Load dataframes
-        pets[tracer] = pet_scans.query(f"(tracer=='{tracer.upper()}')").copy()
-        qc_mich[tracer] = pd.read_csv(op.join(atri_dir, "leads_codebook_study_data_tauqc.csv"))
-
-        # Rename columns
-        qc_mich[tracer] = qc_mich[tracer].rename(
-            columns={
-                "subject_label": "subject_id",
-                "scandate": "pet_date",
-                "scanqlty": "passed_umich_qc",
-            }
-        )
-
-        # Select rows that passed QC
-        qc_mich[tracer] = qc_mich[tracer].query("(passed_umich_qc==1)")
-
-        # Make sure every scan has only one row
-        assert len(qc_mich[tracer]) == len(
-            qc_mich[tracer].drop_duplicates(["subject_id", "pet_date"])
-        )
-
-        # Select needed columns
-        keep_cols = ["subject_id", "pet_date", "passed_umich_qc"]
-        qc_mich[tracer] = qc_mich[tracer][keep_cols]
-
-        # Fix a problem with one scan that was misdated
-        idx = (
-            qc_mich[tracer].query("(subject_id=='LDS0370672') & (pet_date=='2023-09-13')").index
-        )
-        qc_mich[tracer].loc[idx, "pet_date"] = "2023-09-14"
-
-        # Merge into the main PET scans dataframe
-        pets[tracer] = pets[tracer].merge(
-            qc_mich[tracer],
-            on=["subject_id", "pet_date"],
-            how="left",
-        )
-
-        # Select scans that passed QC
-        n_scans = len(pets[tracer])
-        n_passed = int(pets[tracer]["passed_umich_qc"].sum())
-        n_failed = n_scans - n_passed
-        print(f"Keeping {n_passed:,}/{n_scans:,} {tracer.upper()} scans that passed UMich QC")
-        if n_failed > 0:
-            print("Failed scans:")
-            print(pets[tracer].query("(passed_umich_qc!=1)")[["subject_id", "pet_date"]])
-        pets[tracer] = pets[tracer].query("(passed_umich_qc==1)").reset_index(drop=True)
-        pets[tracer] = pets[tracer].drop(columns=["passed_umich_qc"])
-
-        # Print final dataframe shape
-        print(f"{tracer.upper()}: {pets[tracer].shape}")
-
-    # Filter FDG scans
-    if "fdg" in tracers:
-        tracer = "fdg"
-
-        # Load dataframes
-        pets[tracer] = pet_scans.query(f"(tracer=='{tracer.upper()}')").copy()
-        qc_mich[tracer] = pd.read_csv(op.join(atri_dir, "leads_codebook_study_data_fdgqc.csv"))
-
-        # Rename columns
-        qc_mich[tracer] = qc_mich[tracer].rename(
-            columns={
-                "subject_label": "subject_id",
-                "scandate": "pet_date",
-                "scanqltya": "passed_umich_qc",
-            }
-        )
-
-        # Select rows that passed QC
-        qc_mich[tracer] = qc_mich[tracer].query("(passed_umich_qc==1)")
-
-        # Make sure every scan has only one row
-        assert len(qc_mich[tracer]) == len(
-            qc_mich[tracer].drop_duplicates(["subject_id", "pet_date"])
-        )
-
-        # Select needed columns
-        keep_cols = ["subject_id", "pet_date", "passed_umich_qc"]
-        qc_mich[tracer] = qc_mich[tracer][keep_cols]
-
-        # Fix a problem with one scan that was misdated
-        idx = (
-            qc_mich[tracer].query("(subject_id=='LDS0370012') & (pet_date=='2020-12-17')").index
-        )
-        qc_mich[tracer].loc[idx, "pet_date"] = "2020-12-15"
-
-        # Merge into the main PET scans dataframe
-        pets[tracer] = pets[tracer].merge(
-            qc_mich[tracer],
-            on=["subject_id", "pet_date"],
-            how="left",
-        )
-
-        # Select scans that passed QC
-        n_scans = len(pets[tracer])
-        n_passed = int(pets[tracer]["passed_umich_qc"].sum())
-        n_failed = n_scans - n_passed
-        print(f"Keeping {n_passed:,}/{n_scans:,} {tracer.upper()} scans that passed UMich QC")
-        if n_failed > 0:
-            print("Failed scans:")
-            print(pets[tracer].query("(passed_umich_qc!=1)")[["subject_id", "pet_date"]])
-        pets[tracer] = pets[tracer].query("(passed_umich_qc==1)").reset_index(drop=True)
-        pets[tracer] = pets[tracer].drop(columns=["passed_umich_qc"])
-
-        # Print final dataframe shape
-        print(f"{tracer.upper()}: {pets[tracer].shape}")
+        print(f"- {n_passed:,}/{n_scans:,} {tracer.upper()} scans passed QC")
+        if n_scans > n_passed:
+            print(f"- {drop_msg} {n_scans - n_passed:,} scans that did not pass QC:")
+            print(pets[tracer].query("(passed_umich_qc!=1)")[["subject_id", "pet_date"]].to_markdown(index=False, tablefmt="rst"))
+            if drop_failed_scans:
+                pets[tracer] = pets[tracer].query("(passed_umich_qc==1)").reset_index(drop=True)
+                pets[tracer] = pets[tracer].drop(columns=["passed_umich_qc"])
+    print()
 
     # Return the pets dict
     return pets
 
-# $$ UCSF QC FILES
-# @@
-def filter_pet_by_ucsf_qc(pets, metadata_dir):
-    # Get the set of PET tracers
-    tracers = set(pets.keys())
 
+def filter_pet_by_ucsf_qc(pets, ucsf_qc_dir, drop_failed_scans=True):
+    """Filter PET scans and retain rows from scans that passed UCSF QC.
+
+    Parameters
+    ----------
+    pets : dict
+        Dictionary with one PET scan dataframe for each tracer
+    ucsf_qc_dir : str
+        Path to the directory that contains the UCSF QC spreadsheets
+        that we will use to filter.
+    drop_failed_scans : bool
+        Whether to drop scans that failed UCSF QC.
+        - If False, all scans in the input dataframes are retained,
+          and a Boolean "ucsf_qc_pass" column is added to the output
+          dataframes.
+        - If True, only scans that passed QC are retained, and the
+          "ucsf_qc_pass" column is dropped from the output
+          dataframes.
+
+    Returns
+    -------
+    dict
+        Dictionary with one PET scan dataframe for each tracer
+    """
     # Load UCSF QC spreadsheets
-    qc_ucsf_file = uts.glob_sort_mtime(
-        op.join(metadata_dir, "qc", "LEADS_QC*.xlsx")
-    )[0]
-
-    # Create a dict to hold UCSF QC dataframes
-    qc_ucsf = {"mri": pd.read_excel(qc_ucsf_file, sheet_name="MRI")}
-    for tracer in tracers:
-        qc_ucsf["fbb"] = pd.read_excel(qc_ucsf_file, sheet_name="FBB")
-        qc_ucsf["ftp"] = pd.read_excel(qc_ucsf_file, sheet_name="FTP")
-        qc_ucsf["fdg"] = pd.read_excel(qc_ucsf_file, sheet_name="FDG")
+    qc_ucsf = {
+        "mri": pd.read_csv(
+            uts.glob_sort(op.join(ucsf_qc_dir, "processed_MRI-T1_qc-evals_*.csv"))[-1]
+        ),
+        "fbb": pd.read_csv(
+            uts.glob_sort(op.join(ucsf_qc_dir, "processed_FBB_qc-evals_*.csv"))[-1]
+        ),
+        "fdg": pd.read_csv(
+            uts.glob_sort(op.join(ucsf_qc_dir, "processed_FDG_qc-evals_*.csv"))[-1]
+        ),
+        "ftp": pd.read_csv(
+            uts.glob_sort(op.join(ucsf_qc_dir, "processed_FTP_qc-evals_*.csv"))[-1]
+        ),
+    }
 
     # Rename columns
     for scan_type in qc_ucsf:
@@ -323,80 +299,66 @@ def filter_pet_by_ucsf_qc(pets, metadata_dir):
             ]
             qc_ucsf[scan_type] = qc_ucsf[scan_type].drop(columns=drop_cols)
 
-    # Convert datetime to string format
-    for scan_type in qc_ucsf:
-        if scan_type == "mri":
-            qc_ucsf[scan_type]["mri_date"] = qc_ucsf[scan_type]["mri_date"].dt.strftime(
-                "%Y-%m-%d"
-            )
-        else:
-            qc_ucsf[scan_type]["pet_date"] = qc_ucsf[scan_type]["pet_date"].dt.strftime(
-                "%Y-%m-%d"
-            )
-
     # Add QC pass columns
     scan_type = "mri"
     qc_ucsf[scan_type].insert(
         2,
         "mri_qc_pass",
         qc_ucsf[scan_type].apply(
+            lambda x: np.all((x["native_nu_rating"] > 0, x["aparc_rating"] > 0)).astype(
+                float
+            ),
+            axis=1,
+        ),
+    )
+
+    scan_type = "fbb"
+    qc_ucsf[scan_type].insert(
+        2,
+        "pet_qc_pass",
+        qc_ucsf[scan_type].apply(
             lambda x: np.all(
-                (x["native_nu_rating"] > 0, x["aparc_rating"] > 0)
+                (
+                    x["native_pet_ok"] > 0,
+                    x["pet_to_mri_coreg_ok"] > 0,
+                    x["wcbl_mask_ok"] > 0,
+                )
             ).astype(float),
             axis=1,
         ),
     )
 
-    if "fbb" in tracers:
-        scan_type = "fbb"
-        qc_ucsf[scan_type].insert(
-            2,
-            "pet_qc_pass",
-            qc_ucsf[scan_type].apply(
-                lambda x: np.all(
-                    (
-                        x["native_pet_ok"] > 0,
-                        x["pet_to_mri_coreg_ok"] > 0,
-                        x["wcbl_mask_ok"] > 0,
-                    )
-                ).astype(float),
-                axis=1,
-            ),
-        )
+    scan_type = "ftp"
+    qc_ucsf[scan_type].insert(
+        2,
+        "pet_qc_pass",
+        qc_ucsf[scan_type].apply(
+            lambda x: np.all(
+                (
+                    x["native_pet_ok"] > 0,
+                    x["pet_to_mri_coreg_ok"] > 0,
+                    x["infcblgm_mask_ok"] > 0,
+                )
+            ).astype(float),
+            axis=1,
+        ),
+    )
 
-    if "ftp" in tracers:
-        scan_type = "ftp"
-        qc_ucsf[scan_type].insert(
-            2,
-            "pet_qc_pass",
-            qc_ucsf[scan_type].apply(
-                lambda x: np.all(
-                    (
-                        x["native_pet_ok"] > 0,
-                        x["pet_to_mri_coreg_ok"] > 0,
-                        x["infcblgm_mask_ok"] > 0,
-                    )
-                ).astype(float),
-                axis=1,
-            ),
-        )
-
-    if "fdg" in tracers:
-        scan_type = "fdg"
-        qc_ucsf[scan_type].insert(
-            2,
-            "pet_qc_pass",
-            qc_ucsf[scan_type].apply(
-                lambda x: np.all(
-                    (
-                        x["native_pet_ok"] > 0,
-                        x["pet_to_mri_coreg_ok"] > 0,
-                        x["pons_mask_ok"] > 0,
-                    )
-                ).astype(float),
-                axis=1,
-            ),
-        )
+    scan_type = "fdg"
+    qc_ucsf[scan_type].insert(
+        2,
+        "pet_qc_pass",
+        qc_ucsf[scan_type].apply(
+            lambda x: np.all(
+                (
+                    x["native_pet_ok"] > 0,
+                    x["pet_to_mri_coreg_ok"] > 0,
+                    x["pons_mask_ok"] > 0,
+                )
+            ).astype(float),
+            axis=1,
+        ),
+    )
 
     # Merge the UCSF QC data into the PET scans dataframes
     for tracer in pets:
@@ -411,8 +373,9 @@ def filter_pet_by_ucsf_qc(pets, metadata_dir):
             how="left",
         )
 
-        # Add a qc_pass column combining MRI and PET QC fields
-        pets[tracer]["qc_pass"] = pets[tracer].apply(
+    # Add a ucsf_qc_pass column combining MRI and PET QC fields
+    for tracer in pets:
+        pets[tracer]["ucsf_qc_pass"] = pets[tracer].apply(
             lambda x: np.all(
                 (
                     x["mri_qc_pass"] > 0,
@@ -422,319 +385,326 @@ def filter_pet_by_ucsf_qc(pets, metadata_dir):
             axis=1,
         )
 
-    # Print how many scans passed both MRI and PET QC
+    # Select scans that passed QC
+    print("Filtering PET scans by UCSF PET and MRI QC")
+    drop_msg = "Removing" if drop_failed_scans else "These are the"
     for tracer in pets:
         n_scans = len(pets[tracer])
-        n_passed = int(pets[tracer]["qc_pass"].sum())
-        print(
-            f"{n_passed:,}/{n_scans:,} {tracer.upper()} ({n_passed/n_scans:.1%}) scans passed QC"
-        )
+        n_passed = int(pets[tracer]["ucsf_qc_pass"].sum())
+        print(f"- {n_passed:,}/{n_scans:,} {tracer.upper()} scans passed QC")
+        if n_scans > n_passed:
+            print(f"- {drop_msg} {n_scans - n_passed:,} scans that did not pass QC:")
+            print(pets[tracer].query("(ucsf_qc_pass!=1)")[["subject_id", "pet_date"]].to_markdown(index=False, tablefmt="rst"))
+            if drop_failed_scans:
+                pets[tracer] = pets[tracer].query("(ucsf_qc_pass==1)").reset_index(drop=True)
+                pets[tracer] = pets[tracer].drop(columns=["ucsf_qc_pass"])
+    print()
 
     # Return the pets dict
     return pets
 
 
-# $$ REFERENCE REGION MEAN FILES
-# @@
-def parse_pet_proc_dir(pet_proc_dir):
-    """Return subject, tracer, and PET date from the PET proc dir."""
-    subj = op.basename(op.dirname(pet_proc_dir))
-    tracer, pet_date = op.basename(pet_proc_dir).split("_")
-    return subj, tracer, pet_date
+def load_ref_region_dat(pets):
+    """Load reference region scaling factors for each tracer.
 
+    Parameters
+    ----------
+    pets : dict
+        Dictionary with one PET scan dataframe for each tracer
 
-def get_ref_region_means(pet_proc_dir):
-    try:
-        rr_dat = format_ref_region_means(
-            load_ref_region_means_file(find_ref_region_means_file(pet_proc_dir))
-        )
-        return rr_dat
-    except Exception as e:
-        print(e)
-        return None
-
-
-def find_ref_region_means_file(pet_proc_dir):
-    """Return the filepath to the ROI mean CSV file."""
-    subj, tracer, pet_date = parse_pet_proc_dir(pet_proc_dir)
-    filepath = op.join(
-        pet_proc_dir,
-        f"{subj}_{tracer}_{pet_date}_ref-region-means.csv",
-    )
-    if op.isfile(filepath):
-        return filepath
-    else:
-        warnings.warn(f"File not found: {filepath}")
-
-
-def load_ref_region_means_file(filepath):
-    """Load and format the ROI extractions CSV file."""
-
-    def _scrape_ref_regions(mask_file):
-        ref_regions = [
-            op.basename(x).split(".")[0].split("_")[3].split("-")[1]
-            for x in mask_file.split(";")
-        ]
-        if len(ref_regions) > 1:
-            return "compwm"
-        else:
-            return ref_regions[0]
-
-    # Load the CSV file
-    df = pd.read_csv(filepath)
-
-    # Parse the PET proc dir
-    subj, _, pet_date = parse_pet_proc_dir(op.dirname(filepath))
-
-    # Add subject_id and pet_date columns
-    df.insert(0, "subject_id", subj)
-    df.insert(1, "pet_date", pet_date)
-    df.insert(
-        2,
-        "ref_region",
-        df["mask_file"].apply(_scrape_ref_regions),
-    )
-
-    return df
-
-
-def format_ref_region_means(df):
-    """Format ROI extractions dataframe for LEADS quarterly reports."""
-    # Format ROI names
-    df["ref_region"] = df["ref_region"].apply(lambda x: x.replace("-", "_"))
-    df["ref_region"] = df["ref_region"].astype(
-        pd.CategoricalDtype(df["ref_region"], ordered=True)
-    )
-
-    # Remove unnecessary columns
-    df = df.drop(columns=["image_file", "mask_file", "voxel_count"])
-
-    # Rename columns
-    df = df.rename(
-        columns={
-            "mean": "ScalingFactor",
-        }
-    )
-
-    # Pivot the dataframe from long to wide format
-    df = df.set_index(["subject_id", "pet_date", "ref_region"]).unstack("ref_region")
-
-    # Flatten the column index
-    df.columns = ["_".join(col).strip() for col in df.columns.values]
-
-    # Reset the index
-    df = df.reset_index()
-
-    return df
-
-
-# @@
-# Load reference region scaling factors for each tracer
-ref_region_dat = {}
-for tracer in pets:
-    ref_region_dat[tracer] = pd.concat(
-        list(
-            pets[tracer].apply(
-                lambda x: get_ref_region_means(x["pet_proc_dir"]), axis=1
+    Returns
+    -------
+    dict
+        Dictionary with one dataframe of reference region scaling
+        factors for each tracer
+    """
+    def get_ref_region_means(pet_proc_dir):
+        def find_ref_region_means_file(pet_proc_dir):
+            """Return the filepath to the ROI mean CSV file."""
+            subj, tracer, pet_date = uts.parse_scan_tag(uts.get_scan_tag(pet_proc_dir))
+            filepath = op.join(
+                pet_proc_dir,
+                f"{subj}_{tracer}_{pet_date}_ref-region-means.csv",
             )
-        ),
+            if op.isfile(filepath):
+                return filepath
+            else:
+                warnings.warn(f"File not found: {filepath}")
+
+        def load_ref_region_means_file(filepath):
+            """Load and format the ROI extractions CSV file."""
+            def scrape_ref_regions(mask_file):
+                ref_regions = [
+                    op.basename(x).split(".")[0].split("_")[3].split("-")[1]
+                    for x in mask_file.split(";")
+                ]
+                if len(ref_regions) > 1:
+                    return "compwm"
+                else:
+                    return ref_regions[0]
+
+            # Load the CSV file
+            df = pd.read_csv(filepath)
+
+            # Parse the PET proc dir
+            subj, _, pet_date = uts.parse_scan_tag(uts.get_scan_tag(filepath))
+
+            # Add subject_id and pet_date columns
+            df.insert(0, "subject_id", subj)
+            df.insert(1, "pet_date", pet_date)
+            df.insert(
+                2,
+                "ref_region",
+                df["mask_file"].apply(scrape_ref_regions),
+            )
+
+            return df
+
+        def format_ref_region_means(df):
+            """Format ROI extractions dataframe for LEADS quarterly reports."""
+            # Format ROI names
+            df["ref_region"] = df["ref_region"].apply(lambda x: x.replace("-", "_"))
+            df["ref_region"] = df["ref_region"].astype(
+                pd.CategoricalDtype(df["ref_region"], ordered=True)
+            )
+
+            # Remove unnecessary columns
+            df = df.drop(columns=["image_file", "mask_file", "voxel_count"])
+
+            # Rename columns
+            df = df.rename(
+                columns={
+                    "mean": "ScalingFactor",
+                }
+            )
+
+            # Pivot the dataframe from long to wide format
+            df = df.set_index(["subject_id", "pet_date", "ref_region"]).unstack("ref_region")
+
+            # Flatten the column index
+            df.columns = ["_".join(col).strip() for col in df.columns.values]
+
+            # Reset the index
+            df = df.reset_index()
+
+            return df
+
+        try:
+            rr_dat = format_ref_region_means(
+                load_ref_region_means_file(find_ref_region_means_file(pet_proc_dir))
+            )
+            return rr_dat
+        except Exception as e:
+            print(e)
+            return None
+
+    # Load reference region scaling factors for each tracer
+    ref_region_dat = {}
+    for tracer in pets:
+        ref_region_dat[tracer] = pd.concat(
+            list(
+                pets[tracer].apply(
+                    lambda x: get_ref_region_means(x["pet_proc_dir"]), axis=1
+                )
+            ),
+            ignore_index=True,
+        )
+    return ref_region_dat
+
+
+def load_roi_dat(pets):
+    """Load ROI extraction means for each tracer.
+
+    Parameters
+    ----------
+    pets : dict
+        Dictionary with one PET scan dataframe for each tracer
+
+    Returns
+    -------
+    dict
+        Dictionary with one dataframe of reference region scaling
+        factors for each tracer
+    """
+    def get_roi_extractions(pet_proc_dir, ref_region):
+        def find_roi_extractions_file(pet_proc_dir, ref_region):
+            """Return the filepath to the ROI mean CSV file."""
+            subj, tracer, pet_date = uts.parse_scan_tag(uts.get_scan_tag(pet_proc_dir))
+            filepath = op.join(
+                pet_proc_dir,
+                f"r{subj}_{tracer}_{pet_date}_suvr-{ref_region}_roi-extractions.csv",
+            )
+            if op.isfile(filepath):
+                return filepath
+            else:
+                warnings.warn(f"File not found: {filepath}")
+
+        def load_roi_extractions_file(filepath):
+            """Load and format the ROI extractions CSV file."""
+            # Load the CSV file
+            df = pd.read_csv(filepath)
+
+            # Add subject_id and pet_date columns
+            df.insert(
+                0,
+                "subject_id",
+                df["image_file"].apply(lambda x: op.basename(x).split("_")[0][1:]),
+            )
+            df.insert(
+                1, "pet_date", df["image_file"].apply(lambda x: op.basename(x).split("_")[2])
+            )
+
+            return df
+
+        def format_roi_extractions(df):
+            """Format ROI extractions dataframe for LEADS quarterly reports."""
+            # Format ROI names
+            df["roi"] = df["roi"].apply(lambda x: x.replace("-", "_"))
+            df["roi"] = df["roi"].astype(pd.CategoricalDtype(df["roi"], ordered=True))
+
+            # Remove unnecessary columns
+            df = df.drop(columns=["image_file", "roi_file"])
+
+            # Rename columns
+            df = df.rename(
+                columns={
+                    "mean": "MRIBASED_SUVR",
+                    "voxel_count": "ClustSize",
+                }
+            )
+
+            # Pivot the dataframe from long to wide format
+            df = df.set_index(["subject_id", "pet_date", "roi"]).unstack("roi")
+
+            # Flatten the column index
+            df.columns = ["_".join(col[::-1]).strip() for col in df.columns.values]
+
+            # Reset the index
+            df = df.reset_index()
+
+            return df
+        try:
+            roi_dat = format_roi_extractions(
+                load_roi_extractions_file(
+                    find_roi_extractions_file(pet_proc_dir, ref_region)
+                )
+            )
+            return roi_dat
+        except Exception as e:
+            print(e)
+            return None
+
+    # Define reference regions for each tracer
+    ref_regions = {
+        "fbb": "wcbl",
+        "ftp": "infcblgm",
+        "fdg": "pons",
+    }
+
+    # Load ROI extractions for each tracer
+    roi_dat = {}
+    for tracer, ref_region in ref_regions.items():
+        roi_dat[tracer] = pd.concat(
+            list(
+                pets[tracer].apply(
+                    lambda x: get_roi_extractions(x["pet_proc_dir"], ref_region), axis=1
+                )
+            ),
+            ignore_index=True,
+        )
+    return roi_dat
+
+
+def load_centiloid_dat(pets):
+    """Load Centiloid values for amyloid PET.
+
+    Parameters
+    ----------
+    pets : dict
+        Dictionary with one PET scan dataframe for each tracer
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with Centiloid values for amyloid PET
+    """
+    def get_centiloids(pet_proc_dir):
+        def find_centiloid_file(pet_proc_dir):
+            """Return the filepath to the ROI mean CSV file."""
+            subj, tracer, pet_date = uts.parse_scan_tag(uts.get_scan_tag(pet_proc_dir))
+            filepath = op.join(
+                pet_proc_dir,
+                f"{subj}_{tracer}_{pet_date}_amyloid-cortical-summary.csv",
+            )
+            if op.isfile(filepath):
+                return filepath
+            else:
+                warnings.warn(f"File not found: {filepath}")
+
+        def load_centiloid_file(filepath):
+            """Load and format the ROI extractions CSV file."""
+            def _scrape_ref_region(image_file):
+                ref_region = op.basename(image_file).split(".")[0].split("_")[3].split("-")[1]
+                return ref_region
+
+            # Load the CSV file
+            df = pd.read_csv(filepath)
+
+            # Parse the PET proc dir
+            subj, _, pet_date = uts.parse_scan_tag(uts.get_scan_tag(op.dirname(filepath)))
+
+            # Add subject_id and pet_date columns
+            df.insert(0, "subject_id", subj)
+            df.insert(1, "pet_date", pet_date)
+            df.insert(
+                2,
+                "ref_region",
+                df["image_file"].apply(_scrape_ref_region),
+            )
+
+            return df
+
+        def format_centiloid_dat(df):
+            """Format ROI extractions dataframe for LEADS quarterly reports."""
+            # Format ROI names
+            df["ref_region"] = df["ref_region"].apply(lambda x: x.replace("-", "_"))
+            df["ref_region"] = df["ref_region"].astype(
+                pd.CategoricalDtype(df["ref_region"], ordered=True)
+            )
+
+            # Remove unnecessary columns
+            df = df.drop(columns=["image_file", "mask_file", "mean_suvr"])
+
+            # Pivot the dataframe from long to wide format
+            df = df.set_index(["subject_id", "pet_date", "ref_region"]).unstack("ref_region")
+
+            # Flatten the column index
+            df.columns = ["_".join(col) for col in df.columns.values]
+
+            # Reset the index
+            df = df.reset_index()
+
+            return df
+        try:
+            rr_dat = format_centiloid_dat(
+                load_centiloid_file(find_centiloid_file(pet_proc_dir))
+            )
+            return rr_dat
+        except Exception as e:
+            print(e)
+            return None
+
+    # Load Centiloid values for each reference region
+    tracer = "fbb"
+    centiloid_dat = pd.concat(
+        list(pets[tracer].apply(lambda x: get_centiloids(x["pet_proc_dir"]), axis=1)),
         ignore_index=True,
     )
-    print(f"{tracer.upper()}: {ref_region_dat[tracer].shape}")
+    return centiloid_dat
 
 
-# $$ ROI EXTRACTION FILES
-# @@
-def get_roi_extractions(pet_proc_dir, ref_region):
-    try:
-        roi_dat = format_roi_extractions(
-            load_roi_extractions_file(
-                find_roi_extractions_file(pet_proc_dir, ref_region)
-            )
-        )
-        return roi_dat
-    except Exception as e:
-        print(e)
-        return None
 
 
-def find_roi_extractions_file(pet_proc_dir, ref_region):
-    """Return the filepath to the ROI mean CSV file."""
-    subj, tracer, pet_date = parse_pet_proc_dir(pet_proc_dir)
-    filepath = op.join(
-        pet_proc_dir,
-        f"r{subj}_{tracer}_{pet_date}_suvr-{ref_region}_roi-extractions.csv",
-    )
-    if op.isfile(filepath):
-        return filepath
-    else:
-        warnings.warn(f"File not found: {filepath}")
-
-
-def load_roi_extractions_file(filepath):
-    """Load and format the ROI extractions CSV file."""
-    # Load the CSV file
-    df = pd.read_csv(filepath)
-
-    # Add subject_id and pet_date columns
-    df.insert(
-        0,
-        "subject_id",
-        df["image_file"].apply(lambda x: op.basename(x).split("_")[0][1:]),
-    )
-    df.insert(
-        1, "pet_date", df["image_file"].apply(lambda x: op.basename(x).split("_")[2])
-    )
-
-    return df
-
-
-def format_roi_extractions(df):
-    """Format ROI extractions dataframe for LEADS quarterly reports."""
-    # Format ROI names
-    df["roi"] = df["roi"].apply(lambda x: x.replace("-", "_"))
-    df["roi"] = df["roi"].astype(pd.CategoricalDtype(df["roi"], ordered=True))
-
-    # Remove unnecessary columns
-    df = df.drop(columns=["image_file", "roi_file"])
-
-    # Rename columns
-    df = df.rename(
-        columns={
-            "mean": "MRIBASED_SUVR",
-            "voxel_count": "ClustSize",
-        }
-    )
-
-    # Pivot the dataframe from long to wide format
-    df = df.set_index(["subject_id", "pet_date", "roi"]).unstack("roi")
-
-    # Flatten the column index
-    df.columns = ["_".join(col[::-1]).strip() for col in df.columns.values]
-
-    # Reset the index
-    df = df.reset_index()
-
-    return df
-
-
-# @@
-# Define reference regions for each tracer
-ref_regions = {
-    "fbb": "wcbl",
-    "ftp": "infcblgm",
-    "fdg": "pons",
-}
-
-# Load ROI extractions for each tracer
-roi_dat = {}
-for tracer, ref_region in ref_regions.items():
-    roi_dat[tracer] = pd.concat(
-        list(
-            pets[tracer].apply(
-                lambda x: get_roi_extractions(x["pet_proc_dir"], ref_region), axis=1
-            )
-        ),
-        ignore_index=True,
-    )
-    print(f"{tracer.upper()}: {roi_dat[tracer].shape}")
-
-
-# $$ CENTILOID FILES
-# @@
-def load_centiloid_csv(filepath):
-    """Load and format the Centiloid CSV file."""
-    df = pd.read_csv(filepath)
-    df["image_file"] = df["image_file"].apply(op.basename)
-    df.insert(0, "subj", df["image_file"].apply(lambda x: x.split("_")[0][1:]))
-    df.insert(1, "pet_date", df["image_file"].apply(lambda x: x.split("_")[2]))
-    df = df.loc[
-        df["image_file"].apply(lambda x: x.split("_")[3].startswith("suvr-wcbl")), :
-    ]
-    df = df.drop(columns=["image_file", "mask_file"])
-    return df
-
-
-def get_centiloids(pet_proc_dir):
-    try:
-        rr_dat = format_centiloid_dat(
-            load_centiloid_file(find_centiloid_file(pet_proc_dir))
-        )
-        return rr_dat
-    except Exception as e:
-        print(e)
-        return None
-
-
-def find_centiloid_file(pet_proc_dir):
-    """Return the filepath to the ROI mean CSV file."""
-    subj, tracer, pet_date = parse_pet_proc_dir(pet_proc_dir)
-    filepath = op.join(
-        pet_proc_dir,
-        f"{subj}_{tracer}_{pet_date}_amyloid-cortical-summary.csv",
-    )
-    if op.isfile(filepath):
-        return filepath
-    else:
-        warnings.warn(f"File not found: {filepath}")
-
-
-def load_centiloid_file(filepath):
-    """Load and format the ROI extractions CSV file."""
-
-    def _scrape_ref_region(image_file):
-        ref_region = op.basename(image_file).split(".")[0].split("_")[3].split("-")[1]
-        return ref_region
-
-    # Load the CSV file
-    df = pd.read_csv(filepath)
-
-    # Parse the PET proc dir
-    subj, _, pet_date = parse_pet_proc_dir(op.dirname(filepath))
-
-    # Add subject_id and pet_date columns
-    df.insert(0, "subject_id", subj)
-    df.insert(1, "pet_date", pet_date)
-    df.insert(
-        2,
-        "ref_region",
-        df["image_file"].apply(_scrape_ref_region),
-    )
-
-    return df
-
-
-def format_centiloid_dat(df):
-    """Format ROI extractions dataframe for LEADS quarterly reports."""
-    # Format ROI names
-    df["ref_region"] = df["ref_region"].apply(lambda x: x.replace("-", "_"))
-    df["ref_region"] = df["ref_region"].astype(
-        pd.CategoricalDtype(df["ref_region"], ordered=True)
-    )
-
-    # Remove unnecessary columns
-    df = df.drop(columns=["image_file", "mask_file", "mean_suvr"])
-
-    # Pivot the dataframe from long to wide format
-    df = df.set_index(["subject_id", "pet_date", "ref_region"]).unstack("ref_region")
-
-    # Flatten the column index
-    df.columns = ["_".join(col) for col in df.columns.values]
-
-    # Reset the index
-    df = df.reset_index()
-
-    return df
-
-
-# @@
-# Load Centiloid values for amyloid PET
-tracer = "fbb"
-centiloid_dat = pd.concat(
-    list(pets[tracer].apply(lambda x: get_centiloids(x["pet_proc_dir"]), axis=1)),
-    ignore_index=True,
-)
-print(f"{tracer.upper()}: {centiloid_dat.shape}")
 
 # $$ MERGE DATAFRAMES
 # @@

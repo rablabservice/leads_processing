@@ -59,6 +59,7 @@ addpath(genpath(fileparts(fileparts(mfilename('fullpath')))));
 
 % Define defaults
 proj_dir = "/mnt/coredata/processing/leads";
+code_dir = fileparts(fileparts(mfilename('fullpath')));
 scans_to_process_dir = fullfile(proj_dir, 'metadata', 'scans_to_process');
 skip_newdata = false;
 wipe_newdata = true;
@@ -75,15 +76,26 @@ process_freesurfer = true;
 process_post_freesurfer = true;
 pet_dirs = {};
 
+% Get path to the Python interpreter and Python scripts that this
+% program can call
+python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
+qc_evals_script = fullfile(code_dir, 'qc', 'qc_evals.py');
+
 % Figure out what the user wants to do
 prompt_user = sprintf([
     '\n~ Welcome to the LEADS processing pipeline ~\n\n', ...
     'What would you like to do?\n', ...
-    '  [1] Setup scans for processing\n', ...
-    '  [2] View scans that are scheduled for processing\n', ...
+    '  [1] Add scans from newdata to raw, and\n', ...
+    '      schedule raw scans to be processed\n', ...
+    '  [2] View scheduled MRI and PET scans\n', ...
+    '      (but don''t process them yet)\n', ...
     '  [3] Process scheduled MRIs\n', ...
     '  [4] Process scheduled PET scans\n', ...
-    '  [5] Nothing, I would like to exit this program now...\n\n'
+    '  [5] Merge QC evaluation files\n', ...
+    '  [6] View processed scans that need to be QC''d\n', ...
+    '  [7] Merge ROI extraction files (NOT IMPLEMENTED) \n', ...
+    '  [8] Prepare quarterly report files (NOT IMPLEMENTED) \n', ...
+    '  [9] Exit\n\n'
 ]);
 action = input(prompt_user);
 
@@ -92,6 +104,7 @@ change_defaults_msg = '\nDo you need to change any defaults?';
 overwrite_msg = 'Overwrite existing files?';
 switch action
     case 1
+        % Schedule scans to be processed
         fprintf('\nDefault parameters\n------------------\n');
         fprintf('Project directory                                                  = %s\n', proj_dir);
         fprintf('Skip the ''newdata'' -> ''raw'' submodule?                             = %d\n', skip_newdata);
@@ -146,11 +159,13 @@ switch action
             overwrite_processed ...
         );
     case 2
+        % View scheduled MRI and PET scans
         fprintf('\nCalling queue_mris_to_process.m...\n');
         queue_mris_to_process(scans_to_process_dir);
         fprintf('\nCalling queue_pets_to_process.m...\n');
         queue_pets_to_process(scans_to_process_dir);
     case 3
+        % Process scheduled MRIs
         fprintf('\nDefaults parameters\n-------------------\n');
         fprintf('MRIs to process                                   = By default, this program will attempt to process all    \n');
         fprintf('                                                    scheduled MRIs, but it is possible to override this     \n');
@@ -223,6 +238,7 @@ switch action
             process_post_freesurfer ...
         );
     case 4
+        % Process scheduled PET scans
         fprintf('\nDefaults parameters\n-------------------\n');
         fprintf('PET scans to process                              = By default, this program will attempt to process all     \n');
         fprintf('                                                    scheduled PETs scans, but it is possible to override this\n');
@@ -284,9 +300,28 @@ switch action
             overwrite ...
         );
     case 5
-        fprintf('Ok\n');
+        % Merge QC evaluation files
+        cmd = sprintf('%s %s %s', python, qc_evals_script, 'merge');
+        fprintf('Merging QC evaluation files...\n');
+        fprintf('$ %s\n', cmd);
+        system(cmd);
+    case 6
+        % View processed scans that need to be QC'd
+        fprintf([ ...
+            '\n** NOTE: Merge QC evaluation files (Option 5) first to view an\n', ...
+            '         updated list of processed scans that need to be QC''d\n\n' ...
+        ]);
+        cmd = sprintf('%s %s %s', python, qc_evals_script, 'incomplete');
+        fprintf('$ %s\n', cmd);
+        system(cmd);
+    case 7
+        fprintf('Option not yet implemented. Exiting program.\n');
+    case 8
+        fprintf('Option not yet implemented. Exiting program.\n');
+    case 9
+        fprintf('Bye for now\n');
     otherwise
-        fprintf('INVALID INPUT. Try again :(\n');
+        fprintf('Input is invalid. Exiting program.\n');
 end
 
 % End the program

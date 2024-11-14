@@ -244,13 +244,13 @@ def main(
         )
     )
     print(
-        "    - {:,}/{:,} optional MRIs have been processed through Freesurfer".format(
+        "    - {:,}/{:,} orphan MRIs have been processed through Freesurfer".format(
             len(raw_mris_opt.loc[raw_mris_opt["freesurfer_complete"] == 1]),
             len(raw_mris_opt),
         )
     )
     print(
-        "    - {:,}/{:,} optional MRIs have been fully processed".format(
+        "    - {:,}/{:,} orphan MRIs have been fully processed".format(
             len(raw_mris_opt.loc[raw_mris_opt["mri_processing_complete"] == 1]),
             len(raw_mris_opt),
         )
