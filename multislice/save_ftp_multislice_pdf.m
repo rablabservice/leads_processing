@@ -55,7 +55,7 @@ function multislice_file = save_ftp_multislice_pdf( ...
     % Get the input files
     pet_files = get_processed_pet_files(pet_dir);
     mri_files = get_processed_mri_files(fullfile(pet_dir, 'mri'));
-    asuvr_file = pet_files.suvr_infcblgm;
+    asuvr_file = pet_files.asuvr_infcblgm;
     anu_file = mri_files.anu;
     mustBeFile(asuvr_file);
     mustBeFile(anu_file);
