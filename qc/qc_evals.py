@@ -4,12 +4,11 @@
 Create and manage QC eval files.
 """
 
-
 import argparse
 import os
+import os.path as op
 import shutil
 import sys
-import os.path as op
 
 import numpy as np
 import pandas as pd
@@ -118,6 +117,16 @@ def create_qc_eval_file(scan_dir):
     return qc_eval_file
 
 
+def get_qc_png_file(scan_dir):
+    """Return the QC png file for a single scan."""
+    scan_dir = op.abspath(scan_dir)
+    scan_tag = uts.get_scan_tag(scan_dir)
+    qc_png_file = op.join(scan_dir, f"{scan_tag}_qc.png")
+    if not op.isfile(qc_png_file):
+        return None
+    return qc_png_file
+
+
 def get_qc_eval_file(scan_dir):
     """Return the most recent QC eval file for a single scan."""
     scan_dir = op.abspath(scan_dir)
@@ -176,7 +185,7 @@ def check_if_qc_complete(scan_dir):
         elif key == "manual_freesurfer_edits":
             try:
                 val = int(val)
-                if not val in (0, 1):
+                if val not in (0, 1):
                     qc_complete = False
                     break
             except ValueError:
@@ -185,7 +194,7 @@ def check_if_qc_complete(scan_dir):
         elif key.endswith("_rating"):
             try:
                 val = int(val)
-                if not val in (0, 1, 2):
+                if val not in (0, 1, 2):
                     qc_complete = False
                     break
             except ValueError:
@@ -194,7 +203,7 @@ def check_if_qc_complete(scan_dir):
         elif key.endswith("_ok"):
             try:
                 val = int(val)
-                if not val in (0, 1):
+                if val not in (0, 1):
                     qc_complete = False
                     break
             except ValueError:
@@ -286,6 +295,8 @@ def find_scans_with_incomplete_qc(
     scan_dirs = {}
     processed_scans = {}
     unprocessed_scans = {}
+    qc_png_exists = {}
+    qc_png_missing = {}
     qc_complete_scans = {}
     qc_incomplete_scans = {}
     n_scans = {}
@@ -309,6 +320,9 @@ def find_scans_with_incomplete_qc(
         unprocessed_scans[scan_type] = [
             d for d in scan_dirs[scan_type] if d not in processed_scans[scan_type]
         ]
+
+        # Find processed scans with existing vs. missing QC PNG files
+        # TODO: Implement this
 
         # Find processed scans with complete vs. incomplete QC evals
         qc_complete_scans[scan_type] = [

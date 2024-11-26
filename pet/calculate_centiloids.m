@@ -23,7 +23,7 @@ function outfile = calculate_centiloids(suvr_files, cortical_summary_maskf, outf
 
     % Get the output filename and check if it exists
     if isempty(outfile)
-        outfile = fullfile(pet_dir, append(pet_tag, '_amyloid-cortical-summary.csv'));
+        outfile = fullfile(pet_dir, append('r', pet_tag, '_amyloid-cortical-summary.csv'));
     end
     if isfile(outfile) && ~overwrite
         log_append(fid, sprintf('  * %s exists, will not overwrite', basename(outfile)));

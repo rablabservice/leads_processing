@@ -45,7 +45,7 @@ function outfiles = save_pet_suvrs(pet_file, mri_dir, fid, overwrite, ref_region
     [ref_regions, suvr_files] = get_suvr_files(pet_dir, ref_region_file);
 
     % Define the output filenames
-    outfiles.rrmeans = fullfile(pet_dir, append(pet_tag, '_ref-region-means.csv'));
+    outfiles.rrmeans = fullfile(pet_dir, append('r', pet_tag, '_ref-region-means.csv'));
     outfiles = catstruct(outfiles, suvr_files);
 
     % Check if output files already exist

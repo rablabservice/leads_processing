@@ -6,71 +6,45 @@ OR
 $ extract_rois.py -i [pet1.nii pet2.nii ...] -a [aparc+aseg1.nii aparc+aseg2.nii ...]
 """
 
-import sys
-import os.path as op
-import importlib.resources
 import argparse
+import os.path as op
+import sys
+import time
 from collections import OrderedDict as od
 from inspect import isroutine
-import re
-from time import time
 
 import nibabel as nib
 import numpy as np
 import pandas as pd
-import general.nifti.nifti_ops as nops
 
 
 class Timer(object):
-    """I say how long things take to run."""
+    """A simple timer."""
 
-    def __init__(self, msg=None):
+    def __init__(self, msg="Time elapsed: "):
         """Start the global timer."""
         self.reset()
-        if msg is None:
-            self.msg = "Time elapsed: "
-        else:
-            self.msg = msg
+        self.msg = msg
 
     def __str__(self):
         """Print how long the global timer has been running."""
-        elapsed = self.check()
-        hours = int(elapsed / 3600)
-        minutes = int((elapsed % 3600) / 60)
-        seconds = elapsed % 60
-        if hours > 0:
-            msg = self.msg + "{}h, {}m, {:.3f}s".format(hours, minutes, seconds)
-        elif minutes > 0:
-            msg = self.msg + "{}m, {:.3f}s".format(minutes, seconds)
+        self.check()
+        hours, remainder = divmod(self.elapsed, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours:
+            return self.msg + f"{hours:d}h, {minutes:d}m, {seconds:.2f}s"
+        if minutes:
+            return self.msg + f"{minutes:d}m, {seconds:.2f}s"
         else:
-            msg = self.msg + f"{elapsed}s"
-        return msg
+            return self.msg + f"{self.elapsed:.2f}s"
 
-    def check(self, reset=False):
+    def check(self):
         """Report the global runtime."""
-        runtime = time() - self.start
-        if reset:
-            self.reset()
-        return runtime
-
-    def loop(self, key=None, verbose=True):
-        """Report the loop runtime and reset the loop timer."""
-        if not hasattr(self, "loops"):
-            self.loops = od([])
-        if not hasattr(self, "last_loop_start"):
-            self.last_loop_start = self.start
-        if key is None:
-            key = "loop {}".format(len(self.loops) + 1)
-
-        loop_runtime = time() - self.last_loop_start
-        self.loops[key] = loop_runtime
-        self.last_loop_start = time()
-        if verbose:
-            print("{}: {:.1f}s".format(key, self.loops[key]))
+        self.elapsed = time.time() - self.start
 
     def reset(self):
         """Reset the global timer."""
-        self.start = time()
+        self.start = time.time()
 
 
 class TextFormatter(argparse.RawTextHelpFormatter):
@@ -123,7 +97,6 @@ def load_rois(roi_file):
     except AttributeError:
         pass
     rois = pd.Series(rois)
-    rois = pd.Series(rois)
     return rois
 
 
@@ -160,7 +133,7 @@ def roi_desc(dat, rois, subrois=None, aggf=np.mean, conv_nan=0):
         raise ValueError("Cannot define multiple rois and subrois")
 
     # Load the data array.
-    dat = load_nii(dat, dat_only=True, flatten=True, conv_nan=conv_nan)
+    dat = load_nii(dat, flatten=True, conv_nan=conv_nan)
 
     # Format the ROIs to be dict-like.
     if isinstance(rois, str):
@@ -169,19 +142,17 @@ def roi_desc(dat, rois, subrois=None, aggf=np.mean, conv_nan=0):
     if isinstance(rois, (list, tuple)):
         rois_dict = od([])
         for roi in rois:
-            splits = splitt(roi, ["_", "."])
-            for ii, string in enumerate(splits):
-                if string.startswith("mask-"):
-                    roi_name = "-".join(string.split("-")[1:])
-                    rois_dict[roi_name] = roi
-                    break
-                elif ii == len(splits) - 1:
-                    rois_dict[".".join(op.basename(roi).split(".")[:-1])] = roi
+            roi_name = op.basename(roi)
+            i = roi_name.find("mask-")
+            if i != -1:
+                roi_name = roi_name[i + 5 :]
+            roi_name = ".".join(roi_name.split(".")[:-1])
+            rois_dict[roi_name] = roi
         rois = rois_dict
-    elif hasattr(rois, "keys"):
+    elif isinstance(rois, dict):
         pass
     else:
-        raise ValueError("rois must be str, list, tuple, or dict-like")
+        raise ValueError("rois must be str, list, tuple, or dict")
 
     # Format the aggregation functions to be dict-like.
     if isroutine(aggf):
@@ -201,7 +172,7 @@ def roi_desc(dat, rois, subrois=None, aggf=np.mean, conv_nan=0):
     # Loop over the ROIs and sub-ROIs.
     for roi, roi_mask in rois.items():
         if subrois is not None:
-            mask = load_nii(roi_mask, dat_only=True, flatten=True, binarize=False)
+            mask = load_nii(roi_mask, flatten=True, binarize=False)
             assert dat.shape == mask.shape
             for subroi, subroi_vals in subrois.items():
                 mask_idx = np.where(np.isin(mask, subroi_vals))
@@ -209,7 +180,7 @@ def roi_desc(dat, rois, subrois=None, aggf=np.mean, conv_nan=0):
                     output.at[subroi, func_name] = func(dat[mask_idx])
                 output.at[subroi, "voxels"] = mask_idx[0].size
         else:
-            mask = load_nii(roi_mask, dat_only=True, flatten=True, binarize=True)
+            mask = load_nii(roi_mask, flatten=True, binarize=True)
             assert dat.shape == mask.shape
             mask_idx = np.where(mask)
             for func_name, func in aggf.items():
@@ -261,10 +232,86 @@ def load_nii(
     img : Nifti1Image
     dat : ndarray or ndarray subclass
     """
+
     # Get the right file extension.
+    def _format_array(
+        dat,
+        dtype=np.float32,
+        squeeze=True,
+        flatten=False,
+        conv_nan=0,
+        binarize=False,
+        int_rounding="nearest",
+    ):
+        """Format an array.
+
+        Formatting options:
+        - Flattening
+        - NaN handling
+        - Data type conversion
+
+        Parameters
+        ----------
+        dtype : data-type
+            Determines the data type returned.
+        flatten : bool
+            Return `dat` as a flattened copy of the input array.
+        conv_nan : bool, number, or NoneType object
+            Convert NaNs to `conv_nan`. No conversion is applied if
+            `conv_nan` is np.nan, None, or False.
+        binarize : bool
+            If true, `dat` values > 0 become 1 and all other values are 0.
+            `dat` type is recast to np.uint8.
+        int_rounding : str
+            Determines how the data array is recast if `binarize` is false
+            and `dtype` is an integer.
+            `nearest` : round to the nearest integer
+            `floor` : round down
+            `ceil` : round up
+
+        Returns
+        -------
+        dat : ndarray or ndarray subclass
+        """
+        # Flatten the array.
+        if flatten:
+            dat = dat.ravel()
+
+        # Squeeze the array.
+        elif squeeze:
+            dat = np.squeeze(dat)
+
+        # Convert NaNs.
+        if not np.any((conv_nan is None, conv_nan is False, conv_nan is np.nan)):
+            dat[np.invert(np.isfinite(dat))] = conv_nan
+
+        # Recast the data type.
+        if binarize or (dtype is bool):
+            idx = dat > 0
+            dat[idx] = 1
+            dat[~idx] = 0
+            if dtype is bool:
+                dat = dat.astype(bool)
+            else:
+                dat = dat.astype(np.uint8)
+        elif "int" in str(dtype):
+            if int_rounding == "nearest":
+                dat = np.rint(dat)
+            elif int_rounding == "floor":
+                dat = np.floor(dat)
+            elif int_rounding == "ceil":
+                dat = np.ceil(dat)
+            else:
+                raise ValueError("int_rounding='{}' not valid".format(int_rounding))
+            dat = dat.astype(dtype)
+        else:
+            dat = dat.astype(dtype)
+
+        return dat
+
     infile = find_gzip(infile)
 
-    # Load the NIfTI image and data array.
+    # Load a NIfTI file and get its data array.
     img = nib.load(infile)
     dat = np.asanyarray(img.dataobj)
 
@@ -279,7 +326,7 @@ def load_nii(
         int_rounding=int_rounding,
     )
 
-    return img, dat
+    return dat
 
 
 def find_gzip(infile, raise_error=False, return_infile=False):
@@ -338,91 +385,6 @@ def toggle_gzip(infile):
     else:
         outfile = infile + ".gz"
     return outfile
-
-
-def _format_array(
-    dat,
-    dtype=np.float32,
-    squeeze=True,
-    flatten=False,
-    conv_nan=0,
-    binarize=False,
-    int_rounding="nearest",
-):
-    """Format an array.
-
-    Formatting options:
-    - Flattening
-    - NaN handling
-    - Data type conversion
-
-    Parameters
-    ----------
-    dtype : data-type
-        Determines the data type returned.
-    flatten : bool
-        Return `dat` as a flattened copy of the input array.
-    conv_nan : bool, number, or NoneType object
-        Convert NaNs to `conv_nan`. No conversion is applied if
-        `conv_nan` is np.nan, None, or False.
-    binarize : bool
-        If true, `dat` values > 0 become 1 and all other values are 0.
-        `dat` type is recast to np.uint8.
-    int_rounding : str
-        Determines how the data array is recast if `binarize` is false
-        and `dtype` is an integer.
-        `nearest` : round to the nearest integer
-        `floor` : round down
-        `ceil` : round up
-
-    Returns
-    -------
-    dat : ndarray or ndarray subclass
-    """
-    # Flatten the array.
-    if flatten:
-        dat = dat.ravel()
-
-    # Squeeze the array.
-    elif squeeze:
-        dat = np.squeeze(dat)
-
-    # Convert NaNs.
-    if not np.any((conv_nan is None, conv_nan is False, conv_nan is np.nan)):
-        dat[np.invert(np.isfinite(dat))] = conv_nan
-
-    # Recast the data type.
-    if binarize or (dtype is bool):
-        idx = dat > 0
-        dat[idx] = 1
-        dat[~idx] = 0
-        if dtype is bool:
-            dat = dat.astype(bool)
-        else:
-            dat = dat.astype(np.uint8)
-    elif "int" in str(dtype):
-        if int_rounding == "nearest":
-            dat = np.rint(dat)
-        elif int_rounding == "floor":
-            dat = np.floor(dat)
-        elif int_rounding == "ceil":
-            dat = np.ceil(dat)
-        else:
-            raise ValueError("int_rounding='{}' not valid".format(int_rounding))
-        dat = dat.astype(dtype)
-    else:
-        dat = dat.astype(dtype)
-
-    return dat
-
-
-def splitt(string, delimiters):
-    """Split a string into a list of substrings by 1+ delimiters."""
-    if isinstance(delimiters, str):
-        delimiters = [delimiters]
-
-    pattern = "[" + re.escape("".join(delimiters)) + "]"
-    return [substring for substring in re.split(pattern, string) if len(substring) > 0]
 
 
 def _parse_args():
@@ -574,7 +536,7 @@ if __name__ == "__main__":
     output = []
     if args.masks is not None:
         for img in args.images:
-            _output = nops.roi_desc(dat=img, rois=args.masks)
+            _output = roi_desc(dat=img, rois=args.masks)
             _output = _output.reset_index()
             _output.insert(0, "image_file", img)
             _output.insert(1, "roi_file", args.masks)
@@ -597,7 +559,7 @@ if __name__ == "__main__":
             args.aparcs = args.aparcs * len(args.images)
         # Extract ROI values
         for img, aparc in zip(args.images, args.aparcs):
-            _output = nops.roi_desc(dat=img, rois=aparc, subrois=keep_rois)
+            _output = roi_desc(dat=img, rois=aparc, subrois=keep_rois)
             _output = _output.reset_index()
             _output.insert(0, "image_file", img)
             _output.insert(1, "roi_file", aparc)

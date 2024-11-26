@@ -424,7 +424,7 @@ def load_ref_region_dat(pets):
             subj, tracer, pet_date = uts.parse_scan_tag(uts.get_scan_tag(pet_proc_dir))
             filepath = op.join(
                 pet_proc_dir,
-                f"{subj}_{tracer}_{pet_date}_ref-region-means.csv",
+                f"r{subj}_{tracer}_{pet_date}_ref-region-means.csv",
             )
             if op.isfile(filepath):
                 return filepath
@@ -634,7 +634,7 @@ def load_centiloid_dat(pets):
             subj, tracer, pet_date = uts.parse_scan_tag(uts.get_scan_tag(pet_proc_dir))
             filepath = op.join(
                 pet_proc_dir,
-                f"{subj}_{tracer}_{pet_date}_amyloid-cortical-summary.csv",
+                f"r{subj}_{tracer}_{pet_date}_amyloid-cortical-summary.csv",
             )
             if op.isfile(filepath):
                 return filepath
