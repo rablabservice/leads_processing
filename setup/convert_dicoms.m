@@ -10,7 +10,8 @@ function convert_dicoms(topdir)
     topdir = abspath(topdir);
 
     % Get path to dcm2niix
-    dcm2niix = '/home/mac/dschonhaut/bin/dcm2niix -d 9';
+    code_dir = fileparts(fileparts(mfilename('fullpath')));
+    dcm2niix = append(fullfile(code_dir, 'utils', 'dcm2niix'), ' -d 9');
 
     % Find all dicoms in raw
     dcm_files = dir(fullfile(topdir, '**', '*.dcm'));

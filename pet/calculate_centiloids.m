@@ -63,5 +63,5 @@ function outfile = calculate_centiloids(suvr_files, cortical_summary_maskf, outf
 
     % Save the output CSV
     writetable(cl_table, outfile);
-    log_append(fid, sprintf('  * Saved %s', outfile));
+    log_append(fid, sprintf('  * Saved %s', basename(outfile)));
 end
