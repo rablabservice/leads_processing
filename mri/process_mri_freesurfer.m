@@ -63,7 +63,7 @@ function outfiles = process_mri_freesurfer( ...
     end
 
     % Run recon-all
-    cmd_fs=char(append('recon-all -all -i ', raw_mrif, ' -sd ', mri_dir, ' -s ', fs_version));
+    cmd_fs=char(append('recon-all -all -i "', raw_mrif, '" -sd ', mri_dir, ' -s ', fs_version));
     log_append(fid, '- Processing MRI through FreeSurfer');
     log_append(fid, sprintf('    $ %s', cmd_fs));
     system(cmd_fs);
