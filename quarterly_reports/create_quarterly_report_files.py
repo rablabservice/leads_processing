@@ -10,6 +10,7 @@ import argparse
 import os.path as op
 import re
 import sys
+import time
 import warnings
 
 import numpy as np
@@ -51,9 +52,12 @@ class QReport:
         self.filter_pet_by_umich_qc()
         self.filter_pet_by_ucsf_qc()
         self.load_subject_index()
+        self.load_eligibility_list()
         self.load_ref_region_dat()
         self.load_roi_dat()
         self.load_centiloid_dat()
+        self.create_qreport_files(save_output, overwrite)
+        print("-" * 80, "Finished compiling LEADS quarterly report files!", sep="\n")
 
     def get_paths(self, proj_dir):
         """Get a dictionary of important project paths.
@@ -107,7 +111,7 @@ class QReport:
         self.report_period : str
         """
         if isinstance(report_date, str) and re.match(
-            r"^(20[0-9]{2})Q[1-4]$", report_date
+            r"^(20[0-9]{2})-Q[1-4]$", report_date
         ):
             self.report_period = report_date
         else:
@@ -116,7 +120,7 @@ class QReport:
                 if report_date is None
                 else pd.Timestamp(report_date)
             )
-            self.report_period = f"{report_date.year}Q{report_date.quarter}"
+            self.report_period = f"{report_date.year}-Q{report_date.quarter}"
 
     def get_stop_date(self):
         """Get the last date for inclusion in the current report period.
@@ -150,6 +154,18 @@ class QReport:
             stop_day = 30
 
         self.stop_date = pd.Timestamp(year=stop_year, month=stop_month, day=stop_day)
+
+    def load_eligibility_list(self):
+        """Load the LEADS eligibility list.
+
+        Creates
+        -------
+        self.eligibility : DataFrame
+        """
+        eligibility = pd.read_csv(
+            op.join(self.paths["atri"], "LEADS_Eligibility_list.csv")
+        )
+        self.eligible_subjects = set(eligibility["subject_label"])
 
     def load_processed_pet_index(self):
         """Load the dataframe with all processed PET scans.
@@ -198,27 +214,27 @@ class QReport:
         # Rename columns
         pet_scan_idx = pet_scan_idx.rename(columns={"subj": "subject_id"})
 
-        # Report how many PET scans have been processed
+        # Modify columns
+        pet_scan_idx["tracer"] = pet_scan_idx["tracer"].str.lower()
+
+        # Separate each PET tracer into its own dataframe
         n_scans = len(pet_scan_idx)
         n_subjs = pet_scan_idx["subject_id"].nunique()
-        print(f"Loading latest PET scan index from {self.paths["scans_to_process"]}")
         print(
-            f"- Found {n_scans:,} fully processed PET scans from {n_subjs:,} subjects"
+            "",
+            "-" * 80,
+            f"Loading latest PET scan index from {self.paths['scans_to_process']}",
+            sep="\n",
         )
+        print(f"- {n_scans:,} fully processed PET scans from {n_subjs:,} subjects")
+        self.tracers = sorted(pet_scan_idx["tracer"].unique())
+        self.pet_idx = {}
         for tracer, grp in pet_scan_idx.groupby("tracer"):
             n_scans = len(grp)
             n_subjs = grp["subject_id"].nunique()
-            print(f"  * {n_scans:,} {tracer.upper()} scans from {n_subjs:,} subjects")
-
-        # Separate each PET tracer into its own dataframe
-        self.tracers = sorted(pet_scan_idx["tracer"].unique())
-        self.pet_idx = {}
-        for tracer in self.tracers:
-            self.pet_idx[tracer] = (
-                pet_scan_idx.loc[pet_scan_idx["tracer"] == tracer]
-                .reset_index(drop=True)
-                .copy()
-            )
+            self.pet_idx[tracer] = grp.reset_index(drop=True).copy()
+            print(f"  * {n_scans:>5,} {tracer.upper()}, {n_subjs:>3,} subjects")
+        print()
 
     def filter_pet_by_umich_qc(self, drop_failed_scans=True):
         """Filter PET scans and retain rows from scans that passed UMich QC.
@@ -317,21 +333,26 @@ class QReport:
             )
 
         # Select scans that passed QC
-        print("Filtering PET scans by UMich QC")
+        print("-" * 80, "Checking PET scans against UMich QC", sep="\n")
         drop_msg = "Removing" if drop_failed_scans else "These are the"
         for tracer in self.tracers:
             n_scans = len(self.pet_idx[tracer])
             n_passed = int(self.pet_idx[tracer]["passed_umich_qc"].sum())
-            print(f"- {n_passed:,}/{n_scans:,} {tracer.upper()} scans passed QC")
+            print(f"- {n_passed:,}/{n_scans:,} {tracer.upper()} scans passed UMich QC")
             if n_scans > n_passed:
                 print(
-                    f"- {drop_msg} {n_scans - n_passed:,} scans that did not pass QC:"
+                    f"- {drop_msg} {n_scans - n_passed:,} {tracer.upper()} scans that did not pass UMich QC:"
                 )
                 print(
-                    self.pet_idx[tracer]
-                    .query("(passed_umich_qc!=1)")[["subject_id", "pet_date"]]
-                    .to_markdown(index=False, tablefmt="rst")
+                    "    "
+                    + "\n    ".join(
+                        self.pet_idx[tracer]
+                        .query("(passed_umich_qc!=1)")[["subject_id", "pet_date"]]
+                        .to_markdown(index=False, tablefmt="rst")
+                        .split("\n")
+                    )
                 )
+                print()
                 if drop_failed_scans:
                     self.pet_idx[tracer] = (
                         self.pet_idx[tracer]
@@ -509,21 +530,26 @@ class QReport:
             )
 
         # Select scans that passed QC
-        print("Filtering PET scans by UCSF PET and MRI QC")
+        print("-" * 80, "Checking PET scans against UCSF PET/MRI QC", sep="\n")
         drop_msg = "Removing" if drop_failed_scans else "These are the"
         for tracer in self.tracers:
             n_scans = len(self.pet_idx[tracer])
             n_passed = int(self.pet_idx[tracer]["ucsf_qc_pass"].sum())
-            print(f"- {n_passed:,}/{n_scans:,} {tracer.upper()} scans passed QC")
+            print(f"- {n_passed:,}/{n_scans:,} {tracer.upper()} scans passed UCSF QC")
             if n_scans > n_passed:
                 print(
-                    f"- {drop_msg} {n_scans - n_passed:,} scans that did not pass QC:"
+                    f"- {drop_msg} {n_scans - n_passed:,} {tracer.upper()} scans that did not pass UCSF QC:"
                 )
                 print(
-                    self.pet_idx[tracer]
-                    .query("(ucsf_qc_pass!=1)")[["subject_id", "pet_date"]]
-                    .to_markdown(index=False, tablefmt="rst")
+                    "    "
+                    + "\n    ".join(
+                        self.pet_idx[tracer]
+                        .query("(ucsf_qc_pass!=1)")[["subject_id", "pet_date"]]
+                        .to_markdown(index=False, tablefmt="rst")
+                        .split("\n")
+                    )
                 )
+                print()
                 if drop_failed_scans:
                     self.pet_idx[tracer] = (
                         self.pet_idx[tracer]
@@ -598,7 +624,7 @@ class QReport:
         )
 
         # Select rows from Screening visits
-        amyelg = amyelg.query("(event_code=='sc')")
+        amyelg = amyelg[amyelg["event_code"] == "sc"]
 
         # Add additional columns
         FBB_PETONLY_THRESH = 1.18
@@ -645,9 +671,9 @@ class QReport:
 
         # Combine the two diagnosis columns
         self.subj_idx["CohortAssgn"] = self.subj_idx.apply(
-            lambda x: x["CohortAssgn"]
-            if pd.notnull(x["CohortAssgn"])
-            else x["study_group"],
+            lambda x: (
+                x["CohortAssgn"] if pd.notnull(x["CohortAssgn"]) else x["study_group"]
+            ),
             axis=1,
         )
         self.subj_idx = self.subj_idx.drop(columns=["study_group"])
@@ -657,13 +683,6 @@ class QReport:
         self.screening = self.subj_idx.copy()
         keep_cols = ["subject_id", "CohortAssgn"]
         self.subj_idx = self.subj_idx[keep_cols]
-
-        # !!----------------------------------!!
-        # Print dataframe shapes and column names
-        print(f"self.screening: {self.screening.shape}")
-        print("  " + "\n  ".join(self.screening.columns.tolist()))
-        print(f"self.subj_idx: {self.subj_idx.shape}")
-        print("  " + "\n  ".join(self.subj_idx.columns.tolist()))
 
     def load_ref_region_dat(self):
         """Load reference region scaling factors for each tracer.
@@ -976,8 +995,8 @@ class QReport:
         )
 
     def create_qreport_files(self, save_output=True, overwrite=True):
-        def _format_tracer(self, tracer):
-            def _format_fbb(self):
+        def format_tracer(self, tracer):
+            def format_fbb(self):
                 # Drop unnecessary columns
                 drop_cols = [
                     "tracer",
@@ -999,15 +1018,14 @@ class QReport:
                     "warped_pet_ok",
                     "pet_qc_notes",
                     "mri_qc_notes",
-                    "qc_pass",
                     "centiloids_compwm",
                     "brainstem_MRIBASED_SUVR",
                     "eroded_subcortwm_MRIBASED_SUVR",
-                    "cortex_desikan_MRIBASED_SUVR",
+                    "ctx_desikan_MRIBASED_SUVR",
                     "brainstem_ClustSize",
                     "eroded_subcortwm_ClustSize",
                     "amyloid_cortical_summary_ClustSize",
-                    "cortex_desikan_ClustSize",
+                    "ctx_desikan_ClustSize",
                 ]
                 self.qrep_dat[tracer] = self.qrep_dat[tracer].drop(columns=drop_cols)
 
@@ -1054,13 +1072,6 @@ class QReport:
                     "ctx_rh_unknown_ClustSize",
                 ]
                 for col in add_cols:
-                    self.qrep_dat[tracer][col] = np.nan
-
-                # Nullify columns associated with the longitudinal reference region
-                na_cols = [
-                    "ScalingFactor_CompositeWM",
-                ]
-                for col in na_cols:
                     self.qrep_dat[tracer][col] = np.nan
 
                 # Convert the scan date column to a string formatted like '%m/%d/%y'
@@ -1348,11 +1359,7 @@ class QReport:
                         self.qrep_dat[tracer].to_csv(output_file, index=False)
                         print(f"Saved {output_file}")
 
-                print(
-                    f"{self.report_period} {tracer.upper()} Dataframe: {self.qrep_dat[tracer].shape}"
-                )
-
-            def _format_fdg(self):
+            def format_fdg(self):
                 # Drop unnecessary columns
                 drop_cols = [
                     "tracer",
@@ -1377,19 +1384,18 @@ class QReport:
                     "aparc_rating",
                     "warped_nu_ok",
                     "mri_qc_notes",
-                    "qc_pass",
                     "pons_MRIBASED_SUVR",
                     "meta_temporal_MRIBASED_SUVR",
                     "mtl_no_hippocampus_MRIBASED_SUVR",
                     "basolateral_temporal_MRIBASED_SUVR",
                     "temporoparietal_MRIBASED_SUVR",
-                    "cortex_desikan_MRIBASED_SUVR",
+                    "ctx_desikan_MRIBASED_SUVR",
                     "pons_ClustSize",
                     "meta_temporal_ClustSize",
                     "mtl_no_hippocampus_ClustSize",
                     "basolateral_temporal_ClustSize",
                     "temporoparietal_ClustSize",
-                    "cortex_desikan_ClustSize",
+                    "ctx_desikan_ClustSize",
                 ]
                 self.qrep_dat[tracer] = self.qrep_dat[tracer].drop(columns=drop_cols)
 
@@ -1669,11 +1675,7 @@ class QReport:
                         self.qrep_dat[tracer].to_csv(output_file, index=False)
                         print(f"Saved {output_file}")
 
-                print(
-                    f"{self.report_period} {tracer.upper()} Dataframe: {self.qrep_dat[tracer].shape}"
-                )
-
-            def _format_ftp(self):
+            def format_ftp(self):
                 # Drop unnecessary columns
                 drop_cols = [
                     "tracer",
@@ -1699,16 +1701,15 @@ class QReport:
                     "aparc_rating",
                     "warped_nu_ok",
                     "mri_qc_notes",
-                    "qc_pass",
                     "infcblgm_MRIBASED_SUVR",
                     "mtl_no_hippocampus_MRIBASED_SUVR",
                     "basolateral_temporal_MRIBASED_SUVR",
                     "temporoparietal_MRIBASED_SUVR",
-                    "cortex_desikan_MRIBASED_SUVR",
+                    "ctx_desikan_MRIBASED_SUVR",
                     "mtl_no_hippocampus_ClustSize",
                     "basolateral_temporal_ClustSize",
                     "temporoparietal_ClustSize",
-                    "cortex_desikan_ClustSize",
+                    "ctx_desikan_ClustSize",
                 ]
                 self.qrep_dat[tracer] = self.qrep_dat[tracer].drop(columns=drop_cols)
 
@@ -1754,15 +1755,6 @@ class QReport:
                     "ctx_rh_unknown_ClustSize",
                 ]
                 for col in add_cols:
-                    self.qrep_dat[tracer][col] = np.nan
-
-                # Nullify columns associated with the longitudinal reference region
-                na_cols = [
-                    "ScalingFactor_ErodedWM",
-                    "ErodedWM_MRIBASED_SUVR",
-                    "ScalingFactor_ErodedWM_ClustSize",
-                ]
-                for col in na_cols:
                     self.qrep_dat[tracer][col] = np.nan
 
                 # Convert the scan date column to a string formatted like '%m/%d/%y'
@@ -2032,60 +2024,54 @@ class QReport:
                         self.qrep_dat[tracer].to_csv(output_file, index=False)
                         print(f"Saved {output_file}")
 
-                print(
-                    f"{self.report_period} {tracer.upper()} Dataframe: {self.qrep_dat[tracer].shape}"
-                )
-
             match tracer:
                 case "fbb":
-                    self._format_fbb()
+                    format_fbb(self)
                 case "fdg":
-                    self._format_fdg()
+                    format_fdg(self)
                 case "ftp":
-                    self._format_ftp()
+                    format_ftp(self)
                 case _:
                     raise ValueError(f"Tracer {tracer} not recognized")
 
-        # Define the current report period
+        # Prepare the final dataframes for each tracer
         self.qrep_dat = {}
         for tracer in self.tracers:
-            # Merge dataframes that will be used in the quarterly reports
+            # Make a copy of the PET index dataframe that we will use
+            # to structure the quarterly report data
             self.qrep_dat[tracer] = self.pet_idx[tracer].copy()
+            print("-" * 80)
+            print(f"Building quarterly report for {tracer.upper()}")
+
+            # Merge reference region scaling factors into the main dataframe
             self.qrep_dat[tracer] = self.qrep_dat[tracer].merge(
                 self.ref_region_dat[tracer], on=["subject_id", "pet_date"], how="left"
             )
             if tracer == "fbb":
+                # Merge amyloid visual read info into the main dataframe
                 self.qrep_dat[tracer] = self.qrep_dat[tracer].merge(
                     self.screening, on="subject_id", how="left"
                 )
+                # Merge Centiloid data into the main dataframe
                 self.qrep_dat[tracer] = self.qrep_dat[tracer].merge(
                     self.centiloid_dat, on=["subject_id", "pet_date"], how="left"
                 )
             else:
+                # Merge cohort assignment into the main dataframe
                 self.qrep_dat[tracer] = self.qrep_dat[tracer].merge(
                     self.screening[["subject_id", "CohortAssgn"]],
                     on="subject_id",
                     how="left",
                 )
+
+            # Merge ROI mean SUVR and volume data into the main dataframe
             self.qrep_dat[tracer] = self.qrep_dat[tracer].merge(
                 self.roi_dat[tracer], on=["subject_id", "pet_date"], how="left"
-            )
-
-            # Select scans that passed QC
-            self.qrep_dat[tracer] = (
-                self.qrep_dat[tracer].query("(qc_pass==1)").reset_index(drop=True)
             )
 
             # Convert PET date to datetime
             self.qrep_dat[tracer]["pet_date"] = pd.to_datetime(
                 self.qrep_dat[tracer]["pet_date"]
-            )
-
-            # Remove scans from the current quarter onward
-            self.qrep_dat[tracer] = (
-                self.qrep_dat[tracer]
-                .query("(pet_date <= @self.stop_date)")
-                .reset_index(drop=True)
             )
 
             # Sort the data by subject_id and PET date
@@ -2095,21 +2081,80 @@ class QReport:
                 .reset_index(drop=True)
             )
 
+            # Remove scans from the current quarter onward
+            print(
+                f"Checking for {tracer.upper()} scans after {self.stop_date.strftime('%Y-%m-%d')}"
+            )
+            scans_past_stop_date = self.qrep_dat[tracer].query(
+                "(pet_date > @self.stop_date)"
+            )
+            if len(scans_past_stop_date) > 0:
+                self.qrep_dat[tracer] = self.qrep_dat[tracer].query(
+                    "(pet_date <= @self.stop_date)"
+                )
+                print(
+                    "- Removing {:,} {} scans from {:,} subjects acquired after the stop date".format(
+                        len(scans_past_stop_date),
+                        tracer.upper(),
+                        scans_past_stop_date["subject_id"].nunique(),
+                    )
+                )
+                print(
+                    "    "
+                    + "\n    ".join(
+                        scans_past_stop_date[["subject_id", "CohortAssgn", "pet_date"]]
+                        .to_markdown(index=False, tablefmt="rst")
+                        .split("\n")
+                    )
+                )
+            else:
+                print(f"- No {tracer.upper()} scans after the stop date")
+            print()
+
+            # Remove scans not in the eligibility list
+            print("Checking eligibility list")
+            ineligible = self.qrep_dat[tracer].query(
+                "subject_id not in @self.eligible_subjects"
+            )
+            if len(ineligible) > 0:
+                self.qrep_dat[tracer] = self.qrep_dat[tracer].query(
+                    "subject_id in @self.eligible_subjects"
+                )
+                print(
+                    "- Removing {} {} scans from {} subjects not in the eligibility list".format(
+                        len(ineligible),
+                        tracer.upper(),
+                        ineligible["subject_id"].nunique(),
+                    )
+                )
+                print(
+                    "Ineligible subjects:",
+                    ineligible["subject_id"].unique(),
+                    sep="\n",
+                )
+            else:
+                print("- No scans from ineligible subjects")
+            print()
+
             # Convert PET date back to string
             self.qrep_dat[tracer]["pet_date"] = self.qrep_dat[tracer][
                 "pet_date"
             ].dt.strftime("%Y-%m-%d")
 
             # Format the tracer-specific column data
-            self.format_tracer(tracer)
+            format_tracer(self, tracer)
 
             # Print final dataframe shape
             n_scans = len(self.qrep_dat[tracer])
-            n_subjs = self.qrep_dat[tracer]["subject_id"].nunique()
+            n_subjs = self.qrep_dat[tracer]["ID"].nunique()
             print(
-                f"Retained {n_scans:,} {tracer.upper()} scans from {n_subjs:,} subjects"
+                "",
+                f"Final {tracer.upper()} quarterly report dataframe for {self.report_period}:",
+                f"- Retained {n_scans:,} {tracer.upper()} scans from {n_subjs:,} subjects",
+                f"- Dataframe shape: {self.qrep_dat[tracer].shape}",
+                sep="\n",
+                end="\n" * 2,
             )
-            print(f"{tracer.upper()}: {self.qrep_dat[tracer].shape}")
 
 
 def _parse_args():
@@ -2171,14 +2216,23 @@ def _parse_args():
         help="Do not overwrite existing quarterly report CSV files",
     )
 
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
+    start_time = time.time()
+
     # Get command line arguments.
     args = _parse_args()
 
     # Instantiate the QRReport class and run the main function.
     qr = QReport(args.proj_dir, args.report_date)
     qr.compile(args.save, args.overwrite)
+
+    # Report elapsed time.
+    elapsed = time.time() - start_time
+    minutes, seconds = divmod(elapsed, 60)
+    print(f"Elapsed time: {int(minutes)} min, {int(seconds)} s", end="\n" * 2)
 
     # Exit successfully
     sys.exit(0)
