@@ -667,14 +667,14 @@ class XReport:
     #     - 3 = "Unknown"
     #     - `pteducat` -> `years_education`
     #     - Years of education
-    def load_demographics(self):
-        """Load LEADS subject demographics data.
+    def load_subject_demo(self):
+        """Load LEADS subject demographic data.
 
         Creates
         -------
-        self.pt_demo : DataFrame
+        self.subj_demo : DataFrame
         """
-        self.pt_demographic_dat = pd.read_csv(
+        self.subj_demo = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_subject.csv")
         )
         # TODO - WRITE THE REST OF THIS FUNCTION
@@ -682,7 +682,19 @@ class XReport:
     # ### Baseline clinical characteristics
     # Determine each patient's clinical severity (MCI or Dementia), cognitive
     # test scores (MMSE, CDR), and clinical phenotype at baseline.
-    #
+    def load_clinical_baseline_data(self):
+        """Load LEADS subject baseline clinical data.
+
+        Calls subfunctions for individual assessment dataframes
+        all relating to cognitive testing and clinical characteristics
+        of subjects at baseline.
+        """
+        self.load_preliminary_dx()
+        self.load_mmse_baseline()
+        self.load_cdr_baseline()
+        self.load_dx_pca()
+        self.load_dx_lvppa()
+
     # - `atri/leads_codebook_study_data_prelimdx.csv`
     # - Filter by columns
     #     - `event_code` == "sc"
@@ -692,7 +704,20 @@ class XReport:
     #     - `dementia` -> `clinical_severity_baseline`
     #     - 0 = "MCI"
     #     - 1 = "Dementia"
-    #
+    def load_preliminary_dx(self):
+        """Load LEADS preliminary diagnosis data.
+
+        Categorizes patients as MCI or Dementia at baseline.
+
+        Creates
+        -------
+        self.prelim_dx : DataFrame
+        """
+        self.prelim_dx = pd.read_csv(
+            op.join(self.paths["atri"], "leads_codebook_study_data_prelimdx.csv")
+        )
+        # TODO - WRITE THE REST OF THIS FUNCTION
+
     # - `atri/leads_codebook_study_data_mmse.csv`
     # - Filter by columns
     #     - `event_code` == "sc"
@@ -700,7 +725,18 @@ class XReport:
     #     - `subject_label` -> `subject_id`
     # - Include columns
     #     - `mmscore` -> `mmse_baseline`
-    #
+    def load_mmse_baseline(self):
+        """Load LEADS MMSE baseline data.
+
+        Creates
+        -------
+        self.mmse_baseline : DataFrame
+        """
+        self.mmse_baseline = pd.read_csv(
+            op.join(self.paths["atri"], "leads_codebook_study_data_mmse.csv")
+        )
+        # TODO - WRITE THE REST OF THIS FUNCTION
+
     # - `loni/Clinical_Dementia_Rating*.csv`
     # - Filter by columns
     #     - `LEADS_SCREENING_VISIT` == "sc"
@@ -714,7 +750,21 @@ class XReport:
     #     - `CDRSUM` -> `cdr_sb_baseline`
     # - Add columns
     #     - `cdr_date`
-    #
+    #         - Format as "YYYY-MM-DD"
+    def load_cdr_baseline(self):
+        """Load LEADS CDR baseline data.
+
+        Creates
+        -------
+        self.cdr_baseline : DataFrame
+        """
+        self.cdr_baseline = pd.read_csv(
+            uts.glob_sort_mtime(
+                op.join(self.paths["loni"], "Clinical_Dementia_Rating*.csv")
+            )[0]
+        )
+        # TODO - WRITE THE REST OF THIS FUNCTION
+
     # - `atri/leads_codebook_study_data_pcadx.csv`
     # - Filter by columns
     #     - `event_code` == "sc"
@@ -722,9 +772,20 @@ class XReport:
     #     - `subject_label` -> `subject_id`
     # - Include columns
     #     - `pcaformal` -> `pca_formal`
-    #         - 0 = "Does not meet formal clinical diagnostic criteria for PCA"
-    #         - 1 = "Meets formal clinical diagnostic criteria for PCA"
-    #
+    #         - 0 = "Does not meet formal clinical diagnostic criteria for PCA" (code as 0)
+    #         - 1 = "Meets formal clinical diagnostic criteria for PCA" (code as 1)
+    def load_dx_pca(self):
+        """Load LEADS PCA diagnosis data.
+
+        Creates
+        -------
+        self.dx_pca : DataFrame
+        """
+        self.dx_pca = pd.read_csv(
+            op.join(self.paths["atri"], "leads_codebook_study_data_pcadx.csv")
+        )
+        # TODO - WRITE THE REST OF THIS FUNCTION
+
     # - `atri/leads_codebook_study_data_ppadx.csv`
     # - Filter by columns
     #     - `event_code` == "sc"
@@ -732,17 +793,17 @@ class XReport:
     #     - `subject_label` -> `subject_id`
     # - Include columns
     #     - `lvppaformal` -> `lvppa_formal`
-    #         - 0 = "Does not meet formal clinical diagnostic criteria for lvPPA"
-    #         - 1 = "Meets formal clinical diagnostic criteria for lvPPA"
-    def load_baseline_clinical(self):
-        """Load LEADS baseline clinical data.
+    #         - 0 = "Does not meet formal clinical diagnostic criteria for lvPPA" (code as 0)
+    #         - 1 = "Meets formal clinical diagnostic criteria for lvPPA" (code as 1)
+    def load_dx_lvppa(self):
+        """Load LEADS lvPPA diagnosis data.
 
         Creates
         -------
-        self.clinical_dat : DataFrame
+        self.dx_lvppa : DataFrame
         """
-        self.clinical_dat = pd.read_csv(
-            op.join(self.paths["atri"], "leads_codebook_study_data_prelimdx.csv")
+        self.dx_lvppa = pd.read_csv(
+            op.join(self.paths["atri"], "leads_codebook_study_data_ppadx.csv")
         )
         # TODO - WRITE THE REST OF THIS FUNCTION
 
@@ -769,19 +830,41 @@ class XReport:
         self.apoe_dat : DataFrame
         """
         self.apoe_dat = pd.read_csv(
-            op.join(self.paths["loni"], "Biospecimen_Analysis_Results*.csv")
+            uts.glob_sort_mtime(
+                op.join(self.paths["loni"], "Biospecimen_Analysis_Results*.csv")
+            )[0]
         )
         # TODO - WRITE THE REST OF THIS FUNCTION
 
     ### Anti-amyloid treatment
+    # Determine each participant's anti-amyloid treatment status
+    #
+    # - `atri/leads_codebook_study_data_antiamytx.csv`
+    # - Join on columns
+    #     - `subject_label` -> `subject_id`
+    # - Include columns
+    #     - `Txrec` -> `antiamy_tx_received`
+    #         - 1 = "Yes" (recode to 1)
+    #         - 2 = "No" (recode to 0)
+    #     - `Txname` -> `antiamy_tx_name`
+    #         - 1 = "Aducanumab"
+    #         - 2 = "Lecanumab"
+    #         - 3 = "Donanemab"
+    #         - 4 = "Other"
+    #     - `Startdate` -> `antiamy_tx_startdate`
+    #         - Format as "YYYY-MM-DD"
+    #         - Replace xx or XX with 01 (e.g. 2024-05-xx -> 2024-05-01)
+    #     - `Enddate` -> `antiamy_tx_enddate`
+    #         - Format as "YYYY-MM-DD"
+    #         - Replace xx or XX with 01 (e.g. 2024-05-xx -> 2024-05-01)
     def load_anti_amyloid_treatment(self):
         """Load LEADS anti-amyloid treatment data.
 
         Creates
         -------
-        self.treatment_dat : DataFrame
+        self.antiamy_tx : DataFrame
         """
-        self.treatment_dat = pd.read_csv(
+        self.antiamy_tx = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_antiamy.csv")
         )
         # TODO - WRITE THE REST OF THIS FUNCTION
