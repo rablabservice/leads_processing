@@ -1323,7 +1323,7 @@ class XReport:
 
             # Print final dataframe shape
             n_scans = len(self.pet_idx[tracer])
-            n_subjs = self.pet_idx[tracer]["ID"].nunique()
+            n_subjs = self.pet_idx[tracer]["subject_id"].nunique()
             print(
                 "",
                 f"Final {tracer.upper()} ROI extraction dataframe:",
