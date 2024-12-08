@@ -40,15 +40,17 @@ class XReport:
         self.get_paths(proj_dir)
 
     def __repr__(self):
-        return (
-            f"XReport(proj_dir={self.paths['proj']}, report_date={self.report_period})"
-        )
+        return f"XReport(proj_dir={self.paths['proj']})"
 
     def compile(self, save_output=True, overwrite=True):
         self.load_processed_pet_index()
         self.filter_pet_by_umich_qc()
         self.filter_pet_by_ucsf_qc()
         self.load_subject_index()
+        self.load_subject_demo()
+        self.load_clinical_baseline_data()
+        self.load_apoe_genotype()
+        self.load_anti_amyloid_treatment()
         self.load_eligibility_list()
         self.load_ref_region_dat()
         self.load_roi_dat()
@@ -497,49 +499,21 @@ class XReport:
         for tracer in self.tracers:
             self.pet_subjs.update(self.pet_idx[tracer]["subject_id"].unique())
 
-    # ### Cohort assignment
-    # Determine each participant's enrollment status as a control or patient.
-    # For patients, determine their diagnostic assignment into EOAD or EOnonAD
-    # groups based on visual read of the baseline amyloid PET scan.
-    #
-    # - `atri/leads_codebook_study_data_subject.csv`
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `ptcoh` -> `study_cohort`
-    #     - 1 = "Control" (cognitively normal)
-    #     - 2 = "Patient" (cognitively impaired)
-    #
-    # - `atri/leads_codebook_study_data_amyelg.csv`
-    # - Filter by columns
-    #     - `event_code` == "sc"
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `amyelg` -> `CohortAssgn`
-    #         - 0 = "EOnonAD"
-    #         - 1 = "EOAD"
-    #     - `suvr` -> `Screening_PETONLY_Composite_SUVR`
-    #     - `outcome` -> `Screening_PETONLY_VisualRead`
-    #     - `consensres` -> `Screening_PETONLY_Final_Read`
-    # - Add columns
-    #     - `Screening_PETONLY_AmyPos_Quantification_1p18`
-    #     - `Screening_PETONLY_Disagreement`
     def load_subject_index(self):
         """Load the subject index with cohort assignment info.
 
         Creates
         -------
-        self.subj_idx : DataFrame
+        self.cohort : DataFrame
             DataFrame with subject IDs and cohort assignments
-        self.screening : DataFrame
-            Same as self.subj_idx but with amyloid visual read columns
+        self.amyloid_pet_visual_read_screening : DataFrame
+            Same as self.cohort but with amyloid visual read columns
             from the screening visit retained
         """
         self.set_pet_subjs()
 
         # Initialize the subjects dataframe
-        self.subj_idx = pd.DataFrame(self.pet_subjs, columns=["subject_id"])
+        self.cohort = pd.DataFrame(self.pet_subjs, columns=["subject_id"])
 
         # Load the cohort dataframe
         cohort = pd.read_csv(
@@ -559,7 +533,7 @@ class XReport:
         cohort = cohort[keep_cols]
 
         # Merge into the main subject dataframe
-        self.subj_idx = self.subj_idx.merge(
+        self.cohort = self.cohort.merge(
             cohort,
             on="subject_id",
             how="left",
@@ -621,52 +595,27 @@ class XReport:
         amyelg = amyelg[keep_cols]
 
         # Merge into the main subject dataframe
-        self.subj_idx = self.subj_idx.merge(
+        self.cohort = self.cohort.merge(
             amyelg,
             on="subject_id",
             how="left",
         )
 
         # Combine the two diagnosis columns
-        self.subj_idx["CohortAssgn"] = self.subj_idx.apply(
+        self.cohort["CohortAssgn"] = self.cohort.apply(
             lambda x: (
                 x["CohortAssgn"] if pd.notnull(x["CohortAssgn"]) else x["study_group"]
             ),
             axis=1,
         )
-        self.subj_idx = self.subj_idx.drop(columns=["study_group"])
+        self.cohort = self.cohort.drop(columns=["study_group"])
 
         # Create the screening dataframe and drop unnecessary columns from the
         # subjects dataframe
-        self.screening = self.subj_idx.copy()
+        self.amyloid_pet_visual_read_screening = self.cohort.copy()
         keep_cols = ["subject_id", "CohortAssgn"]
-        self.subj_idx = self.subj_idx[keep_cols]
+        self.cohort = self.cohort[keep_cols]
 
-    # ### Participant demographics
-    # Determine each participant's date of birth, sex, race and ethnicity, and years of education
-    #
-    # - `loni/LEADS_PTDEMOG*.csv`
-    # - Join on columns
-    #     - `subject_code` -> `subject_id`
-    # - Include columns
-    #     - `ptdob` -> `dob`
-    #     - `ptgender` -> `sex`
-    #     - 1 = "Male"
-    #     - 2 = "Female"
-    #     - `ptraccat` -> `race`
-    #     - 1 = "American Indian or Alaskan Native"
-    #     - 2 = "Asian"
-    #     - 3 = "Native Hawaiian or Other Pacific Islander"
-    #     - 4 = "Black or African American"
-    #     - 5 = "White"
-    #     - 6 = "More than one race"
-    #     - 7 = "Unknown"
-    #     - `ptethcat` -> `ethnicity`
-    #     - 1 = "Hispanic or Latino"
-    #     - 2 = "Not Hispanic or Latino"
-    #     - 3 = "Unknown"
-    #     - `pteducat` -> `years_education`
-    #     - Years of education
     def load_subject_demo(self):
         """Load LEADS subject demographic data.
 
@@ -675,19 +624,54 @@ class XReport:
         self.subj_demo : DataFrame
         """
         self.subj_demo = pd.read_csv(
-            op.join(self.paths["atri"], "leads_codebook_study_data_subject.csv")
+            uts.glob_sort_mtime(op.join(self.paths["loni"], "LEADS_PTDEMOG*.csv"))[0]
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    # ### Baseline clinical characteristics
-    # Determine each patient's clinical severity (MCI or Dementia), cognitive
-    # test scores (MMSE, CDR), and clinical phenotype at baseline.
+        # Rename columns
+        self.subj_demo = self.subj_demo.rename(
+            columns={
+                "subject_label": "subject_id",
+                "ptdob": "dob",
+                "ptgender": "sex",
+                "ptraccat": "race",
+                "ptethcat": "ethnicity",
+                "pteducat": "years_education",
+            }
+        )
+
+        # Map sex values
+        self.subj_demo["sex"] = self.subj_demo["sex"].map({1: "Male", 2: "Female"})
+
+        # Map race values
+        self.subj_demo.loc[
+            self.subj_demo["race"].astype(str).str.contains("\|"), "race"
+        ] = 6
+        self.subj_demo["race"] = self.subj_demo["race"].map(
+            {
+                1: "American Indian or Alaskan Native",
+                2: "Asian",
+                3: "Native Hawaiian or Other Pacific Islander",
+                4: "Black or African American",
+                5: "White",
+                6: "More than one race",
+                7: "Unknown",
+            }
+        )
+
+        # Map ethnicity values
+        self.subj_demo["ethnicity"] = self.subj_demo["ethnicity"].map(
+            {1: "Hispanic or Latino", 2: "Not Hispanic or Latino", 3: "Unknown"}
+        )
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "dob", "sex", "race", "ethnicity", "years_education"]
+        self.subj_demo = self.subj_demo[keep_cols]
+
     def load_clinical_baseline_data(self):
         """Load LEADS subject baseline clinical data.
 
-        Calls subfunctions for individual assessment dataframes
-        all relating to cognitive testing and clinical characteristics
-        of subjects at baseline.
+        Calls subfunctions for individual assessment dataframes,
+        all cognitive testing and clinical characteristics at baseline.
         """
         self.load_preliminary_dx()
         self.load_mmse_baseline()
@@ -695,15 +679,6 @@ class XReport:
         self.load_dx_pca()
         self.load_dx_lvppa()
 
-    # - `atri/leads_codebook_study_data_prelimdx.csv`
-    # - Filter by columns
-    #     - `event_code` == "sc"
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `dementia` -> `clinical_severity_baseline`
-    #     - 0 = "MCI"
-    #     - 1 = "Dementia"
     def load_preliminary_dx(self):
         """Load LEADS preliminary diagnosis data.
 
@@ -716,15 +691,27 @@ class XReport:
         self.prelim_dx = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_prelimdx.csv")
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    # - `atri/leads_codebook_study_data_mmse.csv`
-    # - Filter by columns
-    #     - `event_code` == "sc"
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `mmscore` -> `mmse_baseline`
+        # Filter to only include screening visits
+        self.prelim_dx = self.prelim_dx.query("event_code == 'sc'")
+
+        # Rename columns
+        self.prelim_dx = self.prelim_dx.rename(
+            columns={
+                "subject_label": "subject_id",
+                "dementia": "clinical_severity_baseline",
+            }
+        )
+
+        # Map clinical severity values
+        self.prelim_dx["clinical_severity_baseline"] = self.prelim_dx[
+            "clinical_severity_baseline"
+        ].map({0: "MCI", 1: "Dementia"})
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "clinical_severity_baseline"]
+        self.prelim_dx = self.prelim_dx[keep_cols]
+
     def load_mmse_baseline(self):
         """Load LEADS MMSE baseline data.
 
@@ -735,22 +722,19 @@ class XReport:
         self.mmse_baseline = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_mmse.csv")
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    # - `loni/Clinical_Dementia_Rating*.csv`
-    # - Filter by columns
-    #     - `LEADS_SCREENING_VISIT` == "sc"
-    # - Join on columns
-    #     - `LEADS_ID` -> `subject_id`
-    # - Include columns
-    #     - `C2VISITYR`
-    #     - `C2VISITMO`
-    #     - `C2VISITDAY`
-    #     - `CDRGLOB` -> `cdr_global_baseline`
-    #     - `CDRSUM` -> `cdr_sb_baseline`
-    # - Add columns
-    #     - `cdr_date`
-    #         - Format as "YYYY-MM-DD"
+        # Filter to only include screening visits
+        self.mmse_baseline = self.mmse_baseline.query("event_code == 'sc'")
+
+        # Rename columns
+        self.mmse_baseline = self.mmse_baseline.rename(
+            columns={"subject_label": "subject_id", "mmscore": "mmse_baseline"}
+        )
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "mmse_baseline"]
+        self.mmse_baseline = self.mmse_baseline[keep_cols]
+
     def load_cdr_baseline(self):
         """Load LEADS CDR baseline data.
 
@@ -763,17 +747,35 @@ class XReport:
                 op.join(self.paths["loni"], "Clinical_Dementia_Rating*.csv")
             )[0]
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    # - `atri/leads_codebook_study_data_pcadx.csv`
-    # - Filter by columns
-    #     - `event_code` == "sc"
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `pcaformal` -> `pca_formal`
-    #         - 0 = "Does not meet formal clinical diagnostic criteria for PCA" (code as 0)
-    #         - 1 = "Meets formal clinical diagnostic criteria for PCA" (code as 1)
+        # Filter to only include screening visits
+        self.cdr_baseline = self.cdr_baseline.query("LEADS_SCREENING_VISIT == 'sc'")
+
+        # Create cdr_date column from year, month, day columns
+        self.cdr_baseline["cdr_date"] = pd.to_datetime(
+            {
+                "year": self.cdr_baseline["C2VISITYR"],
+                "month": self.cdr_baseline["C2VISITMO"],
+                "day": self.cdr_baseline["C2VISITDAY"],
+            }
+        ).dt.strftime("%Y-%m-%d")
+
+        # Rename columns
+        self.cdr_baseline = self.cdr_baseline.rename(
+            columns={
+                "LEADS_ID": "subject_id",
+                "CDRGLOB": "cdr_global_baseline",
+                "CDRSUM": "cdr_sb_baseline",
+            }
+        )
+
+        # Capitalize subject_id values
+        self.cdr_baseline["subject_id"] = self.cdr_baseline["subject_id"].str.upper()
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "cdr_date", "cdr_global_baseline", "cdr_sb_baseline"]
+        self.cdr_baseline = self.cdr_baseline[keep_cols]
+
     def load_dx_pca(self):
         """Load LEADS PCA diagnosis data.
 
@@ -784,17 +786,19 @@ class XReport:
         self.dx_pca = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_pcadx.csv")
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    # - `atri/leads_codebook_study_data_ppadx.csv`
-    # - Filter by columns
-    #     - `event_code` == "sc"
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `lvppaformal` -> `lvppa_formal`
-    #         - 0 = "Does not meet formal clinical diagnostic criteria for lvPPA" (code as 0)
-    #         - 1 = "Meets formal clinical diagnostic criteria for lvPPA" (code as 1)
+        # Filter to only include screening visits
+        self.dx_pca = self.dx_pca.query("event_code == 'sc'")
+
+        # Rename columns
+        self.dx_pca = self.dx_pca.rename(
+            columns={"subject_label": "subject_id", "pcaformal": "pca_formal"}
+        )
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "pca_formal"]
+        self.dx_pca = self.dx_pca[keep_cols]
+
     def load_dx_lvppa(self):
         """Load LEADS lvPPA diagnosis data.
 
@@ -805,58 +809,49 @@ class XReport:
         self.dx_lvppa = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_ppadx.csv")
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    # ### APOE genotype
-    # Determine each participant's APOE genotype
-    #
-    # - `loni/Biospecimen_Analysis_Results*.csv`
-    # - Join on columns
-    #     - `SUBJECT_CODE` -> `subject_id`
-    # - Filter on columns
-    #     - `TESTNAME` == "APOE Genotype"
-    # - Include columns
-    #     - `TESTVALUE` -> `apoe_genotype`
-    # - Add columns
-    #     - `apoe4_alleles`
-    #     - 0
-    #     - 1
-    #     - 2
+        # Filter to only include screening visits
+        self.dx_lvppa = self.dx_lvppa.query("event_code == 'sc'")
+
+        # Rename columns
+        self.dx_lvppa = self.dx_lvppa.rename(
+            columns={"subject_label": "subject_id", "lvppaformal": "lvppa_formal"}
+        )
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "lvppa_formal"]
+        self.dx_lvppa = self.dx_lvppa[keep_cols]
+
     def load_apoe_genotype(self):
         """Load LEADS APOE genotype data.
 
         Creates
         -------
-        self.apoe_dat : DataFrame
+        self.apoe_geno : DataFrame
         """
-        self.apoe_dat = pd.read_csv(
+        self.apoe_geno = pd.read_csv(
             uts.glob_sort_mtime(
                 op.join(self.paths["loni"], "Biospecimen_Analysis_Results*.csv")
             )[0]
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
 
-    ### Anti-amyloid treatment
-    # Determine each participant's anti-amyloid treatment status
-    #
-    # - `atri/leads_codebook_study_data_antiamytx.csv`
-    # - Join on columns
-    #     - `subject_label` -> `subject_id`
-    # - Include columns
-    #     - `Txrec` -> `antiamy_tx_received`
-    #         - 1 = "Yes" (recode to 1)
-    #         - 2 = "No" (recode to 0)
-    #     - `Txname` -> `antiamy_tx_name`
-    #         - 1 = "Aducanumab"
-    #         - 2 = "Lecanumab"
-    #         - 3 = "Donanemab"
-    #         - 4 = "Other"
-    #     - `Startdate` -> `antiamy_tx_startdate`
-    #         - Format as "YYYY-MM-DD"
-    #         - Replace xx or XX with 01 (e.g. 2024-05-xx -> 2024-05-01)
-    #     - `Enddate` -> `antiamy_tx_enddate`
-    #         - Format as "YYYY-MM-DD"
-    #         - Replace xx or XX with 01 (e.g. 2024-05-xx -> 2024-05-01)
+        # Filter to only include APOE Genotype results
+        self.apoe_geno = self.apoe_geno.query("TESTNAME == 'APOE Genotype'")
+
+        # Rename columns
+        self.apoe_geno = self.apoe_geno.rename(
+            columns={"SUBJECT_CODE": "subject_id", "TESTVALUE": "apoe_genotype"}
+        )
+
+        # Add column counting number of APOE4 alleles
+        self.apoe_geno["apoe4_alleles"] = self.apoe_geno["apoe_genotype"].apply(
+            lambda x: str(x).count("4")
+        )
+
+        # Select only needed columns
+        keep_cols = ["subject_id", "apoe_genotype", "apoe4_alleles"]
+        self.apoe_geno = self.apoe_geno[keep_cols]
+
     def load_anti_amyloid_treatment(self):
         """Load LEADS anti-amyloid treatment data.
 
@@ -867,7 +862,59 @@ class XReport:
         self.antiamy_tx = pd.read_csv(
             op.join(self.paths["atri"], "leads_codebook_study_data_antiamy.csv")
         )
-        # TODO - WRITE THE REST OF THIS FUNCTION
+
+        # Rename columns
+        self.antiamy_tx = self.antiamy_tx.rename(
+            columns={
+                "subject_label": "subject_id",
+                "txrec": "antiamy_tx_received",
+                "txname": "antiamy_tx_name",
+                "startdate": "antiamy_tx_start",
+                "enddate": "antiamy_tx_stop",
+            }
+        )
+
+        # Remap treatment received values from 1/2 to 1/0
+        self.antiamy_tx["antiamy_tx_received"] = self.antiamy_tx[
+            "antiamy_tx_received"
+        ].map(
+            {1: 1, 2: 0}  # 1 = Yes, 0 = No
+        )
+
+        # Map treatment names
+        self.antiamy_tx["antiamy_tx_name"] = self.antiamy_tx["antiamy_tx_name"].map(
+            {1: "Aducanumab", 2: "Lecanumab", 3: "Donanemab", 4: "Other"}
+        )
+
+        # Function to format dates and replace xx/XX with 01
+        def format_date(date_str):
+            if pd.isna(date_str):
+                return date_str
+            date_str = str(date_str)
+            # Replace xx or XX with 01
+            date_parts = date_str.lower().split("-")
+            for i in range(len(date_parts)):
+                if date_parts[i] == "xx":
+                    date_parts[i] = "01"
+            return "-".join(date_parts)
+
+        # Format start and end dates
+        self.antiamy_tx["antiamy_tx_start"] = self.antiamy_tx["antiamy_tx_start"].apply(
+            format_date
+        )
+        self.antiamy_tx["antiamy_tx_stop"] = self.antiamy_tx["antiamy_tx_stop"].apply(
+            format_date
+        )
+
+        # Select only needed columns
+        keep_cols = [
+            "subject_id",
+            "antiamy_tx_received",
+            "antiamy_tx_name",
+            "antiamy_tx_start",
+            "antiamy_tx_stop",
+        ]
+        self.antiamy_tx = self.antiamy_tx[keep_cols]
 
     def load_ref_region_dat(self):
         """Load reference region scaling factors for each tracer.
@@ -1168,11 +1215,10 @@ class XReport:
                 print(e)
                 return None
 
-        # Load Centiloid values for each reference region
-        tracer = "fbb"
+        # Load Centiloid values
         self.centiloid_dat = pd.concat(
             list(
-                self.pet_idx[tracer].apply(
+                self.pet_idx["fbb"].apply(
                     lambda x: get_centiloids(x["pet_proc_dir"]), axis=1
                 )
             ),
@@ -1186,30 +1232,13 @@ class XReport:
             print("-" * 80)
             print(f"Building ROI extraction spreadsheet for {tracer.upper()}")
 
-            # Merge reference region scaling factors into the main dataframe
+            # Construct the main dataframe for each tracer. We will
+            # start by merging cohort assignment into the processed PET
+            # scans dataframe.
             self.pet_idx[tracer] = self.pet_idx[tracer].merge(
-                self.ref_region_dat[tracer], on=["subject_id", "pet_date"], how="left"
-            )
-            if tracer == "fbb":
-                # Merge amyloid visual read info into the main dataframe
-                self.pet_idx[tracer] = self.pet_idx[tracer].merge(
-                    self.screening, on="subject_id", how="left"
-                )
-                # Merge Centiloid data into the main dataframe
-                self.pet_idx[tracer] = self.pet_idx[tracer].merge(
-                    self.centiloid_dat, on=["subject_id", "pet_date"], how="left"
-                )
-            else:
-                # Merge cohort assignment into the main dataframe
-                self.pet_idx[tracer] = self.pet_idx[tracer].merge(
-                    self.screening[["subject_id", "CohortAssgn"]],
-                    on="subject_id",
-                    how="left",
-                )
-
-            # Merge ROI mean SUVR and volume data into the main dataframe
-            self.pet_idx[tracer] = self.pet_idx[tracer].merge(
-                self.roi_dat[tracer], on=["subject_id", "pet_date"], how="left"
+                self.cohort,
+                on="subject_id",
+                how="left",
             )
 
             # Sort the data by subject_id and PET date
@@ -1226,7 +1255,6 @@ class XReport:
                 .isin(self.eligible_subjects)
                 .astype(int)
             )
-
             print(
                 "{:,}/{:,} ({:.1%}) {} scans are on the eligibility list".format(
                     self.pet_idx[tracer]["eligible_subject"].sum(),
@@ -1235,6 +1263,52 @@ class XReport:
                     tracer.upper(),
                 ),
                 end="\n" * 2,
+            )
+
+            # Merge subject demographic and clinical data into the main dataframe.
+            # Define dataframes to merge and their descriptions
+            merge_dfs = [
+                self.subj_demo,
+                self.prelim_dx,
+                self.mmse_baseline,
+                self.cdr_baseline,
+                self.dx_pca,
+                self.dx_lvppa,
+                self.apoe_geno,
+                self.antiamy_tx,
+            ]
+            for df in merge_dfs:
+                self.pet_idx[tracer] = self.pet_idx[tracer].merge(
+                    df, on="subject_id", how="left"
+                )
+
+            # Merge reference region scaling factors into the main dataframe
+            self.pet_idx[tracer] = self.pet_idx[tracer].merge(
+                self.ref_region_dat[tracer], on=["subject_id", "pet_date"], how="left"
+            )
+
+            # Merge amyloid-specific columns into the main FBB dataframe
+            if tracer == "fbb":
+                # Merge amyloid visual read info into the main dataframe
+                self.pet_idx[tracer] = self.pet_idx[tracer].merge(
+                    self.amyloid_pet_visual_read_screening[
+                        [
+                            x
+                            for x in self.amyloid_pet_visual_read_screening.columns
+                            if x != "CohortAssgn"
+                        ]
+                    ],
+                    on="subject_id",
+                    how="left",
+                )
+                # Merge Centiloid data into the main dataframe
+                self.pet_idx[tracer] = self.pet_idx[tracer].merge(
+                    self.centiloid_dat, on=["subject_id", "pet_date"], how="left"
+                )
+
+            # Merge ROI mean SUVR and volume data into the main dataframe
+            self.pet_idx[tracer] = self.pet_idx[tracer].merge(
+                self.roi_dat[tracer], on=["subject_id", "pet_date"], how="left"
             )
 
             # Save the output dataframe
@@ -1306,9 +1380,9 @@ if __name__ == "__main__":
     # Get command line arguments.
     args = _parse_args()
 
-    # Instantiate the QRReport class and run the main function.
-    qr = XReport(args.proj_dir)
-    qr.compile(args.save, args.overwrite)
+    # Instantiate the XReport class and run the main function.
+    xr = XReport(args.proj_dir)
+    xr.compile(args.save, args.overwrite)
 
     # Report elapsed time.
     elapsed = time.time() - start_time

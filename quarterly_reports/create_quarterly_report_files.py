@@ -2225,7 +2225,7 @@ if __name__ == "__main__":
     # Get command line arguments.
     args = _parse_args()
 
-    # Instantiate the QRReport class and run the main function.
+    # Instantiate the QReport class and run the main function.
     qr = QReport(args.proj_dir, args.report_date)
     qr.compile(args.save, args.overwrite)
 
