@@ -792,16 +792,18 @@ def audit_pet(
         pet_scans_cp["tracer"].str.startswith("FAILED TO IDENTIFY")
     ].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "flag_notes"] += (
-        "Unknown tracer--check raw PET filename against scan_types_and_tracers.csv; "
-    )
+    pet_scans_cp.loc[
+        idx, "flag_notes"
+    ] += "Unknown tracer--check raw PET filename against scan_types_and_tracers.csv; "
 
     # Multiple tracers
     idx = pet_scans_cp.loc[
         pet_scans_cp["tracer"].str.startswith("FILENAME MATCHED MULTIPLE")
     ].index.tolist()
     pet_scans_cp.loc[idx, "flag"] = 1
-    pet_scans_cp.loc[idx, "flag_notes"] += (
+    pet_scans_cp.loc[
+        idx, "flag_notes"
+    ] += (
         "Matched >1 tracer--check raw PET filename against scan_types_and_tracers.csv; "
     )
 
@@ -816,9 +818,9 @@ def audit_pet(
             pet_scans_cp["pet_res"] != expected_pet_res
         ].index.tolist()
         pet_scans_cp.loc[idx, "flag"] = 1
-        pet_scans_cp.loc[idx, "flag_notes"] += (
-            f"PET resolution could not be parsed or is not at {expected_pet_res}mm; "
-        )
+        pet_scans_cp.loc[
+            idx, "flag_notes"
+        ] += f"PET resolution could not be parsed or is not at {expected_pet_res}mm; "
 
     # Missing MRI
     idx = pet_scans_cp.loc[pd.isna(pet_scans_cp).any(axis=1)].index.tolist()
@@ -831,9 +833,9 @@ def audit_pet(
             f"abs_days_mri_to_pet > {max_pet_to_mri}"
         ).index.tolist()
         pet_scans_cp.loc[idx, "flag"] = 1
-        pet_scans_cp.loc[idx, "flag_notes"] += (
-            f"Closest MRI is more than {max_pet_to_mri} days from PET date; "
-        )
+        pet_scans_cp.loc[
+            idx, "flag_notes"
+        ] += f"Closest MRI is more than {max_pet_to_mri} days from PET date; "
 
     # Same MRI used to process multiple PET scans for the same tracer
     if audit_repeat_mri:
@@ -845,9 +847,9 @@ def audit_pet(
             )
         ].index.tolist()
         pet_scans_cp.loc[idx, "flag"] = 1
-        pet_scans_cp.loc[idx, "flag_notes"] += (
-            "Same MRI would be used to process multiple timepoints for the same PET tracer; "
-        )
+        pet_scans_cp.loc[
+            idx, "flag_notes"
+        ] += "Same MRI would be used to process multiple timepoints for the same PET tracer; "
 
     pet_scans_cp["flag_notes"] = pet_scans_cp["flag_notes"].apply(
         lambda x: x[:-2] if (len(x) >= 2) else x
@@ -922,6 +924,7 @@ def check_if_mri_processed(mri_proc_dir):
         "mask_pons": glob(op.join(mri_proc_dir, "*mask-pons.nii")),
         "mask_wcbl": glob(op.join(mri_proc_dir, "*mask-wcbl.nii")),
         "warp_nu": glob(op.join(mri_proc_dir, "w*nu.nii")),
+        "qc_image": glob(op.join(mri_proc_dir, "*_qc.png")),
     }
 
     # Check if all file types are present
@@ -953,6 +956,7 @@ def check_if_pet_processed(pet_proc_dir):
         "native_pet_pet": op.join(pet_proc_dir, f"{pet_tag}.nii"),
         "native_mri_pet": op.join(pet_proc_dir, f"r{pet_tag}.nii"),
         "ref_region_means": op.join(pet_proc_dir, f"r{pet_tag}_ref-region-means.csv"),
+        "qc_image": op.join(pet_proc_dir, f"{pet_tag}_qc.png"),
     }
     if tracer in AMYLOID_TRACERS:
         proc_files["cortical_summary_values"] = op.join(
