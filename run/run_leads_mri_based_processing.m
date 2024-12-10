@@ -80,6 +80,8 @@ pet_dirs = {};
 % program can call
 python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
 qc_evals_script = fullfile(code_dir, 'qc', 'qc_evals.py');
+quarterly_report_script = fullfile(code_dir, 'quarterly_reports', 'create_quarterly_report_files.py');
+roi_extraction_script = fullfile(code_dir, 'extractions', 'create_extraction_files.py');
 
 % Figure out what the user wants to do
 prompt_user = sprintf([
@@ -313,9 +315,17 @@ switch action
         fprintf('$ %s\n', cmd);
         system(cmd);
     case 7
-        fprintf('Option not yet implemented. Exiting program.\n');
+        % Create internal ROI extraction files
+        cmd = sprintf('%s %s %s', python, roi_extraction_script);
+        fprintf('Merging ROI extractions...\n');
+        fprintf('$ %s\n', cmd);
+        system(cmd);
     case 8
-        fprintf('Option not yet implemented. Exiting program.\n');
+        % Create quarterly report files
+        cmd = sprintf('%s %s %s', python, quarterly_report_script);
+        fprintf('Preparing quarterly report...\n');
+        fprintf('$ %s\n', cmd);
+        system(cmd);
     case 9
         fprintf('Bye for now\n');
     otherwise
