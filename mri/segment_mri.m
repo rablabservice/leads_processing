@@ -1,8 +1,7 @@
 function outfiles = segment_mri(nuf, fid, overwrite)
     % Segment nu.nii and save forward and inverse deformations to MNI space
     %
-    % Also smooths the mwc1 image by 8mm^3 FWHM to create the smwc1
-    % image.
+    % Also saves the mwc1 image for use in Dartel template creation
     %
     % Parameters
     % ----------
@@ -26,7 +25,7 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     % c4<scan_tag>_nu.nii
     % c5<scan_tag>_nu.nii
     % iy_<scan_tag>_nu.nii
-    % smwc1<scan_tag>_nu.nii
+    % mwc1<scan_tag>_nu.nii
     % w<scan_tag>_nu.nii
     % y_<scan_tag>_nu.nii
     % ------------------------------------------------------------------
@@ -48,7 +47,7 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     outfiles.c4 = fullfile(mri_dir, append('c4', scan_tag, '_nu.nii'));
     outfiles.c5 = fullfile(mri_dir, append('c5', scan_tag, '_nu.nii'));
     outfiles.iy = fullfile(mri_dir, append('iy_', scan_tag, '_nu.nii'));
-    outfiles.smwc1 = fullfile(mri_dir, append('smwc1', scan_tag, '_nu.nii'));
+    outfiles.mwc1 = fullfile(mri_dir, append('mwc1', scan_tag, '_nu.nii'));
     outfiles.wnu = fullfile(mri_dir, append('w', scan_tag, '_nu.nii'));
     outfiles.y = fullfile(mri_dir, append('y_', scan_tag, '_nu.nii'));
 
@@ -101,20 +100,9 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];  % save inverse and forward deformation fields
     spm_jobman('run',matlabbatch);
 
-    % Smooth the mwc1 image
-    mwc1f = fullfile(mri_dir, append('mwc1', scan_tag, '_nu.nii'));
-    clear matlabbatch;
-    matlabbatch{1}.spm.spatial.smooth.data = cellstr(mwc1f);
-    matlabbatch{1}.spm.spatial.smooth.fwhm = [8 8 8];
-    matlabbatch{1}.spm.spatial.smooth.dtype = 0;  % same as input
-    matlabbatch{1}.spm.spatial.smooth.im = 0;  % no implicit masking
-    matlabbatch{1}.spm.spatial.smooth.prefix = 's';
-    spm_jobman('run', matlabbatch);
-
     % Delete the intermediary files
     seg_matf = fullfile(mri_dir, append(scan_tag, '_nu_seg8.mat'));
     if isfile(seg_matf)
         delete(seg_matf);
     end
-    delete(mwc1f);
 end
