@@ -1,4 +1,4 @@
-function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
+function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
     % Process a single PET scan through all the processing steps.
     %
     % Overview
@@ -22,11 +22,12 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
     %     The directory containing PET scan data.
     % overwrite : logical
     %     Flag to overwrite existing processed files.
+    % run_qc : logical, optional
+    %     If true, create QC image and add new QC eval file. Default is
+    %     true
     % raw_petf : string, optional
     %     Full path to the raw PET nifti. If not passed, this is assumed
     %     to be the first .nii file in pet_dir/raw
-    % run_qc : logical, optional
-    %     If true, run the QC script. Default is true
     %
     % Returns
     % -------
@@ -36,8 +37,8 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
     arguments
         pet_dir {mustBeFolder}
         overwrite logical = false
-        raw_petf {mustBeText} = ''
         run_qc logical = true
+        raw_petf {mustBeText} = ''
     end
 
     % ------------------------------------------------------------------
@@ -83,6 +84,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, raw_petf, run_qc)
         log_append(fid, 'Input parameters:', 0, 0);
         log_append(fid, sprintf('pet_dir = %s', pet_dir), 0, 0);
         log_append(fid, sprintf('overwrite = %d', overwrite), 0, 0);
+        log_append(fid, sprintf('run_qc = %d', run_qc), 0, 0);
         if isempty(raw_petf)
             log_append(fid, 'raw_petf = ''''', 0, 0);
         else

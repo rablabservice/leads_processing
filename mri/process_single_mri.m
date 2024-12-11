@@ -50,7 +50,8 @@ function outfiles = process_single_mri( ...
     % process_post_freesurfer : logical, optional
     %     If true, run post-FreeSurfer processing. Default is true
     % run_qc : logical, optional
-    %     If true, run the QC script. Default is true
+    %     If true, create QC image and add new QC eval file. Default is
+    %     true
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeFolder}
@@ -117,6 +118,7 @@ function outfiles = process_single_mri( ...
         log_append(fid, sprintf('segment_brainstem = %d', segment_brainstem), 0, 0);
         log_append(fid, sprintf('process_freesurfer = %d', process_freesurfer), 0, 0);
         log_append(fid, sprintf('process_post_freesurfer = %d', process_post_freesurfer), 0, 0);
+        log_append(fid, sprintf('run_qc = %d', run_qc), 0, 0);
         log_append(fid, '', 0, 0);
 
         % --------------------------------------------------------------

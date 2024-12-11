@@ -918,8 +918,8 @@ def check_if_mri_processed(mri_proc_dir):
         "affine_nu": glob(op.join(mri_proc_dir, "a*nu.nii")),
         "c1": glob(op.join(mri_proc_dir, "c1*_nu.nii")),
         "c2": glob(op.join(mri_proc_dir, "c1*_nu.nii")),
-        "fwd_deformation": glob(op.join(mri_proc_dir, "y_*_qc.nii")),
-        "inv_deformation": glob(op.join(mri_proc_dir, "iy_*_qc.nii")),
+        "fwd_deformation": glob(op.join(mri_proc_dir, "y*_nu.nii")),
+        "inv_deformation": glob(op.join(mri_proc_dir, "iy*_nu.nii")),
         "mask_brainstem": glob(op.join(mri_proc_dir, "*mask-brainstem.nii")),
         "mask_eroded_subcortwm": glob(
             op.join(mri_proc_dir, "*mask-eroded-subcortwm.nii")

@@ -26,7 +26,6 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     % c5<scan_tag>_nu.nii
     % iy_<scan_tag>_nu.nii
     % mwc1<scan_tag>_nu.nii
-    % w<scan_tag>_nu.nii
     % y_<scan_tag>_nu.nii
     % ------------------------------------------------------------------
     arguments

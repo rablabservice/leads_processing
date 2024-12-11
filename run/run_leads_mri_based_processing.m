@@ -74,6 +74,7 @@ mri_dirs = {};
 segment_brainstem = true;
 process_freesurfer = true;
 process_post_freesurfer = true;
+run_qc = true;
 pet_dirs = {};
 
 % Get path to the Python interpreter and Python scripts that this
@@ -178,6 +179,7 @@ switch action
         fprintf('Run FreeSurfer processing                         = %d\n', process_freesurfer);
         fprintf('Segment brainstem                                 = %d\n', segment_brainstem);
         fprintf('Run post-FreeSurfer, SPM-based processing         = %d\n', process_post_freesurfer);
+        fprintf('Create QC image and add new QC eval file          = %d\n', run_qc);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
             set_mri_dirs = prompt_bool('Specify a list of MRIs to process?', false);
@@ -227,6 +229,7 @@ switch action
                 segment_brainstem = prompt_bool('Segment brainstem?', true);
             end
             process_post_freesurfer = prompt_bool('Run post-FreeSurfer MRI processing?', true);
+            run_qc = prompt_bool('Create QC image and add new QC eval file?', true);
         end
         fprintf('\nCalling process_mris.m...\n');
         process_mris( ...
@@ -235,7 +238,8 @@ switch action
             overwrite, ...
             segment_brainstem, ...
             process_freesurfer, ...
-            process_post_freesurfer ...
+            process_post_freesurfer, ...
+            run_qc ...
         );
     case 4
         % Process scheduled PET scans
@@ -248,6 +252,7 @@ switch action
         fprintf('                                                    or nothing will happen                                   \n');
         fprintf('Overwrite existing files                          = %d\n', overwrite);
         fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
+        fprintf('Create QC image and add new QC eval file          = %d\n', run_qc);
         change_defaults = prompt_bool(change_defaults_msg, false);
         if change_defaults
             set_pet_dirs = prompt_bool('Specify a list of PET scans to process?', false);
@@ -292,12 +297,14 @@ switch action
             if isempty(pet_dirs)
                 scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
             end
+            run_qc = prompt_bool('Create QC image and add new QC eval file?', true);
         end
         fprintf('\nCalling process_pets.m...\n');
         process_pets( ...
             pet_dirs, ...
             scans_to_process_dir, ...
-            overwrite ...
+            overwrite, ...
+            run_qc ...
         );
     case 5
         % Merge QC evaluation files

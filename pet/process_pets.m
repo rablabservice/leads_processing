@@ -1,4 +1,4 @@
-function process_pets(pet_dirs, scans_to_process_dir, overwrite)
+function process_pets(pet_dirs, scans_to_process_dir, overwrite, run_qc)
     % Process all PET scans that are scheduled for processing
     % in the latest raw_PET_index file
     %
@@ -12,11 +12,15 @@ function process_pets(pet_dirs, scans_to_process_dir, overwrite)
     %     The directory that stores raw_PET_index files
     % overwrite : logical
     %     If true, overwrite existing processed data
+    % run_qc : logical, optional
+    %     If true, create QC image and add new QC eval file. Default is
+    %     true
     % ------------------------------------------------------------------
     arguments
         pet_dirs = {}
         scans_to_process_dir {mustBeText} = '/mnt/coredata/processing/leads/metadata/scans_to_process'
         overwrite logical = false
+        run_qc logical = true
     end
 
     % Format paths
@@ -51,7 +55,7 @@ function process_pets(pet_dirs, scans_to_process_dir, overwrite)
 
     % Process one scan
     if length(pet_dirs) == 1
-        process_single_pet(pet_dirs{1}, overwrite);
+        process_single_pet(pet_dirs{1}, overwrite, run_qc);
     % Process multiple scans in parallel
     else
         % Start a parallel pool
@@ -61,7 +65,7 @@ function process_pets(pet_dirs, scans_to_process_dir, overwrite)
         % Assign a worker to each scan
         parfor ii = 1:length(pet_dirs)
             try
-                process_single_pet(pet_dirs{ii}, overwrite);
+                process_single_pet(pet_dirs{ii}, overwrite, run_qc);
             catch ME
                 warning( ...
                     '\n\n\nERROR processing %s: %s\n\n\n', pet_dirs{ii}, ...
