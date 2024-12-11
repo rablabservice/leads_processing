@@ -916,6 +916,10 @@ def check_if_mri_processed(mri_proc_dir):
     # Search for the processed MRI files
     proc_files = {
         "affine_nu": glob(op.join(mri_proc_dir, "a*nu.nii")),
+        "c1": glob(op.join(mri_proc_dir, "c1*_nu.nii")),
+        "c2": glob(op.join(mri_proc_dir, "c1*_nu.nii")),
+        "fwd_deformation": glob(op.join(mri_proc_dir, "y_*_qc.nii")),
+        "inv_deformation": glob(op.join(mri_proc_dir, "iy_*_qc.nii")),
         "mask_brainstem": glob(op.join(mri_proc_dir, "*mask-brainstem.nii")),
         "mask_eroded_subcortwm": glob(
             op.join(mri_proc_dir, "*mask-eroded-subcortwm.nii")
@@ -923,8 +927,10 @@ def check_if_mri_processed(mri_proc_dir):
         "mask_infcblgm": glob(op.join(mri_proc_dir, "*mask-infcblgm.nii")),
         "mask_pons": glob(op.join(mri_proc_dir, "*mask-pons.nii")),
         "mask_wcbl": glob(op.join(mri_proc_dir, "*mask-wcbl.nii")),
-        "warp_nu": glob(op.join(mri_proc_dir, "w*nu.nii")),
+        "mwc1": glob(op.join(mri_proc_dir, "mwc1*_nu.nii")),
+        "warp_nu": glob(op.join(mri_proc_dir, "w*_nu.nii")),
         "qc_image": glob(op.join(mri_proc_dir, "*_qc.png")),
+        "suit_atlas": glob(op.join(mri_proc_dir, "*_cbl-suit.nii")),
     }
 
     # Check if all file types are present
