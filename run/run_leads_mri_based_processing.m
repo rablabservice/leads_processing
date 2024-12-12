@@ -94,8 +94,8 @@ prompt_user = sprintf([
     '  [4] Process scheduled PET scans\n', ...
     '  [5] Merge QC evaluation files\n', ...
     '  [6] View list of processed scans to QC\n', ...
-    '  [7] Merge ROI extractions (NOT IMPLEMENTED) \n', ...
-    '  [8] Prepare quarterly report (NOT IMPLEMENTED) \n', ...
+    '  [7] Prepare internal ROI extraction files\n', ...
+    '  [8] Prepare quarterly report files\n', ...
     '  [9] Exit\n\n'
 ]);
 action = input(prompt_user);
@@ -309,13 +309,13 @@ switch action
     case 5
         % Merge QC evaluation files
         cmd = sprintf('%s %s %s', python, qc_evals_script, 'merge');
-        fprintf('Merging QC evaluation files...\n');
+        fprintf('Merging QC evaluation files...\n\n');
         fprintf('$ %s\n', cmd);
         system(cmd);
     case 6
         % View processed scans that need to be QC'd
         fprintf([ ...
-            '\n** NOTE: Merge QC evaluation files (Option 5) first to view an\n', ...
+            '\n** NOTE: Merge QC evaluation files (#5) first to view an\n', ...
             '         updated list of processed scans that need to be QC''d\n\n' ...
         ]);
         cmd = sprintf('%s %s %s', python, qc_evals_script, 'incomplete');
@@ -323,14 +323,43 @@ switch action
         system(cmd);
     case 7
         % Create internal ROI extraction files
+        metadata_uploaded = prompt_bool('Are all metadata files up-to-date?', false);
+        if ~metadata_uploaded
+            fprintf([
+                'Please download the latest versions of these files before compiling\n', ...
+                'internal ROI extractions. See "SOP_LEADS_Metadata_Downloads.docx"\n', ...
+                'for detailed instructions. Bye for now...\n\n'
+            ]);
+            return;
+        end
+        setup_run = prompt_bool([ ...
+            'Have you rerun the Setup (#1) and QC Merge (#5) modules since processing\n', ...
+            'and QC''ing the latest round of new PET and MRI scans?' ...
+            ], false);
+        if ~setup_run
+            fprintf([
+                'Please run these modules first so the latest PET scans are included\n', ...
+                'in the internal ROI extraction files. Bye for now...\n\n' ...
+            ]);
+            return;
+        end
         cmd = sprintf('%s %s %s', python, roi_extraction_script);
-        fprintf('Merging ROI extractions...\n');
+        fprintf('Preparing internal ROI extraction files...\n\n');
         fprintf('$ %s\n', cmd);
         system(cmd);
     case 8
         % Create quarterly report files
+        metadata_uploaded = prompt_bool('Are all metadata files up-to-date?', false);
+        if ~metadata_uploaded
+            fprintf([
+                'Please download the latest versions of these files before compiling\n', ...
+                'quarterly report files. See "SOP_LEADS_Metadata_Downloads.docx"\n', ...
+                'for detailed instructions. Bye for now...\n\n'
+            ]);
+            return;
+        end
         cmd = sprintf('%s %s %s', python, quarterly_report_script);
-        fprintf('Preparing quarterly report...\n');
+        fprintf('Preparing quarterly report files...\n\n');
         fprintf('$ %s\n', cmd);
         system(cmd);
     case 9

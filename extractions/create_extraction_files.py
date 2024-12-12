@@ -3,10 +3,11 @@
 """
 Parse ROI extraction files in processed scan directories and compile
 them in the style of LEADS ROI extraction CSV files (one for each
-PET tracer: FBB, FTP, and FDG).
+PET tracer x reference region pair).
 """
 
 import argparse
+import os
 import os.path as op
 import sys
 import time
@@ -51,13 +52,27 @@ class XReport:
         # Define amyloid tracers
         self.amyloid_tracers = ["fbb"]
 
+        # Get a timestamp that we'll use to save unique output filenames
+        self.timestamp = uts.now()
+
     def __repr__(self):
         return f"XReport(proj_dir={self.paths['proj']})"
 
-    def compile(self, save_output=True, overwrite=True):
+    def compile(self, save_output=True):
+        print(
+            "",
+            "-" * 80,
+            "Loading and formatting data files",
+            sep="\n",
+        )
         self.load_data()
-        self.create_extraction_files(save_output, overwrite)
-        print("-" * 80, "Finished compiling LEADS ROI extraction files!", sep="\n")
+        print(
+            "",
+            "-" * 80,
+            "Merging data into final ROI extraction files",
+            sep="\n",
+        )
+        self.create_extraction_files(save_output)
 
     def get_paths(self, proj_dir):
         """Get a dictionary of important project paths.
@@ -86,21 +101,36 @@ class XReport:
             self.paths["extraction"], "quarterly_report_files"
         )
         self.paths["rois"] = op.join(self.paths["extraction"], "internal_roi_files")
+        self.paths["rois_archive"] = op.join(self.paths["rois"], "archive")
         self.paths["proc"] = op.join(self.paths["data"], "processed")
 
     def load_data(self):
         """Load all data needed for the XReport."""
+        print(
+            "  * Getting list of processed PET scans from .../leads/metadata/scans_to_process"
+        )
         self.load_processed_pet_index()
+        print("  * Getting cohort assingment")
         self.load_cohort()
+        print("  * Getting eligibility list")
         self.load_eligibility_list()
+        print("  * Getting subject demographics")
         self.load_subject_demo()
+        print("  * Getting APOE genotypes")
         self.load_apoe_genotype()
+        print("  * Getting anti-amyloid treatment list")
         self.load_anti_amyloid_treatment()
+        print("  * Getting baseline clinical data")
         self.load_clinical_baseline_data()
+        print("  * Getting reference region scaling factors")
         self.load_ref_region_dat()
+        print("  * Getting ROI means and volumes")
         self.load_roi_dat()
+        print("  * Getting Centiloid scores")
         self.load_centiloid_dat()
+        print("  * Getting U. of Michigan PET QC evaluations")
         self.load_umich_qc()
+        print("  * Getting UCSF PET and MRI QC evaluations")
         self.load_ucsf_qc()
 
     def load_processed_pet_index(self):
@@ -128,11 +158,10 @@ class XReport:
             "days_mri_to_pet",
             "pet_proc_dir",
         ]
-        pet_scan_idx = pd.read_csv(
-            uts.glob_sort_mtime(
-                op.join(self.paths["scans_to_process"], "raw_PET_index*.csv")
-            )[0]
-        )
+        infile = uts.glob_sort_mtime(
+            op.join(self.paths["scans_to_process"], "raw_PET_index*.csv")
+        )[0]
+        pet_scan_idx = pd.read_csv(infile)
 
         # Remove PET scans that have not been fully processed
         pet_scan_idx = (
@@ -148,18 +177,6 @@ class XReport:
         pet_scan_idx["tracer"] = pet_scan_idx["tracer"].str.lower()
 
         # Separate each PET tracer into its own dataframe
-        n_scans = len(pet_scan_idx)
-        n_subjs = pet_scan_idx["subject_id"].nunique()
-        print(
-            "",
-            "-" * 80,
-            f"Loading latest PET scan index from {self.paths['scans_to_process']}",
-            sep="\n",
-        )
-        print(
-            f"- {n_scans:,} fully processed PET scans from {n_subjs:,} subjects",
-            end="\n" * 2,
-        )
         self.tracers = sorted(pet_scan_idx["tracer"].unique())
         self.pet_idx = {}
         for tracer, grp in pet_scan_idx.groupby("tracer"):
@@ -186,9 +203,8 @@ class XReport:
 
         # ------------------------------
         # Load the study_group dataframe
-        study_group = pd.read_csv(
-            op.join(self.paths["atri"], "leads_codebook_study_data_subject.csv")
-        )
+        infile = op.join(self.paths["atri"], "leads_codebook_study_data_subject.csv")
+        study_group = pd.read_csv(infile)
 
         # Rename columns
         study_group = study_group.rename(
@@ -993,17 +1009,13 @@ class XReport:
                     columns=drop_cols
                 )
 
-    def create_extraction_files(self, save_output=True, overwrite=True):
+    def create_extraction_files(self, save_output=True):
         """Merge spreadsheets and save each extraction file."""
         self.extraction = {}
 
         # Prepare the final dataframes for each tracer
         for key in self.extraction_keys:
             tracer, ref_region = key
-            print("-" * 80)
-            print(
-                f"Building ROI extraction spreadsheet for {tracer.upper()} - {ref_region.upper()}"
-            )
 
             # Construct the main dataframe for each extraction file.
             # Start by copying the processed scan list
@@ -1100,27 +1112,26 @@ class XReport:
                 how="left",
             )
 
-            # Save the output dataframe
-            output_file = op.join(
-                self.paths["rois"],
-                f"LEADS_{tracer.upper()}-ROI-means_{TODAY}.csv",
-            )
             if save_output:
-                if overwrite or not op.isfile(output_file):
-                    self.extraction[key].to_csv(output_file, index=False)
-                    print(f"Saved {output_file}")
+                # Move any existing files to archive
+                globstr = op.join(
+                    self.paths["rois"],
+                    f"LEADS_{tracer.upper()}_{ref_region}_ROI-means_*.csv",
+                )
+                globfiles = uts.glob_sort(globstr)
+                if globfiles:
+                    for f in globfiles:
+                        os.rename(
+                            f, op.join(self.paths["rois_archive"], op.basename(f))
+                        )
 
-            # Print final dataframe shape
-            n_scans = len(self.extraction[key])
-            n_subjs = self.extraction[key]["subject_id"].nunique()
-            print(
-                "",
-                f"Final {tracer.upper()} ROI extraction dataframe:",
-                f"- {n_scans:,} {tracer.upper()} scans from {n_subjs:,} subjects",
-                f"- Dataframe shape: {self.extraction[key].shape}",
-                sep="\n",
-                end="\n" * 2,
-            )
+                # Save the output dataframe
+                output_file = op.join(
+                    self.paths["rois"],
+                    f"LEADS_{tracer.upper()}_{ref_region}_ROI-means_{self.timestamp}.csv",
+                )
+                self.extraction[key].to_csv(output_file, index=False)
+                print(f"  * Saved {output_file}")
 
 
 def _parse_args():
@@ -1130,10 +1141,10 @@ def _parse_args():
             "Save LEADS PET ROI extraction files\n\n"
             + "Overview\n--------\n"
             + "This program aggregates ROI extraction files in LEADS processed PET scan\n"
-            + "directories, creating 3 CSV files (one each for FBB, FTP, and FDG) that serve\n"
-            + "as internal reference spreadsheets containing all standard ROI extraction data\n"
-            + "for all processed PET scans, along with PET and MRI scan QC results and basic\n"
-            + "subject-level demographic and clinical information."
+            + "directories, creating one CSV file for each PET tracer x reference region\n"
+            + "pair that are defined in the standard processing pipeline. Additional columns\n"
+            + "are included with basic clinical and demographic information, along with\n"
+            + "PET and MRI QC results."
         ),
         formatter_class=argparse.RawTextHelpFormatter,
         exit_on_error=False,
@@ -1147,19 +1158,6 @@ def _parse_args():
             "paths are inferred. Default: %(default)s"
         ),
     )
-    parser.add_argument(
-        "--no-save",
-        action="store_false",
-        dest="save",
-        help="Generate ROI extraction dataframes but do not save them as CSVs",
-    )
-    parser.add_argument(
-        "--no-overwrite",
-        action="store_false",
-        dest="overwrite",
-        help="Do not overwrite existing ROI extraction CSV files",
-    )
-
     return parser.parse_args()
 
 
@@ -1172,7 +1170,7 @@ def main():
 
     # Instantiate the XReport class and run the main function.
     xr = XReport(args.proj_dir)
-    xr.compile(args.save, args.overwrite)
+    xr.compile()
 
     # Report elapsed time.
     elapsed = time.time() - start_time
