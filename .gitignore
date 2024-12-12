@@ -1,1 +1,21 @@
-/wscoring
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Working/temporary directories
+.working/
+
+# Operating System
+.DS_Store
+Thumbs.db
