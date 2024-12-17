@@ -1091,6 +1091,30 @@ class QReport:
                         lambda x: "" if pd.isna(x) else str(int(x))
                     )
 
+                # Round scaling factor columns to 4 decimals
+                round_cols = [
+                    col
+                    for col in self.qrep_dat[tracer].columns
+                    if col.startswith("ScalingFactor")
+                ]
+                self.qrep_dat[tracer][round_cols] = self.qrep_dat[tracer][
+                    round_cols
+                ].round(4)
+
+                # Round MRIBASED_SUVR columns to 7 decimals
+                round_cols = [
+                    col
+                    for col in self.qrep_dat[tracer].columns
+                    if col.endswith("MRIBASED_SUVR")
+                ]
+                round_cols += [
+                    "MRIBASED_Composite_SUVR",
+                    "MRIBASED_Composite_Centiloids",
+                ]
+                self.qrep_dat[tracer][round_cols] = self.qrep_dat[tracer][
+                    round_cols
+                ].round(7)
+
                 # Reorder columns
                 cols_in_order = [
                     "ID",
@@ -1428,6 +1452,26 @@ class QReport:
                 for col in add_cols:
                     self.qrep_dat[tracer][col] = np.nan
 
+                # Round scaling factor columns to 4 decimals
+                round_cols = [
+                    col
+                    for col in self.qrep_dat[tracer].columns
+                    if col.startswith("ScalingFactor")
+                ]
+                self.qrep_dat[tracer][round_cols] = self.qrep_dat[tracer][
+                    round_cols
+                ].round(4)
+
+                # Round MRIBASED_SUVR columns to 7 decimals
+                round_cols = [
+                    col
+                    for col in self.qrep_dat[tracer].columns
+                    if col.endswith("MRIBASED_SUVR")
+                ]
+                self.qrep_dat[tracer][round_cols] = self.qrep_dat[tracer][
+                    round_cols
+                ].round(7)
+
                 # Reorder columns
                 cols_in_order = [
                     "ID",
@@ -1761,6 +1805,26 @@ class QReport:
                 self.qrep_dat[tracer]["FTPPET_Date"] = self.qrep_dat[tracer][
                     "FTPPET_Date"
                 ].apply(lambda x: pd.to_datetime(x).strftime("%m/%d/%y"))
+
+                # Round scaling factor columns to 4 decimals
+                round_cols = [
+                    col
+                    for col in self.qrep_dat[tracer].columns
+                    if col.startswith("ScalingFactor")
+                ]
+                self.qrep_dat[tracer][round_cols] = self.qrep_dat[tracer][
+                    round_cols
+                ].round(4)
+
+                # Round MRIBASED_SUVR columns to 7 decimals
+                round_cols = [
+                    col
+                    for col in self.qrep_dat[tracer].columns
+                    if col.endswith("MRIBASED_SUVR")
+                ]
+                self.qrep_dat[tracer][round_cols] = self.qrep_dat[tracer][
+                    round_cols
+                ].round(7)
 
                 # Reorder columns
                 cols_in_order = [
