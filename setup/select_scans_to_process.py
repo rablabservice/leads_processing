@@ -9,6 +9,7 @@ import datetime
 import os
 import os.path as op
 import re
+import shutil
 import sys
 from glob import glob
 
@@ -35,6 +36,7 @@ def main(
     max_pet_to_mri=365,
     audit_repeat_mri=False,
     check_brainstem=True,
+    reprocess_pet_to_closest_mri=True,
     save_csv=True,
 ):
     """Save CSV files for MRI and PET scans in the raw directory.
@@ -185,6 +187,9 @@ def main(
     raw_mris["mri_proc_dir"] = raw_mris.apply(
         lambda x: get_mri_proc_dir(x["subj"], x["mri_date"], proc_dir), axis=1
     )
+    raw_pets["mri_proc_dir"] = raw_pets.apply(
+        lambda x: get_mri_proc_dir(x["subj"], x["mri_date"], proc_dir), axis=1
+    )
 
     # Add path to the processed PET directory
     ii = raw_pets.columns.tolist().index("pet_raw_niif")
@@ -269,18 +274,59 @@ def main(
             .tolist()
         )
 
+    # Find PET scans that were already processed but not to the most
+    # recent MRI. This might happen, for example, if a visit 2 PET scan
+    # is acquired some months before the visit 2 MRI, and still within a
+    # year of the baseline MRI. In this case, PET might have been
+    # processed to the baseline MRI, but once the visit 2 MRI is
+    # acquired we might want to reprocess the visit 2 PET to visit 2 MRI
+    ii = raw_pets.columns.tolist().index("mri_raw_niif")
+    raw_pets.insert(
+        ii + 1,
+        "pet_not_processed_to_closest_mri",
+        raw_pets.apply(
+            lambda x: check_if_pet_not_processed_to_closest_mri(
+                x["pet_proc_dir"], x["mri_proc_dir"]
+            ),
+            axis=1,
+        ),
+    )
+    if reprocess_pet_to_closest_mri:
+        pet_dirs_to_reprocess = set(
+            raw_pets.loc[
+                raw_pets["pet_not_processed_to_closest_mri"] == 1, "pet_proc_dir"
+            ].tolist()
+        )
+        n = len(pet_dirs_to_reprocess)
+        if n > 0:
+            s1 = "scans have" if n > 1 else "scan has"
+            s2 = "directories" if n > 1 else "directory"
+            print(
+                f"\nNOTE: {n} PET {s1} been processed to an MRI that is not",
+                "the closest MRI in the raw directory. As `reprocess_pet_to_closest_mri`",
+                f"is set to True, the following processed PET {s2} will be removed so the",
+                "PET scan can be reprocessed:",
+                sep="\n",
+            )
+        for pet_dir_to_reprocess in pet_dirs_to_reprocess:
+            print(f"  - {pet_dir_to_reprocess}")
+            shutil.rmtree(pet_dir_to_reprocess)
+
+        # Drop the `pet_not_processed_to_closest_mri` column from the dataframe
+        raw_pets = raw_pets.drop(columns=["pet_not_processed_to_closest_mri"])
+
     # Determine which PET scans have been processed
     ii = raw_pets.columns.tolist().index("mri_raw_niif")
     mri_processed = raw_mris.set_index("mri_image_id")[
         "mri_processing_complete"
     ].to_dict()
     raw_pets.insert(
-        ii + 1,
+        ii + 2,
         "mri_processing_complete",
         raw_pets["mri_image_id"].apply(lambda x: mri_processed.get(x, np.nan)),
     )
     raw_pets.insert(
-        ii + 2,
+        ii + 3,
         "pet_processing_complete",
         raw_pets["pet_proc_dir"].apply(check_if_pet_processed),
     )
@@ -940,6 +986,16 @@ def check_if_mri_processed(mri_proc_dir):
         return 0
 
 
+def check_if_pet_not_processed_to_closest_mri(pet_proc_dir, closest_mri_proc_dir):
+    """Check if PET was processed to a different MRI than closest."""
+    mri_proc_dir = op.join(pet_proc_dir, "mri")
+    if op.islink(mri_proc_dir):
+        mri_used_to_process_pet_dir = op.realpath(mri_proc_dir)
+        if mri_used_to_process_pet_dir != closest_mri_proc_dir:
+            return 1
+    return 0
+
+
 def check_if_pet_processed(pet_proc_dir):
     """Return True if the PET scan has been fully processed"""
     if not op.isdir(pet_proc_dir):
@@ -1250,6 +1306,17 @@ def _parse_args():
         ),
     )
     parser.add_argument(
+        "--no-reprocess-pet-to-closest-mri",
+        action="store_false",
+        dest="reprocess_pet_to_closest_mri",
+        help=(
+            "If a PET scan has already been processed, don't reprocess\n"
+            + "it if it was processed to a different MRI than the closest\n"
+            + "MRI. By default, PET scans are reprocessed if they were\n"
+            + "processed to a different MRI than the closest MRI"
+        ),
+    )
+    parser.add_argument(
         "--no-save-csv",
         action="store_false",
         dest="save_csv",
@@ -1281,6 +1348,7 @@ if __name__ == "__main__":
         max_pet_to_mri=args.max_pet_to_mri,
         audit_repeat_mri=args.audit_repeat_mri,
         check_brainstem=args.check_brainstem,
+        reprocess_pet_to_closest_mri=args.reprocess_pet_to_closest_mri,
         save_csv=args.save_csv,
     )
 

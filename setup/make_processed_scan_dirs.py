@@ -10,7 +10,6 @@ import os
 import os.path as op
 import shutil
 import sys
-from glob import glob
 
 import pandas as pd
 
@@ -199,14 +198,6 @@ def make_processed_scan_dirs(
                     f"!!  - {link_dst} ALREADY EXISTS BUT POINTS TO {op.realpath(link_dst)}; EXPECTED LOCATION IS {link_src}"
                 )
                 count_problems_pet += 1
-
-        # # Copy the raw PET file to the processed PET directory
-        # infile = scan["pet_raw_niif"]
-        # outfile = op.join(scan["pet_proc_dir"], f"{pet_tag}.nii")
-        # if not op.isfile(outfile):
-        #     already_printed = print_tag(pet_tag, already_printed)
-        #     shutil.copy(infile, outfile)
-        #     print(f"    $ cp {infile} {outfile}")
 
         # Create a symlink to the processed MRI directory
         link_src = mri_proc_dir
