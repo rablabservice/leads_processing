@@ -64,7 +64,7 @@ function setup_leads_processing( ...
     code_dir = fullfile(proj_dir, 'code');
 
     % Get path to the Python interpreter
-    python = '/mnt/coredata/Projects/Resources/dscode/bin/python';
+    python = '/mnt/coredata/Projects/Resources/dscode/miniforge3/bin/python';
 
     % Part I: newdata -> raw
     % Unzip any zip files in newdata, convert dicoms to nifti, and move

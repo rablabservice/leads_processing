@@ -83,15 +83,15 @@ that the same versions of required software are used consistently.
 
 A few additional notes about the new codebase:
 - On the PETcore VM, the codebase lives in `/mnt/coredata/processing/leads/code` and is
-  connected to its [remote repository](https://github.com/dschonhaut/leads_processing) on GitHub.
+  connected to its [remote repository](https://github.com/rablabservice/leads_processing) on GitHub.
 - The new code is 10-20x faster than the original codebase, mostly due to the use of multithreading
   throughout the processing pipeline. FreeSurfer still takes ~10 hr to run per scan, although up to
   16 MRIs can be processed in parallel on the PETcore VM.
-- A single Matlab script, [`run_leads_mri_based_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/run/run_leads_mri_based_processing.m), allows
+- A single Matlab script, [`run_leads_mri_based_processing.m`](https://github.com/rablabservice/leads_processing/blob/main/run/run_leads_mri_based_processing.m), allows
   the user to run all parts of the processing pipeline while interacting with the program
   through simple, question and answer based prompts.
 - The processing pipeline is divided into three modules, one of which must be specified by
-  the user with each call to [`run_leads_mri_based_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/run/run_leads_mri_based_processing.m).
+  the user with each call to [`run_leads_mri_based_processing.m`](https://github.com/rablabservice/leads_processing/blob/main/run/run_leads_mri_based_processing.m).
 
 ## Running the processing pipeline
 From an end user's perspective, new MRI and PET data will be downloaded from LONI and manually
@@ -114,7 +114,7 @@ order:
 Here is a somewhat more detailed account of what happens during each processing module.
 
 ### Setup
-* Main script: [`setup_leads_processing.m`](https://github.com/dschonhaut/leads_processing/blob/main/setup/setup_leads_processing.m)
+* Main script: [`setup_leads_processing.m`](https://github.com/rablabservice/leads_processing/blob/main/setup/setup_leads_processing.m)
 * Overview: Newly uploaded data are prepared for subsequent processing
     1. Zip files in `.../leads/data/newdata` are unzipped
     1. All DICOMs in `.../leads/data/newdata` are converted to NIfTI using
@@ -167,7 +167,7 @@ Here is a somewhat more detailed account of what happens during each processing 
     points to the directory of the MRI it will be coregistered to.
 
 ### MRI
-* Main script: [`process_mris.m`](https://github.com/dschonhaut/leads_processing/blob/main/mri/process_mris.m)
+* Main script: [`process_mris.m`](https://github.com/rablabservice/leads_processing/blob/main/mri/process_mris.m)
 * Overview: MRI processing is divided into two submodules:
     1. T1 MRIs are processed through FreeSurfer [`recon-all`](https://surfer.nmr.mgh.harvard.edu/fswiki/recon-all)
        and [`segmentBS.sh`](https://surfer.nmr.mgh.harvard.edu/fswiki/BrainstemSubstructures), which
@@ -197,7 +197,7 @@ Here is a somewhat more detailed account of what happens during each processing 
        1. The affine transform from the previous step is applied to the native space nu.nii
 
 ### PET
-* Main script: [`process_pets.m`](https://github.com/dschonhaut/leads_processing/blob/main/pet/process_pets.m)
+* Main script: [`process_pets.m`](https://github.com/rablabservice/leads_processing/blob/main/pet/process_pets.m)
 * Overview: PET processing must be performed after the MRI that PET will be coregistered to has
     been processed, and the [Setup module](#setup) will not schedule PET scans to be processed until this
     has happened. PET processing includes the following steps, in order:
@@ -211,13 +211,13 @@ Here is a somewhat more detailed account of what happens during each processing 
     1. The PET scan is coregistered and resliced to the nu.nii (at 1mm^3 voxel sizes)
     1. Reference region means are calculated, and voxelwise PET SUVR images are saved.
        - Reference regions in the new pipeline are not hard-coded, but rather depend on a
-         [`ref_regions.csv`](https://github.com/dschonhaut/leads_processing/blob/main/config/ref_regions.csv)
+         [`ref_regions.csv`](https://github.com/rablabservice/leads_processing/blob/main/config/ref_regions.csv)
          file that in the `.../leads/code/config` directory. To process a new PET tracer or reference region,
          the user should need only to add a line to this file and -- if the reference region is not already
          saved in the processed MRI directory -- add a new script to save the desired reference region
-         and call it from [`save_roi_masks.m`](https://github.com/dschonhaut/leads_processing/blob/main/mri/save_roi_masks.m).
+         and call it from [`save_roi_masks.m`](https://github.com/rablabservice/leads_processing/blob/main/mri/save_roi_masks.m).
          If the PET tracer is not recognized, it may need to be added to a different config file,
-         [`scan_types_and_tracers.csv`](https://github.com/dschonhaut/leads_processing/blob/main/config/scan_types_and_tracers.csv).
+         [`scan_types_and_tracers.csv`](https://github.com/rablabservice/leads_processing/blob/main/config/scan_types_and_tracers.csv).
        - Following ADNI processing, the default reference regions saved in LEADS are:
          * Amyloid-PET
            - Whole cerebellum (cross-sectional reference region)
@@ -230,7 +230,7 @@ Here is a somewhat more detailed account of what happens during each processing 
            - Pons
     1. Mean PET SUVRs and ROI volumes are extracted from FreeSurfer regions in native MRI space.
       - The `fsroi_list_<TRACER>.csv` files in
-        [`../leads/code/config`](https://github.com/dschonhaut/leads_processing/tree/main/config)
+        [`../leads/code/config`](https://github.com/rablabservice/leads_processing/tree/main/config)
         define which ROIs are saved for each PET tracer
     1. For amyloid-PET only, the mean SUVR within the ADNI cortical summary region is calculated
        and converted to Centiloids using the appropriate equation from
