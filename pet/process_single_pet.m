@@ -210,7 +210,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
         if run_qc
             % Save the QC image
             log_append(fid, '- Generating QC image');
-            python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
+            python = '/mnt/coredata/Projects/Resources/dscode/bin/python';
             code_dir = fileparts(fileparts(mfilename('fullpath')));
             qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
             cmd = sprintf('%s %s %s', python, qc_script, pet_dir);

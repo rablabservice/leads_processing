@@ -104,9 +104,6 @@ def create_qc_eval_file(scan_dir):
     fields = pd.Index(get_qc_eval_fields(scan_type), name="field")
     values = [subj, scan_date] + [np.nan] * (len(fields) - 2)
     qc_eval = pd.Series(index=fields, data=values, name="value").reset_index()
-    # qc_eval = pd.DataFrame(
-    #     data=[subj, scan_date] + [np.nan] * (len(columns) - 2), columns=columns
-    # )
 
     # Save the dateframe as a CSV file
     timestamp = uts.now()

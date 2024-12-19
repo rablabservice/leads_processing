@@ -52,9 +52,9 @@ say_hi();
 
 % Reset the MATLAB environment
 restoredefaultpath;
-addpath("/home/mac/dschonhaut/code/matlab/spm12");
-addpath("/home/mac/dschonhaut/code/matlab/spm12/toolbox");
-addpath("/home/mac/dschonhaut/code/matlab/spm12/toolbox/suit");
+addpath("/mnt/coredata/Projects/Resources/dscode/lib/spm12");
+addpath("/mnt/coredata/Projects/Resources/dscode/lib/spm12/toolbox");
+addpath("/mnt/coredata/Projects/Resources/dscode/lib/spm12/toolbox/suit");
 addpath(genpath(fileparts(fileparts(mfilename('fullpath')))));
 
 % Define defaults
@@ -79,7 +79,7 @@ pet_dirs = {};
 
 % Get path to the Python interpreter and Python scripts that this
 % program can call
-python = '/home/mac/dschonhaut/mambaforge/envs/nipy311/bin/python';
+python = '/mnt/coredata/Projects/Resources/dscode/bin/python';
 qc_evals_script = fullfile(code_dir, 'qc', 'qc_evals.py');
 quarterly_report_script = fullfile(code_dir, 'quarterly_reports', 'create_quarterly_report_files.py');
 roi_extraction_script = fullfile(code_dir, 'extractions', 'create_extraction_files.py');
