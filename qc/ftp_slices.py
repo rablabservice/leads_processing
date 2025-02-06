@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 from nibabel.orientations import io_orientation, axcodes2ornt
 from matplotlib.colors import LinearSegmentedColormap
-
+from nilearn.image import resample_to_img
 
 
 # Importing the necessary classes from the rablabqc package
@@ -24,11 +24,6 @@ from processing import ImageProcessor
 tpm_file = os.path.join(rablab_pkg_path,'TPM.nii')
 
 rtpm_path = os.path.join(rablab_pkg_path, 'reslice', 'rT1.nii') # Resliced T1 file to 1mm isotropic resolution
-reslice_matlab_script = os.path.join(rablab_pkg_path,'reslice', 'reslice.m')
-
-mask_reslice_matlab_script = os.path.join(rablab_pkg_path, 'reslice', 'mask_reslice.m')
-
-tmp_folder = os.path.join('/mnt/tmp-scratch/')
 #  _____________________________________________________________ CUSTOM COLORMAPS _____________________________________________________________ #
 # Notes: 
 # 1. The custom colormaps are created using the LinearSegmentedColormap class from matplotlib.colors.
@@ -75,7 +70,7 @@ cmap_blue2 = LinearSegmentedColormap.from_list('custom_color', [(46/255, 69/255,
 cmap_blue2.set_under(alpha=0)  # Set transparency for zeros
 
 # _______________________________________________________________ CUSTOM COLORBAR _____________________________________________________________ #
-## Important Note: The old versipn of add_colorbar function has been commented out as it is not being used in the current version of the code.
+## Important Note: The old version of add_colorbar function has been commented out as it is not being used in the current version of the code.
 
 def add_colorbar(fig, ax, cmap='turbo', vmin=0, vmax=2, ticks=[0, 2], orientation='horizontal', cbar_width=0.13, cbar_height=0.01, cbar_x=0.76):
     """
@@ -185,84 +180,30 @@ class FTPQCplots:
 
         img = nib.load(path)
         img_ornt = io_orientation(img.affine)
-        new_ornt = axcodes2ornt(orientation)
         img = img.as_reoriented(img_ornt)
         return img.get_fdata()
-
-    def generate_matlab_script(self, path, output_script_path):
-        """
-        This function generates a MATLAB script to reslice the image.
-        """
-        #with open('/home/mac/pmaiti/Desktop/leads_qc/reslice_test/reslice.m', 'r') as template_file:
-        with open(reslice_matlab_script, 'r') as template_file:
-            script_content = template_file.read()
-
-        # Replace placeholders with actual paths
-        script_content = script_content.replace('<RTPM_PATH>', rtpm_path)
-        script_content = script_content.replace('<DATA_PATH>', path)
-        
-        # Write the modified script to the output path
-        with open(output_script_path, 'w') as script_file:
-            script_file.write(script_content)
-
-
-    def generate_mask_reslice_mtlb(self, path, output_script_path):
-        """
-        This function generates a MATLAB script to reslice the mask image.
-        """
-        #with open('/home/mac/pmaiti/Desktop/leads_qc/reslice_test/mask_reslice.m', 'r') as template_file:
-        with open(mask_reslice_matlab_script, 'r') as template_file:
-            script_content = template_file.read()
-
-        script_content = script_content.replace('<RTPM_PATH>', rtpm_path)
-        script_content = script_content.replace('<DATA_PATH>', path)
-        
-        # Write the modified script to the output path
-        with open(output_script_path, 'w') as script_file:
-            script_file.write(script_content)
 
 
     def load_nii_resliced(self, path, orientation="LAS", mask=False):
         """
         Load nifti image with specified orientation
         """
-        
-        id = path.split('/')[-1].split('.')[0]
-
-        resliced_image_path = os.path.join(tmp_folder, id, 'qc' + id + '.nii')
-        
+        id = path.split("/")[-1].split(".")[0]
+        out_folder = os.path.dirname(path)
+        resliced_image_path = os.path.join(out_folder, "qc" + id + ".nii")
         if not os.path.exists(resliced_image_path):
-            
-            # Check if the temporary folder with the id exists
-            tmp_id_folder = os.path.join(tmp_folder, id)
-            if not os.path.exists(tmp_id_folder):
-                os.makedirs(tmp_id_folder)
-            
-            # Copy the image to the temporary id folder
-            tmp_file = os.path.join(tmp_id_folder, id + '.nii')
-            shutil.copy2(path, tmp_file)
-            print(tmp_file)
-            
+            template_img = nib.load(rtpm_path)
+            source_img = nib.load(os.path.join(out_folder, id + ".nii"))
             if mask:
-                output_script_path = os.path.join(tmp_id_folder, 'mask_reslice.m')
-                self.generate_mask_reslice_mtlb(tmp_file, output_script_path)
+                resliced_img = resample_to_img(source_img, template_img, interpolation='nearest', copy_header=True, force_resample=True)
             else:
-                output_script_path = os.path.join(tmp_id_folder, 'reslice.m')
-                self.generate_matlab_script(tmp_file, output_script_path)
-                
-            # Command to run the MATLAB script
-            command = f"matlab -nodisplay -nosplash -r \"run('{output_script_path}');exit;\""
-            
-            # Run the command
-            matprocess = subprocess.run(command, shell=True, capture_output=True, text=True)
-            print("Output:\n", matprocess.stdout)
-
+                resliced_img = resample_to_img(source_img, template_img, interpolation='continuous', copy_header=True, force_resample=True)
+            nib.save(resliced_img, resliced_image_path)
         else:
             print("Resliced image exists for ", id, ". Loading the resliced image...")
-            
+
         img = nib.load(resliced_image_path)
         img_ornt = io_orientation(img.affine)
-        new_ornt = axcodes2ornt(orientation)
         img = img.as_reoriented(img_ornt)
         return img.get_fdata()
     
@@ -271,23 +212,15 @@ class FTPQCplots:
         Load nifti image with specified orientation
         """
         id = path.split('/')[-1].split('.')[0]
-        
-        reslice_mask_path = os.path.join(tmp_folder, id, 'qc'+"mask_"+id+".nii")
+        out_folder = os.path.dirname(path)
+        reslice_mask_path = os.path.join(out_folder, 'qc'+"mask_"+id+".nii")
         
         if not os.path.exists(reslice_mask_path):
-            
-            # Check if the temporary folder with the id exists
-            tmp_id_folder = os.path.join(tmp_folder, id)
-            if not os.path.exists(tmp_id_folder):
-                os.makedirs(tmp_id_folder)
-            
-            # Copy the image to the temporary id folder
-            tmp_file = os.path.join(tmp_id_folder, id + '.nii')
-            shutil.copy2(path, tmp_file)
-            print(tmp_file)
+            source_img = os.path.join(out_folder, id + ".nii")
+            template_img = nib.load(rtpm_path)
 
             # Loading the nifti image to create a mask of the image
-            img = nib.load(tmp_file)
+            img = nib.load(source_img)
             img_data = img.get_fdata()
             img_affine = img.affine
             img_header = img.header
@@ -300,20 +233,11 @@ class FTPQCplots:
 
             # Save the mask as a nifti image
             mask_img = nib.Nifti1Image(mask, img_affine, img_header)
-            mask_path = os.path.join(tmp_id_folder,"mask_"+id+".nii")
+            mask_path = os.path.join(out_folder,"mask_"+id+".nii")
             nib.save(mask_img, mask_path)
-            
-            output_script_path = os.path.join(tmp_id_folder, 'mask_reslice.m')
-            
-            self.generate_mask_reslice_mtlb(mask_path, output_script_path)
-            
-            # Command to run the MATLAB script
-            command = f"matlab -nodisplay -nosplash -r \"run('{output_script_path}');exit;\""
-            
-            # Run the command
-            matprocess = subprocess.run(command, shell=True, capture_output=True, text=True)
-            print("Output:\n", matprocess.stdout)
-
+            # Reslice the mask to template
+            resliced_img = resample_to_img(mask_path, template_img, interpolation='nearest', copy_header=True, force_resample=True)
+            nib.save(resliced_img, reslice_mask_path)
         else:
             print("Resliced image already exists for ", id, ". Loading the resliced image...")
             

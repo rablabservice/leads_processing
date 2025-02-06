@@ -54,6 +54,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
 
     mri_dir = fullfile(pet_dir, 'mri');
     mri_tag = get_scan_tag(mri_dir);
+    code_dir = fileparts(fileparts(mfilename('fullpath')));
 
     % ------------------------------------------------------------------
     % If processing is already complete and overwrite is false, get
@@ -163,7 +164,6 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
         maskfs = unique(maskfs);
 
         % Get the CSV file that lists FreeSurfer ROIs to extract
-        code_dir = fileparts(fileparts(mfilename('fullpath')));
         fsroif = fullfile(code_dir, 'config', append('fsroi_list_', tracer, '.csv'));
 
         % Run the ROI extractions
@@ -211,7 +211,6 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
             % Save the QC image
             log_append(fid, '- Generating QC image');
             python = '/mnt/coredata/Projects/Resources/dscode/miniforge3/bin/python';
-            code_dir = fileparts(fileparts(mfilename('fullpath')));
             qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
             cmd = sprintf('%s %s %s', python, qc_script, pet_dir);
             system(cmd);

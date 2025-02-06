@@ -67,6 +67,7 @@ function outfiles = process_single_mri( ...
     % Format paths
     mri_dir = abspath(mri_dir);
     scan_tag = get_scan_tag(mri_dir);
+    code_dir = fileparts(fileparts(mfilename('fullpath')));
 
     % ------------------------------------------------------------------
     % If processing is already complete and overwrite is false, get
@@ -143,7 +144,6 @@ function outfiles = process_single_mri( ...
             % Save the QC image
             log_append(fid, '- Generating QC image');
             python = '/mnt/coredata/Projects/Resources/dscode/miniforge3/bin/python';
-            code_dir = fileparts(fileparts(mfilename('fullpath')));
             qc_script = fullfile(code_dir, 'qc', 'leadsqc.py');
             cmd = sprintf('%s %s %s', python, qc_script, mri_dir);
             system(cmd);

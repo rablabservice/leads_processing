@@ -76,7 +76,7 @@ function setup_leads_processing( ...
             fprintf('- %s is empty, skipping ahead\n', newdata_dir);
         else
             % Unzip newdata files
-            cmd = append(python, fullfile(code_dir, 'setup', 'unzip_files_in_dir.py'));
+            cmd = append(python, ' ', fullfile(code_dir, 'setup', 'unzip_files_in_dir.py'));
             cmd = append(cmd, ' -d ', newdata_dir);
             fprintf('- Unzipping zip files\n');
             fprintf('  (unzip_files_in_dir.py)\n');
@@ -88,7 +88,7 @@ function setup_leads_processing( ...
             convert_dicoms(newdata_dir);
 
             % Move scans from newdata to raw
-            cmd = append(python, fullfile(code_dir, 'setup', 'move_newdata_to_raw.py'));
+            cmd = append(python, ' ', fullfile(code_dir, 'setup', 'move_newdata_to_raw.py'));
             cmd = append(cmd, ' --newdata ', newdata_dir);
             cmd = append(cmd, ' --raw ', raw_dir);
             if overwrite_raw
@@ -109,7 +109,7 @@ function setup_leads_processing( ...
 
     % Save CSVs files of MRI and PET scans in the raw directory, and
     % indicate which scans are scheduled for processing
-    cmd = append(python, fullfile(code_dir, 'setup', 'select_scans_to_process.py'));
+    cmd = append(python, ' ', fullfile(code_dir, 'setup', 'select_scans_to_process.py'));
     cmd = append(cmd, ' -p ', proj_dir);
     if schedule_all_mris
         cmd = append(cmd, ' -a');
@@ -132,7 +132,7 @@ function setup_leads_processing( ...
     % to be processed, link each PET scan to its closest MRI, and copy
     % PET niftis from their raw to processed directories
     if setup_processed && ~dry_run
-        cmd = append(python, fullfile(code_dir, 'setup', 'make_processed_scan_dirs.py'));
+        cmd = append(python, ' ', fullfile(code_dir, 'setup', 'make_processed_scan_dirs.py'));
         cmd = append(cmd, ' --scans_to_process_dir ', scans_to_process_dir);
         if overwrite_processed
             cmd = append(cmd, ' -o');

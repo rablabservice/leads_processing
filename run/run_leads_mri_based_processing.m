@@ -79,7 +79,7 @@ pet_dirs = {};
 
 % Get path to the Python interpreter and Python scripts that this
 % program can call
-python = '/mnt/coredata/Projects/Resources/dscode/bin/python';
+python = '/mnt/coredata/Projects/Resources/dscode/miniforge3/bin/python';
 qc_evals_script = fullfile(code_dir, 'qc', 'qc_evals.py');
 quarterly_report_script = fullfile(code_dir, 'quarterly_reports', 'create_quarterly_report_files.py');
 roi_extraction_script = fullfile(code_dir, 'extractions', 'create_extraction_files.py');
@@ -192,7 +192,7 @@ switch action
                 if ~isfolder(response)
                     fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
                 else
-                    mri_dirs = [mri_dirs, response]
+                    mri_dirs = [mri_dirs, response];
                 end
 
                 while 1

@@ -5,12 +5,13 @@ $ leadsqc.py /home/mac/pmaiti/Desktop/leads_qc/mimic_processed_daniel/LDS1770688
 """
 import os
 import sys
-import shutil
 import argparse
-import subprocess
+import warnings
+import glob
 
 import nibabel as nib
 from nibabel.orientations import io_orientation
+from nilearn.image import resample_to_img
 
 # Importing the necessary classes from the rablabqc package
 rablab_pkg_path = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +23,8 @@ from ftp_slices import FTPQCplots
 from fdg_slices import FDGQCplots
 from slice_selector import SliceSelector
 
+warnings.filterwarnings("ignore", category=RuntimeWarning, 
+                        message="NaNs or infinite values are present in the data passed to resample")
 
 def build_parser():
     p = argparse.ArgumentParser(
@@ -35,49 +38,8 @@ def build_parser():
     )
     return p
 
-
-# Functions to Load Images
 rtpm_path = os.path.join(
-    rablab_pkg_path, "reslice", "rT1.nii"
-)  # Resliced T1 file to 1mm isotropic resolution
-reslice_matlab_script = os.path.join(rablab_pkg_path, "reslice", "reslice.m")
-
-mask_reslice_matlab_script = os.path.join(rablab_pkg_path, "reslice", "mask_reslice.m")
-
-tmp_folder = os.path.join('/mnt/tmp-scratch/')
-
-
-def generate_matlab_script(path, output_script_path):
-    """
-    This function generates a MATLAB script to reslice the image.
-    """
-
-    with open(reslice_matlab_script, "r") as template_file:
-        script_content = template_file.read()
-
-    script_content = script_content.replace("<RTPM_PATH>", rtpm_path)
-    script_content = script_content.replace("<DATA_PATH>", path)
-
-    with open(output_script_path, "w") as script_file:
-        script_file.write(script_content)
-
-
-def generate_mask_reslice_mtlb(path, output_script_path):
-    """
-    This function generates a MATLAB script to reslice the mask image.
-    """
-
-    # with open('/home/mac/pmaiti/Desktop/leads_qc/reslice_test/mask_reslice.m', 'r') as template_file:
-    with open(mask_reslice_matlab_script, "r") as template_file:
-        script_content = template_file.read()
-
-    # Replace placeholders with actual paths
-    script_content = script_content.replace("<RTPM_PATH>", rtpm_path)
-    script_content = script_content.replace("<DATA_PATH>", path)
-
-    # Write the modified script to the output path
-    with open(output_script_path, "w") as script_file:
-        script_file.write(script_content)
+    rablab_pkg_path, "reslice", "rT1.nii")  # Resliced T1 file to 1mm isotropic resolution
 
 
 def load_nii_resliced(path, orientation="LAS", mask=False):
@@ -86,39 +48,19 @@ def load_nii_resliced(path, orientation="LAS", mask=False):
     """
 
     id = path.split("/")[-1].split(".")[0]
-
-    tmp_folder = os.path.join('/mnt/tmp-scratch/')
-
-    resliced_image_path = os.path.join(tmp_folder, id, "qc" + id + ".nii")
+    out_folder = os.path.dirname(path)
+    resliced_image_path = os.path.join(out_folder, "qc" + id + ".nii")
 
     if not os.path.exists(resliced_image_path):
 
-        # Check if the temporary folder with the id exists
-        tmp_id_folder = os.path.join(tmp_folder, id)
-        if not os.path.exists(tmp_id_folder):
-            os.makedirs(tmp_id_folder)
-
-        # Copy the image to the temporary id folder
-        tmp_file = os.path.join(tmp_id_folder, id + ".nii")
-        shutil.copy2(path, tmp_file)
-        print(tmp_file)
+        template_img = nib.load(rtpm_path)
+        source_img = nib.load(os.path.join(out_folder, id + ".nii"))
 
         if mask:
-            output_script_path = os.path.join(tmp_id_folder, "mask_reslice.m")
-            generate_mask_reslice_mtlb(tmp_file, output_script_path)
+            resliced_img = resample_to_img(source_img, template_img, interpolation='nearest', copy_header=True, force_resample=True)
         else:
-            output_script_path = os.path.join(tmp_id_folder, "reslice.m")
-            generate_matlab_script(tmp_file, output_script_path)
-
-        # Command to run the MATLAB script
-        command = (
-            f"matlab -nodisplay -nosplash -r \"run('{output_script_path}');exit;\""
-        )
-
-        # Run the command
-        matprocess = subprocess.run(command, shell=True, capture_output=True, text=True)
-        print("Output:\n", matprocess.stdout)
-
+            resliced_img = resample_to_img(source_img, template_img, interpolation='continuous', copy_header=True, force_resample=True)
+        nib.save(resliced_img, resliced_image_path)
     else:
         print(
             "Resliced image already exists for ", id, ". Loading the resliced image..."
@@ -183,6 +125,12 @@ def process_qc_images(results, modality):
             ).plot_slices(results.path)
 
             print(" -- MRI QC Image Generated -- ")
+
+            # Delete qc temp files
+            files_to_delete = glob.glob(os.path.join(folder_path, "qc*.nii"))
+            for file in files_to_delete:
+                os.remove(file)
+                print(f"Deleted: {file}")
         else:
             print("Some files are missing")
             return
@@ -202,7 +150,7 @@ def process_qc_images(results, modality):
 
         print("Gathering the relevant MRI files")
         fbb_related_mri = os.readlink(os.path.join(folder_path, "mri"))
-        fbb_related_mri_date = fbb_related_mri.split("_")[-1]
+        fbb_related_mri_date = fbb_related_mri.rstrip("/").split("_")[-1]
 
         fbb_nu_img = os.path.join(
             fbb_related_mri, f"{id}_MRI-T1_{fbb_related_mri_date}_nu.nii"
@@ -275,6 +223,14 @@ def process_qc_images(results, modality):
             ).plot_slices(results.path)
 
             print(" -- FBB QC Image Generated -- ")
+
+            # Delete temp qc files
+            folders = [folder_path, fbb_related_mri]
+            for folder in folders:
+                for file in glob.glob(os.path.join(folder, "qc*.nii")):
+                    os.remove(file)
+                    print(f"Deleted: {file}")
+                
         else:
             print("Some files are missing")
             return
@@ -296,7 +252,7 @@ def process_qc_images(results, modality):
 
         print("Gathering the relevant MRI files")
         ftp_related_mri = os.readlink(os.path.join(folder_path, "mri"))
-        ftp_related_mri_date = ftp_related_mri.split("_")[-1]
+        ftp_related_mri_date = ftp_related_mri.rstrip("/").split("_")[-1]
 
         ftp_nu_img = os.path.join(
             ftp_related_mri, f"{id}_MRI-T1_{ftp_related_mri_date}_nu.nii"
@@ -363,7 +319,13 @@ def process_qc_images(results, modality):
             ).plot_slices(results.path)
 
             print(" -- FTP QC Image Generated -- ")
-
+            
+            # Delete temp qc files
+            folders = [folder_path, ftp_related_mri]
+            for folder in folders:
+                for file in glob.glob(os.path.join(folder, "qc*.nii")):
+                    os.remove(file)
+                    print(f"Deleted: {file}")
         else:
             print("Some files are missing")
             return
@@ -383,7 +345,7 @@ def process_qc_images(results, modality):
 
         print("Gathering the relevant MRI files")
         fdg_related_mri = os.readlink(os.path.join(folder_path, "mri"))
-        fdg_related_mri_date = fdg_related_mri.split("_")[-1]
+        fdg_related_mri_date = fdg_related_mri.rstrip("/").split("_")[-1]
 
         fdg_nu_img = os.path.join(
             fdg_related_mri, f"{id}_MRI-T1_{fdg_related_mri_date}_nu.nii"
@@ -446,6 +408,12 @@ def process_qc_images(results, modality):
 
             print(" -- FDG QC Image Generated -- ")
 
+            # Delete temp qc files
+            folders = [folder_path, fdg_related_mri]
+            for folder in folders:
+                for file in glob.glob(os.path.join(folder, "qc*.nii")):
+                    os.remove(file)
+                    print(f"Deleted: {file}")
         else:
             print("Some files are missing")
             return
@@ -464,8 +432,7 @@ def main():
     print("Processing ID : ", id)
     print("-----------")
 
-    # Extarcitng the modality from the path name
-    # modality = os.path.basename(results.path).split('/')[-1].split('_')[0]
+    # Extracting the modality from the path name
     modality = os.path.basename(results.path.rstrip("/")).split("_")[0]
 
     print("Modality : ", modality)
