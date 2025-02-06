@@ -2,6 +2,9 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     % Segment nu.nii and save forward and inverse deformations to MNI space
     %
     % Also saves the mwc1 image for use in Dartel template creation
+    % and seg8.mat file for TIV calculation
+    %
+    % TIV volume is calculated as the sum of the GM, WM, and CSF volumes
     %
     % Parameters
     % ----------
@@ -27,6 +30,7 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     % iy_<scan_tag>_nu.nii
     % mwc1<scan_tag>_nu.nii
     % y_<scan_tag>_nu.nii
+    % <scan_tag>_nu_seg8.mat
     % ------------------------------------------------------------------
     arguments
         nuf {mustBeFile}
@@ -49,6 +53,7 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     outfiles.mwc1 = fullfile(mri_dir, append('mwc1', scan_tag, '_nu.nii'));
     outfiles.wnu = fullfile(mri_dir, append('w', scan_tag, '_nu.nii'));
     outfiles.y = fullfile(mri_dir, append('y_', scan_tag, '_nu.nii'));
+    outfiles.seg_matf = fullfile(mri_dir, append(scan_tag, '_nu_seg8.mat'));
 
     % Check if output files already exist
     if all(structfun(@(x) exist(x, 'file'), outfiles)) && ~overwrite
@@ -99,9 +104,17 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];  % save inverse and forward deformation fields
     spm_jobman('run',matlabbatch);
 
-    % Delete the intermediary files
-    seg_matf = fullfile(mri_dir, append(scan_tag, '_nu_seg8.mat'));
-    if isfile(seg_matf)
-        delete(seg_matf);
-    end
+    % Extract volumes for c1, c2, c3; see PMID: 25255942 for more info on methods
+    clear matlabbatch;
+    matlabbatch{1}.spm.util.tvol.matfiles = cellstr(fullfile(mri_dir, append(scan_tag, '_nu_seg8.mat')));
+    matlabbatch{1}.spm.util.tvol.tmax = 3;
+    matlabbatch{1}.spm.util.tvol.mask = cellstr(fullfile(fileparts(which('spm')), 'tpm/mask_ICV.nii,1'));
+    matlabbatch{1}.spm.util.tvol.outf = fullfile(mri_dir, append(scan_tag, '_seg8_TIV.csv'));
+    spm_jobman('run',matlabbatch);
+
+    % Add total volume to spreadsheet
+    T = readtable(fullfile(mri_dir, append(scan_tag, '_seg8_TIV.csv')));
+    T.TIV_in_mL = zeros(height(T), 1);
+    T.TIV_in_mL = sum(T{1, 2:4})*1000; %convert volume in litres to mL
+    writetable(T, fullfile(mri_dir, append(scan_tag, '_seg8_TIV.csv')));
 end
