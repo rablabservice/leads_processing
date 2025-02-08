@@ -12,7 +12,7 @@ import os.path as op
 import sys
 import time
 import warnings
-
+import re
 import pandas as pd
 
 utils_dir = op.join(op.dirname(__file__), "..", "utils")
@@ -128,8 +128,6 @@ class XReport:
         self.load_roi_dat()
         print("  * Getting Centiloid scores")
         self.load_centiloid_dat()
-        print("  * Getting U. of Michigan PET QC evaluations")
-        self.load_umich_qc()
         print("  * Getting UCSF PET and MRI QC evaluations")
         self.load_ucsf_qc()
 
@@ -311,7 +309,7 @@ class XReport:
 
         # Map race values
         self.subj_demo.loc[
-            self.subj_demo["race"].astype(str).str.contains("\|"), "race"
+            self.subj_demo["race"].astype(str).str.contains(r"\|"), "race"
         ] = 6
         self.subj_demo["race"] = self.subj_demo["race"].map(
             {
@@ -354,10 +352,21 @@ class XReport:
         self.apoe_geno = self.apoe_geno.rename(
             columns={"SUBJECT_CODE": "subject_id", "TESTVALUE": "apoe_genotype"}
         )
+        
+        # Replace non-matching entries with NA
+        pattern = re.compile(r"^E\d/E\d$")  
+        self.apoe_geno = self.apoe_geno[self.apoe_geno["apoe_genotype"].astype(str).str.match(pattern)]
+
+        # Sort by timestamp to keep the newest entry
+        if "RUNDATE" in self.apoe_geno.columns:
+            self.apoe_geno = self.apoe_geno.sort_values(by="RUNDATE", ascending=True)
+
+        # Drop duplicates, keeping the last (most recent) entry per subject
+        self.apoe_geno = self.apoe_geno.drop_duplicates(subset="subject_id", keep="last")
 
         # Add column counting number of APOE4 alleles
         self.apoe_geno["apoe4_alleles"] = self.apoe_geno["apoe_genotype"].apply(
-            lambda x: str(x).count("4")
+            lambda x: str(x).count("4") if pd.notna(x) else pd.NA
         )
 
         # Select only needed columns
@@ -495,6 +504,12 @@ class XReport:
                 "day": self.cdr_baseline["C2VISITDAY"],
             }
         ).dt.strftime("%Y-%m-%d")
+
+        # Sort by date
+        self.cdr_baseline = self.cdr_baseline.sort_values(by="cdr_date_baseline", ascending=True)
+
+        # Drop duplicates, keeping the last (latest) entry per subject
+        self.cdr_baseline = self.cdr_baseline.drop_duplicates(subset="LEADS_ID", keep="last")
 
         # Rename columns
         self.cdr_baseline = self.cdr_baseline.rename(
@@ -875,66 +890,6 @@ class XReport:
                 ignore_index=True,
             )
 
-    def load_umich_qc(self):
-        """Filter PET scans and retain rows from scans that passed UMich QC.
-
-        Creates
-        -------
-        self.qc_mich : dict
-            Dictionary of dataframes, one per tracer
-        """
-
-        # Load the UMich QC spreadsheets
-        self.qc_mich = {
-            "fbb": pd.read_csv(
-                op.join(self.paths["atri"], "leads_codebook_study_data_amyqc.csv")
-            ),
-            "ftp": pd.read_csv(
-                op.join(self.paths["atri"], "leads_codebook_study_data_tauqc.csv")
-            ),
-            "fdg": pd.read_csv(
-                op.join(self.paths["atri"], "leads_codebook_study_data_fdgqc.csv")
-            ),
-        }
-
-        # Rename columns
-        for tracer in self.tracers:
-            if tracer == "ftp":
-                self.qc_mich[tracer] = self.qc_mich[tracer].rename(
-                    columns={"scanqlty": "scanqltya"}
-                )
-            self.qc_mich[tracer] = self.qc_mich[tracer].rename(
-                columns={
-                    "subject_label": "subject_id",
-                    "scandate": "pet_date",
-                    "scanqltya": "qc_umich_passed",
-                }
-            )
-
-        # Retain only the columns we need
-        keep_cols = ["subject_id", "pet_date", "qc_umich_passed"]
-        for tracer in self.tracers:
-            self.qc_mich[tracer] = self.qc_mich[tracer][keep_cols]
-
-        # Fix scan date mismatches between our processing and UMich CSVs
-        idx = (
-            self.qc_mich["ftp"]
-            .query("(subject_id=='LDS0360283') & (pet_date=='2020-11-11')")
-            .index
-        )
-        self.qc_mich["ftp"].loc[idx, "pet_date"] = "2020-11-12"
-        idx = (
-            self.qc_mich["ftp"]
-            .query("(subject_id=='LDS0370672') & (pet_date=='2023-09-13')")
-            .index
-        )
-        self.qc_mich["ftp"].loc[idx, "pet_date"] = "2023-09-14"
-        idx = (
-            self.qc_mich["fdg"]
-            .query("(subject_id=='LDS0370012') & (pet_date=='2020-12-17')")
-            .index
-        )
-        self.qc_mich["fdg"].loc[idx, "pet_date"] = "2020-12-15"
 
     def load_ucsf_qc(self):
         """Filter PET scans and retain rows from scans that passed UCSF QC.
@@ -1041,6 +996,18 @@ class XReport:
                 .isin(self.eligible_subjects)
                 .astype("Int64")
             )
+            # Get the eligibility list's file modification timestamp
+            eligibility_timestamp = op.getmtime(op.join(self.paths["atri"], "LEADS_Eligibility_list.csv"))
+
+            # Update eligible_subject to 'not yet available' for unique subjects with pet_date older than eligibility list
+            self.extraction[key]["eligible_subject"] = self.extraction[key].apply(
+                lambda row: "not yet available" if (
+                    self.extraction[key]["subject_id"].value_counts()[row["subject_id"]] == 1 and
+                    row["eligible_subject"] == 0 and
+                    pd.to_datetime(row["pet_date"]) > pd.to_datetime(eligibility_timestamp, unit='s')
+                ) else row["eligible_subject"],
+                axis=1
+            )
 
             # Merge subject demographic and clinical data into the main dataframe.
             merge_dfs = [
@@ -1098,13 +1065,6 @@ class XReport:
                 self.roi_dat[key], on=["subject_id", "pet_date"], how="left"
             )
 
-            # Merge UMich QC columns into the main dataframe
-            self.extraction[key] = self.extraction[key].merge(
-                self.qc_mich[tracer],
-                on=["subject_id", "pet_date"],
-                how="left",
-            )
-
             # Merge UCSF QC columns into the main dataframe
             self.extraction[key] = self.extraction[key].merge(
                 self.qc_ucsf[tracer],
@@ -1124,7 +1084,9 @@ class XReport:
                         os.rename(
                             f, op.join(self.paths["rois_archive"], op.basename(f))
                         )
-
+                # Remove duplicate rows
+                self.extraction[key] = self.extraction[key].drop_duplicates()
+                
                 # Save the output dataframe
                 output_file = op.join(
                     self.paths["rois"],
