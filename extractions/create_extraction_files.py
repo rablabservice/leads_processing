@@ -1019,9 +1019,8 @@ class XReport:
             if scan_type == "mri":
                 drop_cols = [
                     "qc_ucsf_rater",
-                    "qc_ucsf_spm_seg_ok",
                     "qc_ucsf_affine_nu_ok",
-                    "qc_ucsf_warped_nu_ok",
+                    "qc_ucsf_spm_seg_ok",
                     "qc_ucsf_notes",
                 ]
                 self.qc_ucsf[scan_type] = self.qc_ucsf[scan_type].drop(
@@ -1031,7 +1030,6 @@ class XReport:
                 drop_cols = [
                     "qc_ucsf_rater",
                     "qc_ucsf_affine_pet_ok",
-                    "qc_ucsf_warped_pet_ok",
                     "qc_ucsf_notes",
                 ]
                 self.qc_ucsf[scan_type] = self.qc_ucsf[scan_type].drop(
