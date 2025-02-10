@@ -98,3 +98,13 @@ def print_list(lst, max_line=115, sep="  "):
     if len(current_line) > 0:
         print(current_line)
     print()
+
+def get_mri_proc_dir(pet_proc_dir):
+    """
+    Resolve the real path of the 'mri' symlink in the given PET processing directory."""
+    mri_symlink = op.join(pet_proc_dir, "mri")
+
+    if op.islink(mri_symlink):  # Check if 'mri' is a symlink
+        return op.realpath(mri_symlink)  # Resolve to the actual path
+    else:
+        return None  # Return None if 'mri' is not a symlink

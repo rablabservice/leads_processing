@@ -128,6 +128,8 @@ class XReport:
         self.load_roi_dat()
         print("  * Getting Centiloid scores")
         self.load_centiloid_dat()
+        print("  * Getting TIV values")
+        self.load_tiv_dat()
         print("  * Getting UCSF PET and MRI QC evaluations")
         self.load_ucsf_qc()
 
@@ -889,6 +891,78 @@ class XReport:
                 ),
                 ignore_index=True,
             )
+    
+    def load_tiv_dat(self):
+        """Load total intracranial volume measures.
+
+        Creates
+        -------
+        self.ctiv_dat : dict
+            Dictionary with one dataframe of TIV values per MRI scan
+        """
+
+        def get_tiv(pet_proc_dir):
+            def find_tiv_file(pet_proc_dir):
+                """Return the filepath to the TIV CSV file."""
+                mri_proc_dir = uts.get_mri_proc_dir(pet_proc_dir)
+                subj, tracer, mri_date = uts.parse_scan_tag(
+                    uts.get_scan_tag(mri_proc_dir)
+                )
+
+                filepath = op.join(
+                    mri_proc_dir,
+                    f"{subj}_{tracer}_{mri_date}_nu_seg8_TIV.csv",
+                )
+                if op.isfile(filepath):
+                    return filepath
+                else:
+                    warnings.warn(f"File not found: {filepath}")
+
+            def load_tiv_file(filepath):
+                """Load and format the TIV CSV file."""
+                if filepath is None:
+                    return pd.DataFrame()  # Return empty DataFrame if file not found
+                
+                # Load the CSV file
+                df = pd.read_csv(filepath)
+
+                subj, _, pet_date = uts.parse_scan_tag(
+                    uts.get_scan_tag(pet_proc_dir)
+                )
+
+                # Add subject_id and pet_date columns
+                df.insert(0, "subject_id", subj)
+                df.insert(1, "pet_date", pet_date)
+                return df
+
+            def format_tiv_dat(df):
+                """Format TIV dataframe for LEADS ROI extractions."""
+                if df.empty:
+                    return df  # Return empty DataFrame as-is
+                
+                # Remove unnecessary columns
+                return df.drop(columns=["File", "Volume1", "Volume2", "Volume3"], errors="ignore")
+
+            try:
+                rr_dat = format_tiv_dat(
+                    load_tiv_file(find_tiv_file(pet_proc_dir))
+                )
+                return rr_dat
+            except Exception as e:
+                warnings.warn(f"Error processing {pet_proc_dir}: {e}")
+                return pd.DataFrame()
+
+        # Load TIV values
+        self.tiv_dat = {}
+        for tracer in self.tracers:
+            self.tiv_dat[tracer] = pd.concat(
+                list(
+                    self.pet_idx[tracer].apply(
+                        lambda x: get_tiv(x["pet_proc_dir"]), axis=1
+                    )
+                ),
+                ignore_index=True,
+            )
 
 
     def load_ucsf_qc(self):
@@ -1059,6 +1133,12 @@ class XReport:
                     on=["subject_id", "pet_date"],
                     how="left",
                 )
+            
+            # Merge TIV data into the main dataframe
+            self.extraction[key] = self.extraction[key].merge(
+                self.tiv_dat[tracer], on=["subject_id", "pet_date"], 
+                how="left"
+            )
 
             # Merge ROI mean SUVR and volume data into the main dataframe
             self.extraction[key] = self.extraction[key].merge(
