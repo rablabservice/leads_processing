@@ -61,6 +61,7 @@ addpath(genpath(fileparts(fileparts(mfilename('fullpath')))));
 proj_dir = "/mnt/coredata/processing/leads";
 code_dir = fileparts(fileparts(mfilename('fullpath')));
 scans_to_process_dir = fullfile(proj_dir, 'metadata', 'scans_to_process');
+scans_to_edit_dir = fullfile(proj_dir, 'data', 'freesurfer_edits');
 skip_newdata = false;
 wipe_newdata = true;
 setup_processed = true;
@@ -74,6 +75,7 @@ mri_dirs = {};
 segment_brainstem = true;
 process_freesurfer = true;
 process_post_freesurfer = true;
+run_pet_post_fs_edits = true;
 run_qc = true;
 pet_dirs = {};
 
@@ -96,7 +98,8 @@ prompt_user = sprintf([
     '  [6] View list of processed scans to QC\n', ...
     '  [7] Prepare internal ROI extraction files\n', ...
     '  [8] Prepare quarterly report files\n', ...
-    '  [9] Exit\n\n'
+    '  [9] Integrate FreeSurfer edits and re-process MRI\n', ...
+    '  [10] Exit\n\n'
 ]);
 action = input(prompt_user);
 
@@ -363,6 +366,76 @@ switch action
         fprintf('$ %s\n', cmd);
         system(cmd);
     case 9
+        % Integrate FreeSurfer edits and re-process MRI
+        fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('MRIs to process                                   = By default, this program will attempt to process all    \n');
+        fprintf('                                                    MRIs for which edited FS files exist in freesurfer_edits\n');
+        fprintf('                                                    folder. Note that existed MRI and PET processed files   \n');
+        fprintf('                                                    will be overwritten. You can change defaults to process \n');
+        fprintf('                                                    any specific edited MRI scan.                           \n');
+        fprintf('Segment brainstem                                 = %d\n', segment_brainstem);
+        fprintf('Run post-FreeSurfer, SPM-based processing         = %d\n', process_post_freesurfer);
+        fprintf('Create QC image and add new QC eval file          = %d\n', run_qc);
+        proj_dir = abspath(proj_dir);
+        mustBeFolder(proj_dir);
+        
+        change_defaults = prompt_bool(change_defaults_msg, false);
+        if change_defaults
+            set_mri_dirs = prompt_bool('Specify a list of MRIs to process?', false);
+            if set_mri_dirs
+                response = prompt_text( ...
+                    'Enter path to the first FreeSurfer edited scan you want to process', ...
+                    '', ...
+                    false ...
+                );
+                if ~isfolder(response)
+                    fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                else
+                    mri_dirs = [mri_dirs, response];
+                end
+
+                while 1
+                    msg = sprintf('Enter path to the next FreeSurfer edited scan you want to process, or type ''q'' to move on\n');
+                    response = prompt_text(msg, '', false);
+                    if strcmp(lower(response(1)), 'q')
+                        break;
+                    elseif ~isfolder(response)
+                        fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                    else
+                        mri_dirs = [mri_dirs, response];
+                    end
+                end
+                mri_dirs = unique(abspath(cellvec(mri_dirs)));
+
+                % Confirm the submitted directories
+                n_scans = length(mri_dirs);
+                fprintf('\nYou have submitted the following %d MRI scan directories to process:\n', n_scans);
+                for i = 1:n_scans
+                    fprintf('  %s\n', mri_dirs{i});
+                end
+                confirm_response = prompt_bool('Is this correct?', false, true);
+                if ~confirm_response
+                    fprintf('OK--let''s exit the program and try again...\n');
+                    return;
+                end
+            end
+            if isempty(mri_dirs)
+                scans_to_process_dir = prompt_text('Enter path to ''freedurfer_edits'' directory', scans_to_edit_dir, false);
+            end
+            segment_brainstem = prompt_bool('Segment brainstem?', true);
+            process_post_freesurfer = prompt_bool('Run post-FreeSurfer MRI processing?', true);
+            run_qc = prompt_bool('Create QC image and add new QC eval file?', true);
+        end
+        fprintf('\nCalling process_fs_edits.m...\n');
+        fprintf('\nNOTE: MRI files will be overwritten and PET processing needs to be re-run!\n');
+        process_fs_edits( ...
+            mri_dirs, ...
+            scans_to_edit_dir, ...
+            segment_brainstem, ...
+            process_post_freesurfer, ...
+            run_qc ...
+        );
+    case 10
         fprintf('Bye for now\n');
     otherwise
         fprintf('Input is invalid. Exiting program.\n');

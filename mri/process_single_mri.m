@@ -5,7 +5,8 @@ function outfiles = process_single_mri( ...
     segment_brainstem, ...
     process_freesurfer, ...
     process_post_freesurfer, ...
-    run_qc ...
+    run_qc, ...
+    fs_edited ...
 )
     % Run a single MRI scan through all the processing steps.
     %
@@ -52,6 +53,8 @@ function outfiles = process_single_mri( ...
     % run_qc : logical, optional
     %     If true, create QC image and add new QC eval file. Default is
     %     true
+    % fs_edited : logical
+    %     If true, process the edited FreeSurfer files. Default is false
     % ------------------------------------------------------------------
     arguments
         mri_dir {mustBeFolder}
@@ -61,6 +64,7 @@ function outfiles = process_single_mri( ...
         process_freesurfer logical = true
         process_post_freesurfer logical = true
         run_qc logical = true
+        fs_edited logical = false
     end
 
     % ------------------------------------------------------------------
@@ -116,6 +120,9 @@ function outfiles = process_single_mri( ...
         else
             log_append(fid, sprintf('raw_mrif = %s', raw_mrif), 0, 0);
         end
+        if fs_edited
+            log_append(fid, 'fs_edited = true', 0, 0);
+        end
         log_append(fid, sprintf('segment_brainstem = %d', segment_brainstem), 0, 0);
         log_append(fid, sprintf('process_freesurfer = %d', process_freesurfer), 0, 0);
         log_append(fid, sprintf('process_post_freesurfer = %d', process_post_freesurfer), 0, 0);
@@ -125,7 +132,7 @@ function outfiles = process_single_mri( ...
         % --------------------------------------------------------------
         % Run FreeSurfer
         if process_freesurfer
-            process_mri_freesurfer(raw_mrif, mri_dir, fid, overwrite, segment_brainstem);
+            process_mri_freesurfer(raw_mrif, mri_dir, fid, overwrite, segment_brainstem, fs_edited);
         end
 
         % --------------------------------------------------------------

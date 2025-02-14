@@ -1020,7 +1020,6 @@ class XReport:
                 drop_cols = [
                     "qc_ucsf_rater",
                     "qc_ucsf_affine_nu_ok",
-                    "qc_ucsf_spm_seg_ok",
                     "qc_ucsf_notes",
                 ]
                 self.qc_ucsf[scan_type] = self.qc_ucsf[scan_type].drop(
@@ -1147,6 +1146,13 @@ class XReport:
             self.extraction[key] = self.extraction[key].merge(
                 self.qc_ucsf[tracer],
                 on=["subject_id", "pet_date"],
+                how="left",
+            )
+
+            # Merge UCS MRI QC columns into the main dataframe
+            self.extraction[key] = self.extraction[key].merge(
+                self.qc_ucsf["mri"],
+                on=["subject_id", "mri_date"],
                 how="left",
             )
 

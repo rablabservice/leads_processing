@@ -3,7 +3,8 @@ function outfiles = process_mri_freesurfer( ...
     mri_dir, ...
     fid, ...
     overwrite, ...
-    segment_brainstem ...
+    segment_brainstem, ...
+    fs_edited ...
 )
     % Process raw MRIs using FreeSurfer recon-all and segmentBS.sh
     %
@@ -24,6 +25,8 @@ function outfiles = process_mri_freesurfer( ...
     %     If true, overwrite the FreeSurfer directory if it already exists
     % segment_brainstem : logical
     %     If true, segment the brainstem using segmentBS.sh
+    % fs_edited : logical
+    %     If true, use the edited FreeSurfer directory
     % ------------------------------------------------------------------
     arguments
         raw_mrif {mustBeFile}
@@ -31,10 +34,15 @@ function outfiles = process_mri_freesurfer( ...
         fid {mustBeNumeric} = 1
         overwrite logical = false
         segment_brainstem logical = true
+        fs_edited logical = false
     end
 
     % Format paths
-    fs_version = 'freesurfer_7p1';
+    if fs_edited
+        fs_version = 'freesurfer_7p1_edited';
+    else
+        fs_version = 'freesurfer_7p1';
+    end
     raw_mrif = abspath(raw_mrif);
     mri_dir = abspath(mri_dir);
     fs_dir = fullfile(mri_dir, fs_version);
@@ -42,7 +50,7 @@ function outfiles = process_mri_freesurfer( ...
 
     % If processing is already complete and overwrite is false, get
     % the struct of FreeSurfer *.mgz files that we care about and return
-    if freesurfer_files_exist(mri_dir)
+    if freesurfer_files_exist(mri_dir) && ~fs_edited
         if overwrite
             log_append(fid, sprintf('- Removing existing FreeSurfer directory: %s', fs_dir));
             rmdir(fs_dir, 's');
@@ -55,18 +63,22 @@ function outfiles = process_mri_freesurfer( ...
     % rerun recon-all with defaults (e.g. if the servers crashed midway
     % through FreeSurfer processing), delete the existing FreeSurfer
     % directory so we can start from a clean slate
+    elseif fs_edited
+        log_append(fid, sprintf('- Running brainstem only from existing FreeSurfer directory: %s', fs_dir));
     else
-        if isfolder(fs_dir)
+        if isfolder(fs_dir) && ~fs_edited
             log_append(fid, sprintf('- Removing existing FreeSurfer directory: %s', fs_dir));
             rmdir(fs_dir, 's');
         end
     end
 
     % Run recon-all
-    cmd_fs=char(append('recon-all -all -i "', raw_mrif, '" -sd ', mri_dir, ' -s ', fs_version));
-    log_append(fid, '- Processing MRI through FreeSurfer');
-    log_append(fid, sprintf('    $ %s', cmd_fs));
-    system(cmd_fs);
+    if ~fs_edited
+        cmd_fs=char(append('recon-all -all -i "', raw_mrif, '" -sd ', mri_dir, ' -s ', fs_version));
+        log_append(fid, '- Processing MRI through FreeSurfer');
+        log_append(fid, sprintf('    $ %s', cmd_fs));
+        system(cmd_fs);
+    end
 
     % Symlink to the freesurfer directory
     if isfolder(fs_dir)

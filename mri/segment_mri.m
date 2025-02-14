@@ -109,12 +109,12 @@ function outfiles = segment_mri(nuf, fid, overwrite)
     matlabbatch{1}.spm.util.tvol.matfiles = cellstr(fullfile(mri_dir, append(scan_tag, '_nu_seg8.mat')));
     matlabbatch{1}.spm.util.tvol.tmax = 3;
     matlabbatch{1}.spm.util.tvol.mask = cellstr(fullfile(fileparts(which('spm')), 'tpm/mask_ICV.nii,1'));
-    matlabbatch{1}.spm.util.tvol.outf = fullfile(mri_dir, append(scan_tag, '_seg8_TIV.csv'));
+    matlabbatch{1}.spm.util.tvol.outf = fullfile(mri_dir, append(scan_tag, '_nu_seg8_TIV.csv'));
     spm_jobman('run',matlabbatch);
 
     % Add total volume to spreadsheet
-    T = readtable(fullfile(mri_dir, append(scan_tag, '_seg8_TIV.csv')));
+    T = readtable(fullfile(mri_dir, append(scan_tag, '_nu_seg8_TIV.csv')));
     T.TIV_in_mL = zeros(height(T), 1);
     T.TIV_in_mL = sum(T{1, 2:4})*1000; %convert volume in litres to mL
-    writetable(T, fullfile(mri_dir, append(scan_tag, '_seg8_TIV.csv')));
+    writetable(T, fullfile(mri_dir, append(scan_tag, '_nu_seg8_TIV.csv')));
 end
