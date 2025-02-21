@@ -72,6 +72,7 @@ schedule_overwrite = false;
 overwrite_processed = false;
 overwrite = false;
 mri_dirs = {};
+run_dirs = {};
 segment_brainstem = true;
 process_freesurfer = true;
 process_post_freesurfer = true;
@@ -99,7 +100,8 @@ prompt_user = sprintf([
     '  [7] Prepare internal ROI extraction files\n', ...
     '  [8] Prepare quarterly report files\n', ...
     '  [9] Integrate FreeSurfer edits and re-process MRI\n', ...
-    '  [10] Exit\n\n'
+    '  [10] Create W-maps\n', ...
+    '  [11] Exit\n\n'
 ]);
 action = input(prompt_user);
 
@@ -436,6 +438,80 @@ switch action
             run_qc ...
         );
     case 10
+        % Create W-maps
+        ptdemog_updated = prompt_bool('Did you download the latest patient demographic spreadsheet?', false);
+        if ~ptdemog_updated
+            fprintf([
+                'Please download the latest version of demographic spreadsheet            \n',...
+                'See "LEADS-SOP_External-File-Downloads.docx" for detailed instructions.  \n', ...
+                'Bye for now...                                                           \n\n'
+            ]);
+            return;
+        end
+        
+        fprintf('\nDefaults parameters\n-------------------\n');
+        fprintf('Scans to process                                  = By default, this program will attempt to create W-maps  \n');
+        fprintf('                                                    for all available warped MRI and PET scans in the       \n');
+        fprintf('                                                    processed folder. You can change defaults to process any\n');
+        fprintf('                                                    specific MRI or PET scan.                               \n');
+        fprintf('Overwrite existing files                          = %d\n', overwrite);
+        fprintf('Directory with CSV files listing scans to process = %s\n', scans_to_process_dir);
+        
+        proj_dir = abspath(proj_dir);
+        mustBeFolder(proj_dir);
+        
+        change_defaults = prompt_bool(change_defaults_msg, false);
+        if change_defaults
+            set_run_dirs = prompt_bool('Specify a list of scans to process?', false);
+            if set_run_dirs
+                response = prompt_text( ...
+                    'Enter path to the scan you want to process W-maps for', ...
+                    '', ...
+                    false ...
+                );
+                if ~isfolder(response)
+                    fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                else
+                    run_dirs = [run_dirs, response];
+                end
+
+                while 1
+                    msg = sprintf('Enter path to the next scan you want to process, or type ''q'' to move on\n');
+                    response = prompt_text(msg, '', false);
+                    if strcmp(lower(response(1)), 'q')
+                        break;
+                    elseif ~isfolder(response)
+                        fprintf('\n!! WARNING: %s is not a folder and will not be added to the list\n\n', response);
+                    else
+                        run_dirs = [run_dirs, response];
+                    end
+                end
+                run_dirs = unique(abspath(cellvec(run_dirs)));
+
+                % Confirm the submitted directories
+                n_scans = length(run_dirs);
+                fprintf('\nYou have submitted the following %d directories to process:\n', n_scans);
+                for i = 1:n_scans
+                    fprintf('  %s\n', run_dirs{i});
+                end
+                confirm_response = prompt_bool('Is this correct?', false, true);
+                if ~confirm_response
+                    fprintf('OK--let''s exit the program and try again...\n');
+                    return;
+                end
+            end
+            if isempty(run_dirs)
+                scans_to_process_dir = prompt_text('Enter path to ''scans_to_process'' directory', scans_to_process_dir, false);
+            end
+            overwrite = prompt_bool('Overwrite existing W-maps?', true);
+        end
+        fprintf('\nCalling process_wmaps.m...\n');
+        process_wmaps( ...
+            run_dirs, ...
+            scans_to_process_dir, ...
+            overwrite ...
+        );
+    case 11
         fprintf('Bye for now\n');
     otherwise
         fprintf('Input is invalid. Exiting program.\n');
