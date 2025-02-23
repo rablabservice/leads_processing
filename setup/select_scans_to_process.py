@@ -23,6 +23,7 @@ import utilities as uts
 
 # Define globals
 AMYLOID_TRACERS = ["FBB", "FBP", "FLUTE", "NAV", "PIB"]
+TAU_TRACERS = ['FTP', 'PI2620', 'MK6240']
 
 
 def main(
@@ -1023,6 +1024,10 @@ def check_if_pet_processed(pet_proc_dir):
     if tracer in AMYLOID_TRACERS:
         proc_files["cortical_summary_values"] = op.join(
             pet_proc_dir, f"r{pet_tag}_amyloid-cortical-summary.csv"
+        )
+    if tracer in TAU_TRACERS:
+        proc_files["cortical_summary_values"] = op.join(
+            pet_proc_dir, f"wr{pet_tag}_tau-centaur.csv"
         )
     for rr in ref_regions_by_tracer[tracer]:
         proc_files[f"native_mri_suvr_{rr}"] = op.join(

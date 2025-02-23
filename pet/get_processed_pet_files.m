@@ -18,12 +18,14 @@ function pet_files = get_processed_pet_files(pet_dir)
 
     % Hard-code a list amyloid PET tracers
     amyloid_tracers = {'FBB', 'FBP', 'FLUTE', 'NAV', 'PIB'};
+    tau_tracers = {'FTP', 'PI2620', 'MK6240'};
 
     % Get scan info
     pet_dir = abspath(pet_dir);
     pet_tag = get_scan_tag(pet_dir);
     [~, tracer] = parse_scan_tag(pet_tag);
     tracer_is_amyloid = ismember(tracer, amyloid_tracers);
+    tracer_is_tau = ismember(tracer, tau_tracers);
 
     % Get names of all the processed PET files
     pet_files = struct( ...
@@ -59,7 +61,10 @@ function pet_files = get_processed_pet_files(pet_dir)
 
     if tracer_is_amyloid
         pet_files.cortical_summary = fullfile(pet_dir, append('r', pet_tag, '_amyloid-cortical-summary.csv'));
+    elseif tracer_is_tau
+        pet_files.centaur = fullfile(pet_dir, append('wr', pet_tag, '_tau-centaur.csv'));
     end
+
     pet_files = catstruct(pet_files, format_outfiles(suvr_files, 'w'));
     pet_files = catstruct(pet_files, format_outfiles(suvr_files, 'a'));
 end

@@ -44,6 +44,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
     % ------------------------------------------------------------------
     % Hard-code a list amyloid PET tracers
     amyloid_tracers = {'FBB', 'FBP', 'FLUTE', 'NAV', 'PIB'};
+    tau_tracers = {'FTP', 'PI2620', 'MK6240'};
 
     % ------------------------------------------------------------------
     % Get scan info
@@ -51,6 +52,7 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
     pet_tag = get_scan_tag(pet_dir);
     [~, tracer] = parse_scan_tag(pet_tag);
     tracer_is_amyloid = ismember(tracer, amyloid_tracers);
+    tracer_is_tau = ismember(tracer, tau_tracers);
 
     mri_dir = fullfile(pet_dir, 'mri');
     mri_tag = get_scan_tag(mri_dir);
@@ -197,6 +199,20 @@ function outfiles = process_single_pet(pet_dir, overwrite, run_qc, raw_petf)
         outfiles = catstruct( ...
             outfiles, apply_warp_to_mni(suvr_files, mri_files.y, fid, overwrite) ...
         );
+
+        % --------------------------------------------------------------
+        % For tau PET, calculate the CenTauR z-score values
+        if tracer_is_tau
+            outfiles.centaur = fullfile( ...
+                pet_dir, append('wr', pet_tag, '_tau-centaur.csv') ...
+            );
+            calculate_centaur( ...
+                outfiles.wsuvr_infcblgm, ...
+                outfiles.centaur, ...
+                fid, ...
+                overwrite ...
+            );
+        end
 
         % --------------------------------------------------------------
         % Affine transform the nu.nii to MNI space
