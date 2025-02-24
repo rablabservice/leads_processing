@@ -51,6 +51,7 @@ class XReport:
 
         # Define amyloid tracers
         self.amyloid_tracers = ["fbb"]
+        self.tau_tracers = ["ftp"]
 
         # Get a timestamp that we'll use to save unique output filenames
         self.timestamp = uts.now()
@@ -128,6 +129,8 @@ class XReport:
         self.load_roi_dat()
         print("  * Getting Centiloid scores")
         self.load_centiloid_dat()
+        print("  * Getting Centaur Z values")
+        self.load_centaur_dat()
         print("  * Getting TIV values")
         self.load_tiv_dat()
         print("  * Getting UCSF PET and MRI QC evaluations")
@@ -419,8 +422,6 @@ class XReport:
         self.load_preliminary_dx()
         self.load_mmse_baseline()
         self.load_cdr_baseline()
-        self.load_dx_pca()
-        self.load_dx_lvppa()
 
     def load_preliminary_dx(self):
         """Load LEADS preliminary diagnosis data.
@@ -533,52 +534,6 @@ class XReport:
             "cdr_sb_baseline",
         ]
         self.cdr_baseline = self.cdr_baseline[keep_cols]
-
-    def load_dx_pca(self):
-        """Load LEADS PCA diagnosis data.
-
-        Creates
-        -------
-        self.dx_pca : DataFrame
-        """
-        self.dx_pca = pd.read_csv(
-            op.join(self.paths["atri"], "leads_codebook_study_data_pcadx.csv")
-        )
-
-        # Filter to only include screening visits
-        self.dx_pca = self.dx_pca.query("event_code == 'sc'")
-
-        # Rename columns
-        self.dx_pca = self.dx_pca.rename(
-            columns={"subject_label": "subject_id", "pcaformal": "pca_formal"}
-        )
-
-        # Select only needed columns
-        keep_cols = ["subject_id", "pca_formal"]
-        self.dx_pca = self.dx_pca[keep_cols]
-
-    def load_dx_lvppa(self):
-        """Load LEADS lvPPA diagnosis data.
-
-        Creates
-        -------
-        self.dx_lvppa : DataFrame
-        """
-        self.dx_lvppa = pd.read_csv(
-            op.join(self.paths["atri"], "leads_codebook_study_data_ppadx.csv")
-        )
-
-        # Filter to only include screening visits
-        self.dx_lvppa = self.dx_lvppa.query("event_code == 'sc'")
-
-        # Rename columns
-        self.dx_lvppa = self.dx_lvppa.rename(
-            columns={"subject_label": "subject_id", "lvppaformal": "lvppa_formal"}
-        )
-
-        # Select only needed columns
-        keep_cols = ["subject_id", "lvppa_formal"]
-        self.dx_lvppa = self.dx_lvppa[keep_cols]
 
     def get_roi_name_from_file(self, filepath, prefix):
         """Return the ROI name from a filepath."""
@@ -891,7 +846,85 @@ class XReport:
                 ),
                 ignore_index=True,
             )
-    
+
+    def load_centaur_dat(self):
+        """Load Centuar Z values for tau PET.
+
+        Creates
+        -------
+        self.centaur_dat : dict
+            Dictionary with one dataframe of Centaur values per tracer
+        """
+        def get_centaurs(pet_proc_dir):
+            def find_centaur_file(pet_proc_dir):
+                """Return the filepath to the ROI mean CSV file."""
+                subj, tracer, pet_date = uts.parse_scan_tag(
+                    uts.get_scan_tag(pet_proc_dir)
+                )
+                filepath = op.join(
+                    pet_proc_dir,
+                    f"wr{subj}_{tracer}_{pet_date}_tau-centaur.csv",
+                )
+                if op.isfile(filepath):
+                    return filepath
+                else:
+                    warnings.warn(f"File not found: {filepath}")
+
+            def load_centaur_file(filepath):
+                """Load and format the ROI extractions CSV file."""
+
+                # Load the CSV file
+                df = pd.read_csv(filepath)
+
+                # Parse the PET proc dir
+                subj, _, pet_date = uts.parse_scan_tag(
+                    uts.get_scan_tag(op.dirname(filepath))
+                )
+
+                # Add subject_id and pet_date columns
+                df.insert(0, "subject_id", subj)
+                df.insert(1, "pet_date", pet_date)
+
+                return df
+            def format_centaur_dat(df):
+                """Format ROI extractions dataframe for LEADS ROI extractions."""
+
+                # Remove unnecessary columns
+                df = df.drop(columns=["Filename", "Mask", "SUVR_ref-centaur"])
+
+                # Pivot the dataframe from long to wide format
+                df = df.pivot(index=["subject_id", "pet_date"], columns="Region", values="CenTauRz")
+
+                # Rename columns to include 'CenTauRz_' prefix
+                df.columns = [f"CenTauRz_{region}" for region in df.columns]
+
+                # Reset the index
+                df = df.reset_index()
+
+                return df
+
+            try:
+                rr_dat = format_centaur_dat(
+                    load_centaur_file(find_centaur_file(pet_proc_dir))
+                )
+                return rr_dat
+            except Exception as e:
+                print(e)
+                return None
+
+        # Load Centiloid values
+        self.centaur_dat = {}
+        for tracer in self.tau_tracers:
+            self.centaur_dat[tracer] = pd.concat(
+                list(
+                    self.pet_idx[tracer].apply(
+                        lambda x: get_centaurs(x["pet_proc_dir"]), axis=1
+                    )
+                ),
+                ignore_index=True,
+            )
+
+
     def load_tiv_dat(self):
         """Load total intracranial volume measures.
 
@@ -1088,8 +1121,6 @@ class XReport:
                 self.prelim_dx,
                 self.mmse_baseline,
                 self.cdr_baseline,
-                self.dx_pca,
-                self.dx_lvppa,
             ]
             for df in merge_dfs:
                 self.extraction[key] = self.extraction[key].merge(
@@ -1127,6 +1158,15 @@ class XReport:
             if tracer in self.amyloid_tracers:
                 self.extraction[key] = self.extraction[key].merge(
                     self.centiloid_dat[tracer][keep_cols],
+                    on=["subject_id", "pet_date"],
+                    how="left",
+                )
+
+            # Merge Centaur-Z data into the main dataframe
+            keep_cols = ["subject_id", "pet_date", "CenTauRz_Universal", "CenTauRz_MetaTemporal", "CenTauRz_MesialTemporal", "CenTauRz_TemporoParietal", "CenTauRz_Frontal"]
+            if tracer in self.tau_tracers:
+                self.extraction[key] = self.extraction[key].merge(
+                    self.centaur_dat[tracer][keep_cols],
                     on=["subject_id", "pet_date"],
                     how="left",
                 )
