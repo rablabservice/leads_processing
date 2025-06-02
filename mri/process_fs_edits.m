@@ -66,6 +66,12 @@ function process_fs_edits( ...
     for i=1:length(mri_dirs)
         mri_dir = strrep(mri_dirs{i},'freesurfer_edits','processed');
         
+        % Skip editing if the freesurfer edits exist
+        if isfolder(fullfile(mri_dir,'freesurfer_7p1_edited'))
+            fprintf('Skipping %s, freesurfer edits already exist\n', mri_dirs{i});
+            continue;
+        end
+
         % Remove the processed MRI files
         outfiles = get_processed_mri_files(mri_dir);
         fprintf('Removing processed MRI files in %s\n', mri_dir);
@@ -76,6 +82,14 @@ function process_fs_edits( ...
                 delete(filename); % Delete the file
             end
         end
+        
+        % Remove w-map and s8mwc1 file if exists
+        if ~isempty(dir(fullfile(mri_dir, "W-map*.nii")))
+            delete(fullfile(mri_dir, "W-map*.nii"));
+        end 
+        if ~isempty(dir(fullfile(mri_dir, "s8mwc1*.nii")))
+            delete(fullfile(mri_dir, "s8mwc1*.nii"));
+        end 
 
         % Find any linked PET directories
         linked_pet_dirs = pet_linked_to_mri(mri_dir);
@@ -94,6 +108,7 @@ function process_fs_edits( ...
                 end
             end
 
+            % Rename and keep the arLDS*FTP*multislice.pdf file
             if contains(linked_pet_dirs{ii},"FTP")
                 if ~isempty(dir(fullfile(linked_pet_dirs{ii}, "arLDS*FTP*.pdf")))
                     filename_old=dir(fullfile(linked_pet_dirs{ii}, "arLDS*FTP*multislice.pdf")); 
@@ -102,6 +117,21 @@ function process_fs_edits( ...
                     movefile(fullfile(filename_old.folder,filename_old.name),filename_new);
                 end
             end
+
+            % Rename and keep the arLDS*FDG*multislice.pdf file
+            if contains(linked_pet_dirs{ii},"FDG")
+                if ~isempty(dir(fullfile(linked_pet_dirs{ii}, "arLDS*FDG*.pdf")))
+                    filename_old=dir(fullfile(linked_pet_dirs{ii}, "arLDS*FDG*multislice.pdf")); 
+                    filename_new=fullfile(filename_old.folder,...
+                        [filename_old.name(1:end-4),'_',filename_old.date(1:11),'.pdf']);
+                    movefile(fullfile(filename_old.folder,filename_old.name),filename_new);
+                end
+            end
+
+            % Remove w-map file if exists
+            if ~isempty(dir(fullfile(linked_pet_dirs{ii}, "W-map*.nii")))
+                delete(fullfile(linked_pet_dirs{ii}, "W-map*.nii"));
+            end  
         end
 
         % Move the FS edits to the processed directory
